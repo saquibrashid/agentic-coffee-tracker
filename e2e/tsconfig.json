@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "../dist/e2e",
+    "tsBuildInfoFile": "../dist/.tsbuildinfo-e2e",
+    "types": ["node"]
+  },
+  "include": ["**/*.ts"]
+}

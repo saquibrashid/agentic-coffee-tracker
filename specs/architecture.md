@@ -190,8 +190,6 @@ Comfortably within the 180 KB initial-JS budget.
 
 ---
 
-
-
 ```
 src/
   app/                  # Routes, providers, layouts

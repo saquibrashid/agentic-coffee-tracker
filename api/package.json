@@ -1,0 +1,29 @@
+{
+  "name": "@agentic-coffee-tracker/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BFF for Agentic Coffee Tracker — Azure Functions v4, Node 20, TypeScript.",
+  "license": "MIT",
+  "main": "dist/src/functions/*.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "prestart": "pnpm run build",
+    "start": "func start",
+    "dev": "concurrently -k -n tsc,func \"pnpm watch\" \"func start\"",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@azure/functions": "^4.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.6",
+    "concurrently": "^9.1.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.3"
+  }
+}
