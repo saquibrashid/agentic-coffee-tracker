@@ -71,7 +71,7 @@ jobs:
 
       - name: Unit & component tests
         if: steps.scaffold.outputs.ready == 'true'
-        run: pnpm test --coverage
+        run: pnpm test -- --coverage
 
       - name: Build
         if: steps.scaffold.outputs.ready == 'true'
