@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist/app",
+    "tsBuildInfoFile": "dist/.tsbuildinfo-app",
+    "types": ["vite/client", "@testing-library/jest-dom", "vitest/globals"]
+  },
+  "include": ["src", "src/**/*.json"],
+  "exclude": ["e2e"]
+}
