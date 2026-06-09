@@ -1,0 +1,97 @@
+# ☕ Agentic Coffee Tracker
+
+> An offline-first, AI-powered coffee tracking PWA. Snap a photo of the bag, let an LLM extract the details, rate every cup, and watch your taste profile emerge.
+
+[![Status: Spec phase](https://img.shields.io/badge/status-spec--phase-orange)](./specs)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
+
+---
+
+## ✨ What it does
+
+- 📸 **Photo-first capture** — point the camera at a coffee bag; OCR + an LLM extract roaster, origin, process, roast level, tasting notes, and more.
+- 🌐 **Aggressive web enrichment** — fills in missing fields by searching and scraping roaster sites.
+- ⭐ **Multiple ratings per bean** — track how a coffee evolves across brews and brew types (espresso, latte, pour-over, …).
+- 📊 **Insights & monthly summaries** — favorite origins, roasters, flavor patterns, ratings over time.
+- 💡 **Recommendations** — suggests new beans grounded in your actual preferences.
+- 📦 **Local-first** — all data lives in your browser via IndexedDB. Works offline; nothing leaves your device except images sent for AI processing.
+- 📤 **Full export** — CSV + JSON, your data is yours.
+
+## 🏛️ Status
+
+This repository is currently in the **specification phase**. No code yet — the `specs/` folder defines the entire system, and the next step is to scaffold the project per `specs/copilot.md`.
+
+```
+specs/
+├── specs.md          # Vision and scope
+├── architecture.md   # Topology, BFF, secrets, offline, storage, styling
+├── data-model.md     # TypeScript types, enums, LLM JSON schema, IndexedDB layout
+├── ui.md             # Screens
+├── ux-states.md      # Loading / empty / error / offline / success per screen
+├── ai.md             # OCR, LLM, web search, preference modeling
+└── copilot.md        # Generation responsibilities for GitHub Copilot
+```
+
+## 🧰 Planned tech stack
+
+| Layer | Choice |
+|---|---|
+| Frontend | **React 18 + TypeScript + Vite** as a **PWA** |
+| Styling | **Tailwind CSS** + **shadcn/ui** (Radix primitives) + **lucide-react** icons |
+| Charts | Recharts (lazy-loaded) |
+| Local storage | **IndexedDB** via **Dexie 4** |
+| Backend (BFF) | **Azure Functions** (Node 20, TypeScript, v4 model) |
+| AI services | Azure AI Vision (OCR), Azure OpenAI (parsing + summaries), Bing Web Search |
+| Hosting | Azure Static Web Apps (Standard) |
+| IaC | Bicep (`/infra`) |
+| Testing | Vitest, Testing Library, Playwright, axe-core |
+| Accessibility | WCAG 2.1 AA target |
+
+See [`specs/architecture.md`](./specs/architecture.md) for the full rationale.
+
+## 🚀 Getting started
+
+> The scaffold doesn't exist yet. These instructions describe what running the app **will** look like.
+
+```bash
+# Prerequisites: Node 20+, pnpm (or npm), Azure Functions Core Tools v4
+
+# 1. Install dependencies
+pnpm install
+
+# 2. Configure local env
+cp api/local.settings.example.json api/local.settings.json
+# fill in Azure Vision / OpenAI / Bing keys
+
+# 3. Run client + BFF in parallel
+pnpm dev          # Vite dev server on http://localhost:5173
+pnpm dev:api      # Functions host on  http://localhost:7071
+
+# 4. Tests
+pnpm test         # unit + component
+pnpm test:e2e     # Playwright
+```
+
+## 🗺️ Roadmap
+
+- **v1** — capture, OCR/LLM parsing, ratings, analytics, monthly summaries, export, recommendations
+- **v1.5** — barcode scan, voice input, URL scrape entry
+- **v2** — Microsoft + Apple ID login, Azure cloud sync, café drink tracking, embeddings/vector search, native iOS app
+
+## 🔒 Privacy
+
+- All user data lives locally in IndexedDB.
+- Photos are sent to Azure Vision and Azure OpenAI **only for the duration of processing**; the BFF logs no request bodies.
+- EXIF is stripped from images before forwarding.
+- Settings → Reset wipes IndexedDB, Cache Storage, and unregisters the service worker.
+
+See [`SECURITY.md`](./SECURITY.md) for vulnerability reporting.
+
+## 🤝 Contributing
+
+PRs welcome. Read [`CONTRIBUTING.md`](./CONTRIBUTING.md) and [`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md) before opening a pull request.
+
+## 📜 License
+
+[MIT](./LICENSE) © Saquib Rashid

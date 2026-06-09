@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Spec-only PRs still need to validate markdown.
+  docs:
+    name: Docs lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lint markdown
+        uses: DavidAnson/markdownlint-cli2-action@v16
+        with:
+          globs: |
+            **/*.md
+            !node_modules
+
+  # The full build job is gated on the project being scaffolded.
+  # Until package.json exists at the repo root, this job is skipped automatically.
+  build-and-test:
+    name: Build & test
+    runs-on: ubuntu-latest
+    needs: docs
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect project scaffold
+        id: scaffold
+        run: |
+          if [ -f package.json ]; then
+            echo "ready=true" >> $GITHUB_OUTPUT
+          else
+            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "::notice::No package.json yet — skipping build/test. Scaffold the project to enable this step."
+          fi
+
+      - name: Setup pnpm
+        if: steps.scaffold.outputs.ready == 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        if: steps.scaffold.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        if: steps.scaffold.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        if: steps.scaffold.outputs.ready == 'true'
+        run: pnpm lint
+
+      - name: Typecheck
+        if: steps.scaffold.outputs.ready == 'true'
+        run: pnpm typecheck
+
+      - name: Unit & component tests
+        if: steps.scaffold.outputs.ready == 'true'
+        run: pnpm test --coverage
+
+      - name: Build
+        if: steps.scaffold.outputs.ready == 'true'
+        run: pnpm build

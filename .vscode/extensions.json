@@ -1,0 +1,14 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "editorconfig.editorconfig",
+    "ms-azuretools.vscode-azurefunctions",
+    "ms-azuretools.vscode-bicep",
+    "github.vscode-github-actions",
+    "yoavbls.pretty-ts-errors",
+    "davidanson.vscode-markdownlint",
+    "ms-playwright.playwright"
+  ]
+}
