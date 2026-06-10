@@ -5,7 +5,7 @@ const onePixelPng = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAA
 
 describe('imagePipeline utils', () => {
   it('converts dataURL to Blob', async () => {
-    const blob = await dataUrlToBlob(onePixelPng);
+    const blob = dataUrlToBlob(onePixelPng);
     expect(blob).toBeInstanceOf(Blob);
     expect(blob.type).toBe('image/png');
     expect(blob.size).toBeGreaterThan(0);
