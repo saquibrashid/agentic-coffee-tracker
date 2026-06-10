@@ -1,4 +1,4 @@
-export async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
+export function dataUrlToBlob(dataUrl: string): Blob {
   const matches = dataUrl.match(/^data:(.+);base64,(.*)$/);
   if (!matches) throw new Error('Invalid data URL');
   const mime = matches[1];
@@ -40,7 +40,7 @@ export async function resizeDataUrl(
       const out = canvas.toDataURL(mimeType, quality);
       resolve({ dataUrl: out, width, height });
     };
-    img.onerror = (e) => reject(new Error('Failed to load image'));
+    img.onerror = (_e) => reject(new Error('Failed to load image'));
     img.src = dataUrl;
   });
 }
