@@ -28,6 +28,12 @@ function useOnlineStatus(): boolean {
 
 function Shell() {
   const online = useOnlineStatus();
+  // Start the background queue runner for pending AI tasks
+  useEffect(() => {
+    // Start the runner lazily on mount
+    import('@/services/queue/queueRunner').then((m) => m.startQueueRunner());
+  }, []);
+
   return (
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">

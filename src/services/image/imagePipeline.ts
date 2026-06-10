@@ -21,8 +21,9 @@ export async function resizeDataUrl(
   dataUrl: string,
   maxWidth = 1600,
   mimeType = 'image/webp',
-  quality = 0.85,
+  quality = 0.9,
 ): Promise<{ dataUrl: string; width: number; height: number }> {
+  // Drawing to canvas strips EXIF metadata — serves as EXIF strip
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -35,6 +36,7 @@ export async function resizeDataUrl(
       const ctx = canvas.getContext('2d');
       if (!ctx) return reject(new Error('Canvas not supported'));
       ctx.drawImage(img, 0, 0, width, height);
+      // Use higher quality for main images
       const out = canvas.toDataURL(mimeType, quality);
       resolve({ dataUrl: out, width, height });
     };
@@ -44,5 +46,6 @@ export async function resizeDataUrl(
 }
 
 export async function createThumbnail(dataUrl: string, maxDim = 160) {
-  return resizeDataUrl(dataUrl, maxDim, 'image/webp', 0.75);
+  // Slightly lower quality for thumbnails to save space
+  return resizeDataUrl(dataUrl, maxDim, 'image/webp', 0.8);
 }
