@@ -75,7 +75,7 @@ async function processTask(task: QueueTask) {
             rawOcrText: (parsed.rawText as string) ?? bean.rawOcrText,
             needsReview: true,
             updatedAt: new Date().toISOString(),
-          } as unknown);
+          } as Partial<QueueTask>);
         }
       }
 
@@ -95,7 +95,7 @@ async function processTask(task: QueueTask) {
       attempts,
       lastError: error.message,
       nextAttemptAt,
-    } as unknown);
+    } as Partial<QueueTask>);
   }
 }
 
