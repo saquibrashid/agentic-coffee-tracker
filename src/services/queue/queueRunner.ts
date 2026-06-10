@@ -21,11 +21,11 @@ async function processTask(task: QueueTask) {
   try {
     if (task.type === 'ocr') {
       const { photoId } = task.payload as { photoId?: string };
-      const photo = await db.photos.get(photoId as string);
+      const photo = await db.photos.get(photoId);
       if (!photo) throw new Error('photo not found');
 
       // Read blob and call mock OCR
-      const ocr = await mockOcrFromPhotoBlob(photo.blob as Blob);
+      const ocr = mockOcrFromPhotoBlob(photo.blob);
       await db.ocrResults.add({
         id: ocr.id,
         photoId,
@@ -38,18 +38,18 @@ async function processTask(task: QueueTask) {
       // enqueue llm-parse task
       const parseTask: QueueTask = {
         id: ulid(),
-        schemaVersion: 1 as unknown,
+        schemaVersion: 1,
         type: 'llm-parse',
         payload: { photoId, ocrId: ocr.id },
         beanId: task.beanId,
         attempts: 0,
-        createdAt: now as unknown,
+        createdAt: now,
       };
       await db.pendingAiTasks.add(parseTask);
     } else if (task.type === 'llm-parse') {
       const { photoId } = task.payload as { photoId?: string };
       // For mock, call mockParse with base64 of photo blob
-      const photo = await db.photos.get(photoId as string);
+      const photo = await db.photos.get(photoId);
       if (!photo) throw new Error('photo not found');
 
       // Convert blob to base64
@@ -57,17 +57,17 @@ async function processTask(task: QueueTask) {
       const base64 = await new Promise<string>((resolve, reject) => {
         reader.onload = () => resolve((reader.result as string).split(',')[1] || '');
         reader.onerror = () => reject(new Error('Failed to read blob'));
-        reader.readAsDataURL(photo.blob as Blob);
+        reader.readAsDataURL(photo.blob);
       });
 
-      const parsed = await mockParse(base64);
+      const parsed = mockParse(base64);
 
       // Update bean with parsed fields
       if (task.beanId) {
-        const bean = await db.beans.get(task.beanId as string);
+        const bean = await db.beans.get(task.beanId);
         if (bean) {
           const parsedBean = parsed.bean as Record<string, unknown> | undefined;
-          await db.beans.update(task.beanId as string, {
+          await db.beans.update(task.beanId, {
             name: (parsedBean?.name as string) || bean.name,
             roaster: (parsedBean?.roaster as string) || bean.roaster,
             origin: (parsedBean?.origin as string) || (bean as Record<string, unknown>).origin,
@@ -84,8 +84,8 @@ async function processTask(task: QueueTask) {
 
     // task processed — remove it
     await db.pendingAiTasks.delete(task.id);
-  } catch (err) {
-    const error = err as Error;
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err : new Error(String(err));
     console.error('QueueRunner task failed', err);
     // update task attempts and lastError/backoff
     const attempts = (task.attempts || 0) + 1;
@@ -93,7 +93,7 @@ async function processTask(task: QueueTask) {
     const nextAttemptAt = new Date(Date.now() + nextDelay).toISOString();
     await db.pendingAiTasks.update(task.id, {
       attempts,
-      lastError: String(error?.message || err),
+      lastError: error.message,
       nextAttemptAt,
     } as unknown);
   }
