@@ -26,12 +26,12 @@ export function CaptureDemo() {
       setLoading(true);
       try {
         // Resize main image to 1600px and create thumbnail
-        const resized = await resizeDataUrl(dataUrl, 1600);
-        const thumb = await createThumbnail(dataUrl, 160);
+        const resized = resizeDataUrl(dataUrl, 1600);
+        const thumb = createThumbnail(dataUrl, 160);
 
         // Convert to blobs
-        const mainBlob = await dataUrlToBlob(resized.dataUrl);
-        const _thumbBlob = await dataUrlToBlob(thumb.dataUrl);
+        const mainBlob = dataUrlToBlob(resized.dataUrl);
+        const _thumbBlob = dataUrlToBlob(thumb.dataUrl);
 
         // Persist to Dexie
         const photoId = ulid();
@@ -77,7 +77,7 @@ export function CaptureDemo() {
         });
 
         // Call mock parse to show immediate feedback (simulates cloud parse)
-        const res = await dataUrlToBase64(resized.dataUrl);
+        const res = dataUrlToBase64(resized.dataUrl);
         const parseRes = await mockParse(res);
         setResult({ res: parseRes, photoId, beanId, taskId });
       } catch (err) {
