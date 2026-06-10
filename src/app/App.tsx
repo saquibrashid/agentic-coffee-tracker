@@ -31,7 +31,7 @@ function Shell() {
   // Start the background queue runner for pending AI tasks
   useEffect(() => {
     // Start the runner lazily on mount
-    import('@/services/queue/queueRunner').then((m) => m.startQueueRunner());
+    void import('@/services/queue/queueRunner').then((m) => m.startQueueRunner());
   }, []);
 
   return (
@@ -98,11 +98,11 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'add', element: <AddCoffeePage /> },
-    { path: 'capture-demo', element: <CaptureDemo /> },
-    { path: 'beans/:beanId', element: <BeanDetailPage /> },
-    { path: 'analytics', element: <AnalyticsPage /> },
-    { path: 'summary', element: <SummaryPage /> },
-    { path: 'settings', element: <SettingsPage /> },
+      { path: 'capture-demo', element: <CaptureDemo /> },
+      { path: 'beans/:beanId', element: <BeanDetailPage /> },
+      { path: 'analytics', element: <AnalyticsPage /> },
+      { path: 'summary', element: <SummaryPage /> },
+      { path: 'settings', element: <SettingsPage /> },
     ],
   },
 ]);

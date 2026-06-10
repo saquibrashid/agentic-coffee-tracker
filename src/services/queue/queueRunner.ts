@@ -6,12 +6,22 @@ import { ulid } from 'ulid';
 let running = false;
 let intervalId: number | null = null;
 
-async function processTask(task: any) {
+interface QueueTask {
+  id: string;
+  type: 'ocr' | 'llm-parse';
+  payload: Record<string, unknown>;
+  beanId?: string;
+  attempts?: number;
+  nextAttemptAt?: string;
+  [key: string]: unknown;
+}
+
+async function processTask(task: QueueTask) {
   const now = new Date().toISOString();
   try {
     if (task.type === 'ocr') {
-      const { photoId, beanId } = task.payload || {};
-      const photo = await db.photos.get(photoId);
+      const { photoId } = task.payload as { photoId?: string };
+      const photo = await db.photos.get(photoId as string);
       if (!photo) throw new Error('photo not found');
 
       // Read blob and call mock OCR
@@ -26,20 +36,20 @@ async function processTask(task: any) {
       });
 
       // enqueue llm-parse task
-      const parseTask = {
+      const parseTask: QueueTask = {
         id: ulid(),
-        schemaVersion: 1,
+        schemaVersion: 1 as unknown,
         type: 'llm-parse',
         payload: { photoId, ocrId: ocr.id },
-        beanId,
+        beanId: task.beanId,
         attempts: 0,
-        createdAt: now,
+        createdAt: now as unknown,
       };
-      await db.pendingAiTasks.add(parseTask as any);
+      await db.pendingAiTasks.add(parseTask);
     } else if (task.type === 'llm-parse') {
-      const { photoId, ocrId } = task.payload || {};
+      const { photoId } = task.payload as { photoId?: string };
       // For mock, call mockParse with base64 of photo blob
-      const photo = await db.photos.get(photoId);
+      const photo = await db.photos.get(photoId as string);
       if (!photo) throw new Error('photo not found');
 
       // Convert blob to base64
@@ -54,17 +64,18 @@ async function processTask(task: any) {
 
       // Update bean with parsed fields
       if (task.beanId) {
-        const bean = await db.beans.get(task.beanId);
+        const bean = await db.beans.get(task.beanId as string);
         if (bean) {
-          await db.beans.update(task.beanId, {
-            name: parsed.bean?.name || bean.name,
-            roaster: parsed.bean?.roaster || bean.roaster,
-            origin: parsed.bean?.origin || (bean as any).origin,
-            confidence: parsed.confidence ?? bean.confidence,
-            rawOcrText: parsed.rawText ?? bean.rawOcrText,
+          const parsedBean = parsed.bean as Record<string, unknown> | undefined;
+          await db.beans.update(task.beanId as string, {
+            name: (parsedBean?.name as string) || bean.name,
+            roaster: (parsedBean?.roaster as string) || bean.roaster,
+            origin: (parsedBean?.origin as string) || (bean as Record<string, unknown>).origin,
+            confidence: (parsed.confidence as number) ?? bean.confidence,
+            rawOcrText: (parsed.rawText as string) ?? bean.rawOcrText,
             needsReview: true,
             updatedAt: new Date().toISOString(),
-          } as any);
+          } as unknown);
         }
       }
 
@@ -73,7 +84,8 @@ async function processTask(task: any) {
 
     // task processed — remove it
     await db.pendingAiTasks.delete(task.id);
-  } catch (err: any) {
+  } catch (err) {
+    const error = err as Error;
     console.error('QueueRunner task failed', err);
     // update task attempts and lastError/backoff
     const attempts = (task.attempts || 0) + 1;
@@ -81,9 +93,9 @@ async function processTask(task: any) {
     const nextAttemptAt = new Date(Date.now() + nextDelay).toISOString();
     await db.pendingAiTasks.update(task.id, {
       attempts,
-      lastError: String(err?.message || err),
+      lastError: String(error?.message || err),
       nextAttemptAt,
-    } as any);
+    } as unknown);
   }
 }
 
@@ -96,7 +108,7 @@ async function drainOnce() {
         for (const t of tasks) {
           // skip scheduled tasks
           if (t.nextAttemptAt && new Date(t.nextAttemptAt) > new Date()) continue;
-          await processTask(t);
+          await processTask(t as QueueTask);
         }
       });
     } catch (err) {
@@ -110,7 +122,7 @@ async function drainOnce() {
       const tasks = await db.pendingAiTasks.orderBy('nextAttemptAt').toArray();
       for (const t of tasks) {
         if (t.nextAttemptAt && new Date(t.nextAttemptAt) > new Date()) continue;
-        await processTask(t);
+        await processTask(t as QueueTask);
       }
     } finally {
       running = false;
@@ -121,7 +133,7 @@ async function drainOnce() {
 export function startQueueRunner(intervalMs = 30_000) {
   if (intervalId) return;
   // Drain immediately and then on interval
-  drainOnce().catch((e) => console.error(e));
+  void drainOnce().catch((e) => console.error(e));
   window.addEventListener('online', () => void drainOnce());
   intervalId = window.setInterval(() => void drainOnce(), intervalMs);
   console.info('QueueRunner started');

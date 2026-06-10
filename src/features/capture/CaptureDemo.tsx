@@ -1,15 +1,22 @@
 import React, { useState } from 'react';
 import { mockParse } from '@/services/mocks/parseMock';
-import { resizeDataUrl, createThumbnail, dataUrlToBlob, byteSizeOfDataUrl } from '@/services/image/imagePipeline';
+import { resizeDataUrl, createThumbnail, dataUrlToBlob } from '@/services/image/imagePipeline';
 import { db } from '@/services/db';
 import { ulid } from 'ulid';
 
+interface ParseResult {
+  res: unknown;
+  photoId: string;
+  beanId: string;
+  taskId: string;
+}
+
 export function CaptureDemo() {
   const [preview, setPreview] = useState<string | null>(null);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<ParseResult | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
     const reader = new FileReader();
@@ -24,7 +31,7 @@ export function CaptureDemo() {
 
         // Convert to blobs
         const mainBlob = await dataUrlToBlob(resized.dataUrl);
-        const thumbBlob = await dataUrlToBlob(thumb.dataUrl);
+        const _thumbBlob = await dataUrlToBlob(thumb.dataUrl);
 
         // Persist to Dexie
         const photoId = ulid();
@@ -55,7 +62,7 @@ export function CaptureDemo() {
           needsReview: true,
           createdAt: now,
           updatedAt: now,
-        } as any);
+        });
 
         // Enqueue pending AI task
         const taskId = ulid();
@@ -70,8 +77,9 @@ export function CaptureDemo() {
         });
 
         // Call mock parse to show immediate feedback (simulates cloud parse)
-        const res = await mockParse(await dataUrlToBase64(resized.dataUrl));
-        setResult({ res, photoId, beanId, taskId });
+        const res = await dataUrlToBase64(resized.dataUrl);
+        const parseRes = await mockParse(res);
+        setResult({ res: parseRes, photoId, beanId, taskId });
       } catch (err) {
         console.error(err);
       } finally {
@@ -79,9 +87,9 @@ export function CaptureDemo() {
       }
     };
     reader.readAsDataURL(f);
-  };
+  }
 
-  async function dataUrlToBase64(dataUrl: string) {
+  function dataUrlToBase64(dataUrl: string): string {
     return dataUrl.split(',')[1] || '';
   }
 
@@ -91,7 +99,7 @@ export function CaptureDemo() {
       <p className="text-sm text-muted-foreground">Use this page to test the local parse flow without Azure.</p>
 
       <div className="mt-4">
-        <input aria-label="Upload photo" type="file" accept="image/*" onChange={onFile} />
+        <input aria-label="Upload photo" type="file" accept="image/*" onChange={(e) => void onFile(e)} />
       </div>
 
       {preview && (

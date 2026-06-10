@@ -1,12 +1,9 @@
-export async function mockOcrFromPhotoBlob(blob: Blob) {
-  // Simulate OCR latency
-  await new Promise((r) => setTimeout(r, 400));
-  // Return a minimal OCR result
+export async function mockOcrFromPhotoBlob(_blob: Blob) {
   return {
-    id: `mock-ocr-${Date.now()}`,
-    rawText: 'Mock OCR extracted text: Bag label with roaster and tasting notes',
-    provider: 'mock-vision',
-    providerVersion: '0.1',
+    id: 'ocr-1',
+    rawText: 'Mock roaster, espresso blend',
+    provider: 'MockOCR',
+    providerVersion: '1.0.0',
     createdAt: new Date().toISOString(),
   };
 }

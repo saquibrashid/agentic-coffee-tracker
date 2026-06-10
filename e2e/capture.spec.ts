@@ -14,7 +14,7 @@ test('capture demo: upload image and receive mocked parse result', async ({ page
     name: 'one-pixel.png',
     mimeType: 'image/png',
     buffer: Buffer.from(onePixelPngBase64, 'base64'),
-  } as any);
+  });
 
   // Wait for processing text or parse result to appear
   await expect(page.getByText(/processing|parsing/i)).toHaveCount(0); // ensure no leftover
