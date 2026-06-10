@@ -1,5 +1,8 @@
 import React, { useState } from 'react';
 import { mockParse } from '@/services/mocks/parseMock';
+import { resizeDataUrl, createThumbnail, dataUrlToBlob, byteSizeOfDataUrl } from '@/services/image/imagePipeline';
+import { db } from '@/services/db';
+import { ulid } from 'ulid';
 
 export function CaptureDemo() {
   const [preview, setPreview] = useState<string | null>(null);
@@ -11,17 +14,75 @@ export function CaptureDemo() {
     if (!f) return;
     const reader = new FileReader();
     reader.onload = async () => {
-      const base64 = (reader.result as string).split(',')[1];
-      setPreview(reader.result as string);
+      const dataUrl = reader.result as string;
+      setPreview(dataUrl);
       setLoading(true);
       try {
-        const res = await mockParse(base64);
-        setResult(res);
+        // Resize main image to 1600px and create thumbnail
+        const resized = await resizeDataUrl(dataUrl, 1600);
+        const thumb = await createThumbnail(dataUrl, 160);
+
+        // Convert to blobs
+        const mainBlob = await dataUrlToBlob(resized.dataUrl);
+        const thumbBlob = await dataUrlToBlob(thumb.dataUrl);
+
+        // Persist to Dexie
+        const photoId = ulid();
+        await db.photos.add({
+          id: photoId,
+          schemaVersion: 1,
+          kind: 'bag',
+          mimeType: mainBlob.type,
+          blob: mainBlob,
+          widthPx: resized.width,
+          heightPx: resized.height,
+          byteSize: mainBlob.size,
+          createdAt: new Date().toISOString(),
+        });
+
+        // Create a draft bean record
+        const beanId = ulid();
+        const now = new Date().toISOString();
+        await db.beans.add({
+          id: beanId,
+          schemaVersion: 1,
+          roaster: 'Unknown',
+          name: 'Draft from photo',
+          source: 'photo-ocr',
+          thumbnailDataUrl: thumb.dataUrl,
+          photoId,
+          isArchived: false,
+          needsReview: true,
+          createdAt: now,
+          updatedAt: now,
+        } as any);
+
+        // Enqueue pending AI task
+        const taskId = ulid();
+        await db.pendingAiTasks.add({
+          id: taskId,
+          schemaVersion: 1,
+          type: 'ocr',
+          payload: { photoId },
+          beanId,
+          attempts: 0,
+          createdAt: now,
+        });
+
+        // Call mock parse to show immediate feedback (simulates cloud parse)
+        const res = await mockParse(await dataUrlToBase64(resized.dataUrl));
+        setResult({ res, photoId, beanId, taskId });
+      } catch (err) {
+        console.error(err);
       } finally {
         setLoading(false);
       }
     };
     reader.readAsDataURL(f);
+  };
+
+  async function dataUrlToBase64(dataUrl: string) {
+    return dataUrl.split(',')[1] || '';
   }
 
   return (
@@ -39,10 +100,13 @@ export function CaptureDemo() {
         </div>
       )}
 
-      {loading && <p className="mt-4">Parsing…</p>}
+      {loading && <p className="mt-4">Processing &amp; parsing…</p>}
 
       {result && (
-        <pre className="mt-4 whitespace-pre-wrap rounded bg-muted p-3 text-sm">{JSON.stringify(result, null, 2)}</pre>
+        <div className="mt-4">
+          <h3 className="font-medium">Parse result</h3>
+          <pre className="mt-2 whitespace-pre-wrap rounded bg-muted p-3 text-sm">{JSON.stringify(result, null, 2)}</pre>
+        </div>
       )}
     </div>
   );
