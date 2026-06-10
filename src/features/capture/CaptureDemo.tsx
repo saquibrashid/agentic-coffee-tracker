@@ -79,9 +79,11 @@ export function CaptureDemo() {
         // Call mock parse to show immediate feedback (simulates cloud parse)
         const res = dataUrlToBase64(resized.dataUrl);
         const parseRes = await mockParse(res);
+
         setResult({ res: parseRes, photoId, beanId, taskId });
-      } catch (err) {
-        console.error(err);
+      } catch (err: unknown) {
+        const error = err instanceof Error ? err : new Error(String(err));
+        console.error(error.message);
       } finally {
         setLoading(false);
       }
