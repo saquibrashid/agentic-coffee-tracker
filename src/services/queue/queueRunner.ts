@@ -38,12 +38,12 @@ async function processTask(task: QueueTask) {
       // enqueue llm-parse task
       const parseTask: QueueTask = {
         id: ulid(),
-        schemaVersion: 1 as unknown,
+        schemaVersion: 1,
         type: 'llm-parse',
         payload: { photoId, ocrId: ocr.id },
         beanId: task.beanId,
         attempts: 0,
-        createdAt: now as unknown,
+        createdAt: now,
       };
       await db.pendingAiTasks.add(parseTask);
     } else if (task.type === 'llm-parse') {
@@ -75,7 +75,7 @@ async function processTask(task: QueueTask) {
             rawOcrText: (parsed.rawText as string) ?? bean.rawOcrText,
             needsReview: true,
             updatedAt: new Date().toISOString(),
-          } as unknown);
+          });
         }
       }
 
