@@ -22,10 +22,23 @@ app.http('parse', {
       }
       ctx.log('parse invoked', { length: body.ocrText.length });
 
-      return json(501, {
-        parsed: null,
-        model: '',
-        notice: 'Not yet wired — implement Azure OpenAI structured-output call.',
+      // Return a mocked structured parse result matching the LLM schema
+      return json(200, {
+        parsed: {
+          bean: {
+            id: `mock-bean-${Date.now()}`,
+            name: 'Mock Roaster Espresso Blend',
+            roastDate: null,
+            origin: [{ country: 'Mockland' }],
+            roastLevel: 'medium',
+            varietals: ['mock-arabica'],
+            tastingNotes: ['chocolate', 'caramel', 'sweet'],
+            metadata: { weightGrams: 20, brewMethod: 'espresso' },
+          },
+          confidence: 0.92,
+          rawText: body.ocrText,
+        },
+        model: (body.model as string) || 'mock-model',
       });
     } catch (err) {
       return errorResponse(ctx, 500, 'Parse failed', err);

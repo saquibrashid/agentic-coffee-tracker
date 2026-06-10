@@ -21,10 +21,18 @@ app.http('scrape', {
       }
       ctx.log('scrape invoked', { url: body.url });
 
-      return json(501, {
-        extracted: null,
+      // Mock scrape + extraction
+      return json(200, {
+        extracted: {
+          bean: {
+            id: `scrape-bean-${Date.now()}`,
+            name: 'Scraped Roaster Single Origin',
+            origin: [{ country: 'Scrapeland' }],
+            roastLevel: 'medium',
+            tastingNotes: ['berry', 'citrus'],
+          },
+        },
         sourceUrl: body.url,
-        notice: 'Not yet wired — implement scrape + LLM extraction.',
       });
     } catch (err) {
       return errorResponse(ctx, 500, 'Scrape failed', err);

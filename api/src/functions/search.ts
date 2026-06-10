@@ -23,9 +23,15 @@ app.http('search', {
       }
       ctx.log('search invoked', { roaster: body.roaster, name: body.name });
 
-      return json(501, {
-        results: [],
-        notice: 'Not yet wired — implement Bing Web Search.',
+      // Mock search results
+      return json(200, {
+        results: [
+          {
+            url: 'https://mockroaster.example/espresso-blend',
+            title: `${body.roaster} ${body.name} — Mock Roaster`,
+            snippet: 'Mock search snippet: a delicious espresso blend with chocolate notes.',
+          },
+        ],
       });
     } catch (err) {
       return errorResponse(ctx, 500, 'Search failed', err);

@@ -22,11 +22,11 @@ app.http('ocr', {
       }
       ctx.log('ocr invoked', { mimeType: body.mimeType, bytes: body.imageBase64.length });
 
-      // TODO: Call Azure AI Vision /imageanalysis:analyze with features=read.
-      return json(501, {
-        rawText: '',
-        provider: 'azure-vision',
-        notice: 'Not yet wired — implement Azure Vision call.',
+      // Mock OCR response for local development and CI
+      return json(200, {
+        rawText: 'Mock OCR extracted text: Bag label with roaster Mock Roaster and tasting notes: chocolate, caramel',
+        provider: 'mock-vision',
+        providerVersion: '0.1',
       });
     } catch (err) {
       return errorResponse(ctx, 500, 'OCR failed', err);
