@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 
 import { HomePage } from '@/features/home/HomePage';
 import { AddCoffeePage } from '@/features/capture/AddCoffeePage';
+import { CaptureDemo } from '@/features/capture/CaptureDemo';
 import { BeanDetailPage } from '@/features/beans/BeanDetailPage';
 import { AnalyticsPage } from '@/features/analytics/AnalyticsPage';
 import { SummaryPage } from '@/features/summary/SummaryPage';
@@ -27,6 +28,12 @@ function useOnlineStatus(): boolean {
 
 function Shell() {
   const online = useOnlineStatus();
+  // Start the background queue runner for pending AI tasks
+  useEffect(() => {
+    // Start the runner lazily on mount
+    import('@/services/queue/queueRunner').then((m) => m.startQueueRunner());
+  }, []);
+
   return (
     <div className="flex min-h-full flex-col">
       <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
@@ -91,10 +98,11 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'add', element: <AddCoffeePage /> },
-      { path: 'beans/:beanId', element: <BeanDetailPage /> },
-      { path: 'analytics', element: <AnalyticsPage /> },
-      { path: 'summary', element: <SummaryPage /> },
-      { path: 'settings', element: <SettingsPage /> },
+    { path: 'capture-demo', element: <CaptureDemo /> },
+    { path: 'beans/:beanId', element: <BeanDetailPage /> },
+    { path: 'analytics', element: <AnalyticsPage /> },
+    { path: 'summary', element: <SummaryPage /> },
+    { path: 'settings', element: <SettingsPage /> },
     ],
   },
 ]);
