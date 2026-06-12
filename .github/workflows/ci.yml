@@ -48,7 +48,7 @@ jobs:
 
       - name: Setup pnpm
         if: steps.scaffold.outputs.ready == 'true'
-        uses: pnpm/action-setup@v4
+        uses: pnpm/action-setup@v6
 
       - name: Setup Node
         if: steps.scaffold.outputs.ready == 'true'
