@@ -31,7 +31,7 @@ export function CaptureDemo() {
 
         // Convert to blobs
         const mainBlob = dataUrlToBlob(resized.dataUrl);
-        const _thumbBlob = dataUrlToBlob(thumb.dataUrl);
+        const thumbBlob = dataUrlToBlob(thumb.dataUrl);
 
         // Persist to Dexie
         const photoId = ulid();
