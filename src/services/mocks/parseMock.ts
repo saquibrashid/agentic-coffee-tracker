@@ -1,4 +1,4 @@
-export async function mockParse(_imageBase64: string) {
+export function mockParse(_imageBase64: string) {
   return {
     bean: {
       name: 'Espresso Blend',
