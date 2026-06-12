@@ -1,4 +1,4 @@
-export async function mockOcrFromPhotoBlob(_blob: Blob) {
+export function mockOcrFromPhotoBlob(_blob: Blob) {
   return {
     id: 'ocr-1',
     rawText: 'Mock roaster, espresso blend',
