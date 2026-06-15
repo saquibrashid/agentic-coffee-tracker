@@ -79,7 +79,7 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.scaffold.outputs.ready == 'true'
-        run: pnpm exec playwright install --with-deps chromium
+        run: pnpm exec playwright install --with-deps
 
       - name: Playwright e2e (smoke + a11y)
         if: steps.scaffold.outputs.ready == 'true'
