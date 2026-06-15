@@ -12,5 +12,7 @@
   "MD034": false,        // bare URLs (Code-of-Conduct attribution)
   "MD036": false,        // emphasis-as-heading — used for callouts
   "MD040": false,        // fenced-code-language — ASCII diagrams use plain fences
-  "MD041": false         // first-line-h1 — README badges first is fine
+  "MD041": false,        // first-line-h1 — README badges first is fine
+  "MD058": false,        // blanks-around-tables — tolerate flexible spec tables
+  "MD060": false         // table-column-style — newer rule; allow compact tables
 }

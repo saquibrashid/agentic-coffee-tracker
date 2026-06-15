@@ -76,3 +76,19 @@ jobs:
       - name: Build
         if: steps.scaffold.outputs.ready == 'true'
         run: pnpm build
+
+      - name: Install Playwright browsers
+        if: steps.scaffold.outputs.ready == 'true'
+        run: pnpm exec playwright install --with-deps
+
+      - name: Playwright e2e (smoke + a11y)
+        if: steps.scaffold.outputs.ready == 'true'
+        run: pnpm test:e2e
+
+      - name: Upload Playwright report
+        if: always() && steps.scaffold.outputs.ready == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

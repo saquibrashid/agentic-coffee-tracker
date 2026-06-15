@@ -26,12 +26,11 @@ export function CaptureDemo() {
       setLoading(true);
       try {
         // Resize main image to 1600px and create thumbnail
-        const resized = resizeDataUrl(dataUrl, 1600);
-        const thumb = createThumbnail(dataUrl, 160);
+        const resized = await resizeDataUrl(dataUrl, 1600);
+        const thumb = await createThumbnail(dataUrl, 160);
 
         // Convert to blobs
-        const mainBlob = dataUrlToBlob(resized.dataUrl);
-        const thumbBlob = dataUrlToBlob(thumb.dataUrl);
+        const mainBlob = await dataUrlToBlob(resized.dataUrl);
 
         // Persist to Dexie
         const photoId = ulid();
