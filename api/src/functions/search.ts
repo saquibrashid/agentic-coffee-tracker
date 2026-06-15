@@ -7,10 +7,25 @@ interface SearchRequest {
   max?: unknown;
 }
 
-/**
- * POST /api/search — stub. Replace with Bing Web Search v7 call.
- * Cache results for 24h keyed by (roaster|name).
- */
+interface BingSearchResponse {
+  webPages?: {
+    value?: { url: string; name: string; snippet: string }[];
+  };
+}
+
+async function callBingSearch(roaster: string, name: string, max: number): Promise<{ results: { url: string; title: string; snippet: string }[] }> {
+  const key = process.env.BING_SEARCH_KEY!;
+  const endpoint = process.env.BING_SEARCH_ENDPOINT || 'https://api.bing.microsoft.com/v7.0/search';
+  const q = encodeURIComponent(`${roaster} ${name} coffee`);
+  const url = `${endpoint}?q=${q}&count=${Math.min(max, 10)}&safeSearch=Moderate`;
+  const res = await fetch(url, { headers: { 'Ocp-Apim-Subscription-Key': key } });
+  if (!res.ok) throw new Error(`Bing returned ${res.status}: ${await res.text()}`);
+  const data = (await res.json()) as BingSearchResponse;
+  return {
+    results: (data.webPages?.value || []).map((v) => ({ url: v.url, title: v.name, snippet: v.snippet })),
+  };
+}
+
 app.http('search', {
   methods: ['POST'],
   authLevel: 'function',
@@ -21,11 +36,22 @@ app.http('search', {
       if (typeof body.roaster !== 'string' || typeof body.name !== 'string') {
         return errorResponse(ctx, 400, 'roaster and name are required');
       }
+      const max = typeof body.max === 'number' ? body.max : 5;
       ctx.log('search invoked', { roaster: body.roaster, name: body.name });
 
-      return json(501, {
-        results: [],
-        notice: 'Not yet wired — implement Bing Web Search.',
+      if (process.env.BING_SEARCH_KEY) {
+        const result = await callBingSearch(body.roaster, body.name, max);
+        return json(200, result);
+      }
+
+      return json(200, {
+        results: [
+          {
+            url: 'https://mockroaster.example/espresso-blend',
+            title: `${body.roaster} ${body.name} — Mock Roaster`,
+            snippet: 'Mock search snippet: a delicious espresso blend with chocolate notes.',
+          },
+        ],
       });
     } catch (err) {
       return errorResponse(ctx, 500, 'Search failed', err);
