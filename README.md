@@ -2,7 +2,7 @@
 
 > An offline-first, AI-powered coffee tracking PWA. Snap a photo of the bag, let an LLM extract the details, rate every cup, and watch your taste profile emerge.
 
-[![Status: Spec phase](https://img.shields.io/badge/status-spec--phase-orange)](./specs)
+[![Status: MVP](https://img.shields.io/badge/status-MVP-green)](./specs)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
@@ -20,7 +20,9 @@
 
 ## 🏛️ Status
 
-This repository is currently in the **specification phase**. No code yet — the `specs/` folder defines the entire system, and the next step is to scaffold the project per `specs/copilot.md`.
+MVP scaffolded and functional with mocked AI services. The BFF (Azure Functions) automatically calls **Azure AI Vision**, **Azure OpenAI**, and **Bing Web Search** when the corresponding environment variables are configured; otherwise it falls back to deterministic mock responses so the app runs end-to-end without Azure credentials.
+
+See `api/local.settings.example.json` for the full list of supported variables.
 
 ```
 specs/

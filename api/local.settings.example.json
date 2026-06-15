@@ -9,7 +9,10 @@
     "AZURE_OPENAI_ENDPOINT": "",
     "AZURE_OPENAI_KEY": "",
     "AZURE_OPENAI_DEPLOYMENT": "",
+    "AZURE_OPENAI_API_VERSION": "2024-08-01-preview",
     "BING_SEARCH_KEY": "",
+    "BING_SEARCH_ENDPOINT": "https://api.bing.microsoft.com/v7.0/search",
+    "SCRAPE_ALLOWLIST": "bluebottlecoffee.com,counterculturecoffee.com,intelligentsiacoffee.com",
     "ALLOWED_ORIGINS": "http://localhost:5173"
   },
   "Host": {

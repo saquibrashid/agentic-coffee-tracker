@@ -6,10 +6,27 @@ interface OcrRequest {
   mimeType?: unknown;
 }
 
-/**
- * POST /api/ocr — stub. Replace with Azure AI Vision call.
- * See specs/architecture.md "BFF Endpoints" and specs/ai.md "OCR Pipeline".
- */
+async function callAzureVision(imageBase64: string): Promise<{ rawText: string; providerVersion?: string }> {
+  const endpoint = process.env.AZURE_VISION_ENDPOINT!.replace(/\/$/, '');
+  const key = process.env.AZURE_VISION_KEY!;
+  const url = `${endpoint}/computervision/imageanalysis:analyze?features=read&api-version=2024-02-01`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Ocp-Apim-Subscription-Key': key,
+      'Content-Type': 'application/octet-stream',
+    },
+    body: Buffer.from(imageBase64, 'base64'),
+  });
+  if (!res.ok) {
+    throw new Error(`Azure Vision returned ${res.status}: ${await res.text()}`);
+  }
+  const data = (await res.json()) as { readResult?: { blocks?: { lines?: { text?: string }[] }[] } };
+  const lines = data.readResult?.blocks?.flatMap((b) => b.lines || []) ?? [];
+  const rawText = lines.map((l) => l.text || '').join('\n');
+  return { rawText, providerVersion: '2024-02-01' };
+}
+
 app.http('ocr', {
   methods: ['POST'],
   authLevel: 'function',
@@ -22,11 +39,16 @@ app.http('ocr', {
       }
       ctx.log('ocr invoked', { mimeType: body.mimeType, bytes: body.imageBase64.length });
 
-      // TODO: Call Azure AI Vision /imageanalysis:analyze with features=read.
-      return json(501, {
-        rawText: '',
-        provider: 'azure-vision',
-        notice: 'Not yet wired — implement Azure Vision call.',
+      if (process.env.AZURE_VISION_ENDPOINT && process.env.AZURE_VISION_KEY) {
+        const result = await callAzureVision(body.imageBase64);
+        return json(200, { ...result, provider: 'azure-vision' });
+      }
+
+      // Mock fallback for local/dev
+      return json(200, {
+        rawText: 'Mock OCR: Bag label with roaster Mock Roaster and tasting notes: chocolate, caramel',
+        provider: 'mock-vision',
+        providerVersion: '0.1',
       });
     } catch (err) {
       return errorResponse(ctx, 500, 'OCR failed', err);
