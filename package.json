@@ -40,7 +40,7 @@
     "recharts": "^2.13.3",
     "tailwind-merge": "^2.5.4",
     "tailwindcss-animate": "^1.0.7",
-    "ulid": "^2.3.0"
+    "ulid": "^3.0.2"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.10.1",
