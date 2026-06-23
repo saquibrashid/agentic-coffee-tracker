@@ -18,7 +18,7 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@azure/functions": "^4.5.1"
+    "@azure/functions": "^4.16.1"
   },
   "devDependencies": {
     "@types/node": "^20.17.6",
