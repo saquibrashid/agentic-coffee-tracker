@@ -91,11 +91,25 @@ Response: { extracted: <partial LLM Output schema>, sourceUrl: string }
 ```
 Fetches, sanitizes HTML, runs LLM extraction with the same JSON schema. Allowlist of domains (roaster sites + known coffee retailers); deny-by-default for unknown domains in v1.
 
-### `POST /api/recommend` (v1.5)
+### `POST /api/recommend`
 ```
-Request:  { preferences: UserPreferences, count?: number }
-Response: { suggestions: { roaster, name, why, sourceUrl }[] }
+Request:  { preferences: <PreferenceSummary>, max?: number }
+Response: { recommendations: Recommendation[], model: string, reason?: 'insufficient-history' }
+Errors:   400 missing/invalid summary, 422 model output failed validation, 500 upstream
 ```
+
+`PreferenceSummary` is an **anonymous** projection of `UserPreferences`: ranked
+values with counts and average scores only. Bean names, tasting notes, photos,
+dates, and prices never leave the device.
+
+Each `Recommendation` must populate `basedOn` with the preference values it is
+grounded in. The server rejects (422) any suggestion with an empty `basedOn` —
+an ungrounded suggestion is exactly the hallucination this endpoint guards
+against. The prompt also forbids inventing roaster names, products, prices, or
+availability; the model describes the *kind* of coffee to look for.
+
+Below `totalRatings < 3` the endpoint short-circuits to an empty list with
+`reason: 'insufficient-history'` rather than calling the model at all.
 
 ---
 

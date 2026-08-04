@@ -1,11 +1,20 @@
 import { createBrowserRouter, RouterProvider, Outlet, NavLink } from 'react-router-dom';
-import { Coffee, Home, Plus, BarChart3, Calendar, Settings as SettingsIcon } from 'lucide-react';
+import {
+  Coffee,
+  Home,
+  Plus,
+  BarChart3,
+  Calendar,
+  Sparkles,
+  Settings as SettingsIcon,
+} from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import { HomePage } from '@/features/home/HomePage';
 import { AddCoffeePage } from '@/features/capture/AddCoffeePage';
 import { BeanDetailPage } from '@/features/beans/BeanDetailPage';
 import { AnalyticsPage } from '@/features/analytics/AnalyticsPage';
+import { RecommendationsPage } from '@/features/recommendations/RecommendationsPage';
 import { SummaryPage } from '@/features/summary/SummaryPage';
 import { SettingsPage } from '@/features/settings/SettingsPage';
 import { cn } from '@/lib/utils';
@@ -58,9 +67,10 @@ function Shell() {
         aria-label="Primary"
         className="sticky bottom-0 z-30 border-t bg-background/95 backdrop-blur"
       >
-        <ul className="container grid grid-cols-5">
+        <ul className="container grid grid-cols-6">
           <NavItem to="/" icon={<Home />} label="Home" />
           <NavItem to="/add" icon={<Plus />} label="Add" />
+          <NavItem to="/for-you" icon={<Sparkles />} label="For you" />
           <NavItem to="/analytics" icon={<BarChart3 />} label="Analytics" />
           <NavItem to="/summary" icon={<Calendar />} label="Summary" />
           <NavItem to="/settings" icon={<SettingsIcon />} label="Settings" />
@@ -99,6 +109,7 @@ const router = createBrowserRouter([
       { path: 'add', element: <AddCoffeePage /> },
       { path: 'beans/:beanId', element: <BeanDetailPage /> },
       { path: 'analytics', element: <AnalyticsPage /> },
+      { path: 'for-you', element: <RecommendationsPage /> },
       { path: 'summary', element: <SummaryPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],
