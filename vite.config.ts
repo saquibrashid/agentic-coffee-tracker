@@ -19,6 +19,22 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // recharts is the largest single dependency and is only pulled in by the
+    // (lazy) analytics route, so it sits above the app-code threshold on purpose.
+    chunkSizeWarningLimit: 400,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Framework code changes rarely — splitting it out keeps it cached
+          // across app deploys.
+          react: ['react', 'react-dom', 'react-router-dom'],
+          charts: ['recharts'],
+          db: ['dexie', 'dexie-react-hooks'],
+        },
+      },
+    },
+  },
   plugins: [
     react(),
     VitePWA({

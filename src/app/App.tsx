@@ -11,12 +11,6 @@ import {
 import { useEffect, useState } from 'react';
 
 import { HomePage } from '@/features/home/HomePage';
-import { AddCoffeePage } from '@/features/capture/AddCoffeePage';
-import { BeanDetailPage } from '@/features/beans/BeanDetailPage';
-import { AnalyticsPage } from '@/features/analytics/AnalyticsPage';
-import { RecommendationsPage } from '@/features/recommendations/RecommendationsPage';
-import { SummaryPage } from '@/features/summary/SummaryPage';
-import { SettingsPage } from '@/features/settings/SettingsPage';
 import { cn } from '@/lib/utils';
 
 function useOnlineStatus(): boolean {
@@ -100,18 +94,42 @@ function NavItem({ to, icon, label }: { to: string; icon: React.ReactNode; label
   );
 }
 
+// Home is eagerly bundled because it is the landing route; every other route is
+// code-split so the initial payload stays inside the performance budget. The
+// heavy dependencies (chart library, capture/image pipeline) ride along with the
+// route that actually needs them.
 const router = createBrowserRouter([
   {
     path: '/',
     element: <Shell />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: 'add', element: <AddCoffeePage /> },
-      { path: 'beans/:beanId', element: <BeanDetailPage /> },
-      { path: 'analytics', element: <AnalyticsPage /> },
-      { path: 'for-you', element: <RecommendationsPage /> },
-      { path: 'summary', element: <SummaryPage /> },
-      { path: 'settings', element: <SettingsPage /> },
+      {
+        path: 'add',
+        lazy: async () => ({ Component: (await import('@/features/capture/AddCoffeePage')).AddCoffeePage }),
+      },
+      {
+        path: 'beans/:beanId',
+        lazy: async () => ({ Component: (await import('@/features/beans/BeanDetailPage')).BeanDetailPage }),
+      },
+      {
+        path: 'analytics',
+        lazy: async () => ({ Component: (await import('@/features/analytics/AnalyticsPage')).AnalyticsPage }),
+      },
+      {
+        path: 'for-you',
+        lazy: async () => ({
+          Component: (await import('@/features/recommendations/RecommendationsPage')).RecommendationsPage,
+        }),
+      },
+      {
+        path: 'summary',
+        lazy: async () => ({ Component: (await import('@/features/summary/SummaryPage')).SummaryPage }),
+      },
+      {
+        path: 'settings',
+        lazy: async () => ({ Component: (await import('@/features/settings/SettingsPage')).SettingsPage }),
+      },
     ],
   },
 ]);

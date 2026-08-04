@@ -14,18 +14,18 @@ High-level roadmap for the Agentic Coffee Tracker. Detailed work items live in [
 - Monthly summary (narrative + highlights, persisted)
 - Export (CSV / JSON / JSON+photos)
 - Settings: pending operations UI (retry / cancel / run-now)
-- CI: lint, typecheck, build, Vitest, Playwright (chromium + webkit), axe a11y sweep
+- CI: lint, typecheck, build, Vitest, Playwright (chromium + webkit), axe a11y sweep, Bicep lint, Lighthouse budgets
 - Docs: README, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, CHANGELOG, issue & PR templates
+- Recommendations engine (`/for-you`) — anonymous preference summary → grounded LLM suggestions
+- `/api/parse` output validated against the JSON schema server-side; 422 on violation
+- Deployment: azd + Bicep (SWA, Flex Consumption Functions, Key Vault, App Insights), OIDC deploy workflow, `/api/health`
+- Route-level code splitting; Lighthouse perf/a11y budgets enforced in CI
 
 ## 🟡 Next up
 
 | # | Issue | Notes |
 |---|-------|-------|
-| [#12](https://github.com/saquibrashid/agentic-coffee-tracker/issues/12) | Deployment: azd + Bicep + deploy workflow | Key Vault references, SWA + Functions |
-| [#13](https://github.com/saquibrashid/agentic-coffee-tracker/issues/13) | Recommendations engine | UserPreferences → grounded LLM suggestions |
-| [#14](https://github.com/saquibrashid/agentic-coffee-tracker/issues/14) | Validate `/api/parse` LLM output against JSON schema | ajv; 422 on failure |
-| [#15](https://github.com/saquibrashid/agentic-coffee-tracker/issues/15) | Azure smoke + Application Insights | end-to-end with real Azure |
-| [#16](https://github.com/saquibrashid/agentic-coffee-tracker/issues/16) | Lighthouse PWA budget check in CI | perf / PWA / a11y budgets |
+| [#15](https://github.com/saquibrashid/agentic-coffee-tracker/issues/15) | Azure smoke + Application Insights | IaC and probes are in place; needs a real subscription to execute |
 | [#17](https://github.com/saquibrashid/agentic-coffee-tracker/issues/17) | Re-tighten TS + ESLint rules | remove `any`, re-enable `exactOptionalPropertyTypes` |
 
 ## 💡 Ideas (not yet issues)
