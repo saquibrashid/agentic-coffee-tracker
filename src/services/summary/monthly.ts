@@ -29,7 +29,10 @@ export async function generateMonthlySummary(): Promise<MonthlySummary> {
     month: monthKey(),
     totals: { beans: a.totalBeans, ratings: a.totalRatings, averageScore: a.averageScore },
     narrative,
-    highlights: { topRoaster, topFlavor },
+    highlights: {
+      ...(topRoaster !== undefined && { topRoaster }),
+      ...(topFlavor !== undefined && { topFlavor }),
+    },
   };
 
   // Persist into meta store keyed by month

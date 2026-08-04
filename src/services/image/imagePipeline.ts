@@ -1,8 +1,9 @@
 export function dataUrlToBlob(dataUrl: string): Blob {
-  const matches = dataUrl.match(/^data:(.+);base64,(.*)$/);
-  if (!matches) throw new Error('Invalid data URL');
-  const mime = matches[1];
-  const bstr = atob(matches[2]);
+  const matches = /^data:(.+);base64,(.*)$/.exec(dataUrl);
+  const mime = matches?.[1];
+  const base64 = matches?.[2];
+  if (mime === undefined || base64 === undefined) throw new Error('Invalid data URL');
+  const bstr = atob(base64);
   let n = bstr.length;
   const u8arr = new Uint8Array(n);
   while (n--) {

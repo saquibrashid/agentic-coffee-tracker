@@ -5,6 +5,25 @@ import { ulid } from 'ulid';
 import { db } from '@/services/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import type { BrewType, Rating } from '@/types';
+
+// Ordered for the picker; the union in @/types is the source of truth, so a new
+// brew type fails to compile here until it is offered to the user.
+const BREW_TYPE_OPTIONS: { value: BrewType; label: string }[] = [
+  { value: 'drip', label: 'Drip' },
+  { value: 'espresso', label: 'Espresso' },
+  { value: 'pour-over', label: 'Pour-over' },
+  { value: 'latte', label: 'Latte' },
+  { value: 'iced-latte', label: 'Iced latte' },
+  { value: 'cappuccino', label: 'Cappuccino' },
+  { value: 'cortado', label: 'Cortado' },
+  { value: 'americano', label: 'Americano' },
+  { value: 'french-press', label: 'French press' },
+  { value: 'aeropress', label: 'AeroPress' },
+  { value: 'moka', label: 'Moka' },
+  { value: 'cold-brew', label: 'Cold brew' },
+  { value: 'other', label: 'Other' },
+];
 
 export function BeanDetailPage() {
   const { beanId } = useParams<{ beanId: string }>();
@@ -35,7 +54,7 @@ export function BeanDetailPage() {
           <div>
             <h3 className="text-sm font-medium">Attributes</h3>
             <p className="text-sm text-muted-foreground">Roast: {bean.roastLevel || '—'}</p>
-            <p className="text-sm text-muted-foreground">Origins: {(bean.origins || []).map((o:any)=>o.country).join(', ') || '—'}</p>
+            <p className="text-sm text-muted-foreground">Origins: {(bean.origins ?? []).map((o) => o.country).join(', ') || '—'}</p>
           </div>
 
           <div>
@@ -72,26 +91,27 @@ function RatingsList({ beanId }: { beanId: string }) {
 
 function AddRatingForm({ beanId }: { beanId: string }) {
   const [score, setScore] = useState(4);
-  const [brewType, setBrewType] = useState('drip');
+  const [brewType, setBrewType] = useState<BrewType>('drip');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
   async function onAdd() {
     setSaving(true);
     try {
-      const id = ulid();
       const now = new Date().toISOString();
-      await db.ratings.add({
-        id,
+      const rating: Rating = {
+        id: ulid(),
         schemaVersion: 1,
         beanId,
         score,
-        brewType: brewType as any,
-        notes,
+        brewType,
         ratedAt: now,
         createdAt: now,
         updatedAt: now,
-      } as any);
+        // Only set when non-empty; an empty string is not a note.
+        ...(notes.trim() && { notes: notes.trim() }),
+      };
+      await db.ratings.add(rating);
       setNotes('');
       setScore(4);
     } finally {
@@ -105,12 +125,17 @@ function AddRatingForm({ beanId }: { beanId: string }) {
         <select value={score} onChange={(e)=>setScore(Number(e.target.value))} className="rounded border p-2">
           {[5,4,3,2,1].map(n=> <option key={n} value={n}>{n}</option>)}
         </select>
-        <select value={brewType} onChange={(e)=>setBrewType(e.target.value)} className="rounded border p-2">
-          <option value="drip">Drip</option>
-          <option value="espresso">Espresso</option>
-          <option value="pour-over">Pour-over</option>
-          <option value="latte">Latte</option>
-          <option value="other">Other</option>
+        <select
+          value={brewType}
+          onChange={(e) => setBrewType(e.target.value as BrewType)}
+          className="rounded border p-2"
+          aria-label="Brew type"
+        >
+          {BREW_TYPE_OPTIONS.map(({ value, label }) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
         </select>
       </div>
       <textarea value={notes} onChange={(e)=>setNotes(e.target.value)} className="w-full rounded border p-2" placeholder="Tasting notes (optional)" />

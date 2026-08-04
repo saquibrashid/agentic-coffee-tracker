@@ -20,13 +20,13 @@ High-level roadmap for the Agentic Coffee Tracker. Detailed work items live in [
 - `/api/parse` output validated against the JSON schema server-side; 422 on violation
 - Deployment: azd + Bicep (SWA, Flex Consumption Functions, Key Vault, App Insights), OIDC deploy workflow, `/api/health`
 - Route-level code splitting; Lighthouse perf/a11y budgets enforced in CI
+- Strict TypeScript across the whole repo (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) and no `any` in application code
 
 ## 🟡 Next up
 
 | # | Issue | Notes |
 |---|-------|-------|
 | [#15](https://github.com/saquibrashid/agentic-coffee-tracker/issues/15) | Azure smoke + Application Insights | IaC and probes are in place; needs a real subscription to execute |
-| [#17](https://github.com/saquibrashid/agentic-coffee-tracker/issues/17) | Re-tighten TS + ESLint rules | remove `any`, re-enable `exactOptionalPropertyTypes` |
 
 ## 💡 Ideas (not yet issues)
 

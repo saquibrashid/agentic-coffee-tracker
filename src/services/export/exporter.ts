@@ -14,7 +14,7 @@ function toCsv(rows: Record<string, unknown>[]): string {
     return '"' + s.replace(/"/g, '""') + '"';
   };
   const headerLine = headers.join(',');
-  const lines = rows.map((r) => headers.map((h) => escape((r as any)[h])).join(','));
+  const lines = rows.map((r) => headers.map((h) => escape(r[h])).join(','));
   return [headerLine, ...lines].join('\n');
 }
 
@@ -58,7 +58,7 @@ export async function exportJsonWithPhotos(): Promise<void> {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result as string);
         reader.onerror = () => reject(new Error('Failed to read photo blob'));
-        reader.readAsDataURL(p.blob as Blob);
+        reader.readAsDataURL(p.blob);
       });
       return { ...p, blob: undefined, dataUrl };
     }),
