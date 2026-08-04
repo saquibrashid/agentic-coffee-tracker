@@ -1,0 +1,45 @@
+# Roadmap & TODO
+
+High-level roadmap for the Agentic Coffee Tracker. Detailed work items live in [GitHub Issues](https://github.com/saquibrashid/agentic-coffee-tracker/issues); this file is the at-a-glance view.
+
+## ✅ Done
+
+- Project scaffold (Vite + React + TS, Tailwind + shadcn, Azure Functions BFF, PWA)
+- Specs: data model, architecture, UX states, AI contract
+- Capture flow: photo → resize + thumbnail + EXIF strip → Dexie persist
+- Offline AI queue (`QueueRunner` with `navigator.locks`, exponential backoff)
+- BFF endpoints with mock fallback and real Azure wiring (Vision / OpenAI / Bing)
+- Ratings CRUD on Bean Detail
+- Analytics (top roasters/flavors, score histogram) — Recharts
+- Monthly summary (narrative + highlights, persisted)
+- Export (CSV / JSON / JSON+photos)
+- Settings: pending operations UI (retry / cancel / run-now)
+- CI: lint, typecheck, build, Vitest, Playwright (chromium + webkit), axe a11y sweep
+- Docs: README, CONTRIBUTING, SECURITY, CODE_OF_CONDUCT, CHANGELOG, issue & PR templates
+
+## 🟡 Next up
+
+| # | Issue | Notes |
+|---|-------|-------|
+| [#12](https://github.com/saquibrashid/agentic-coffee-tracker/issues/12) | Deployment: azd + Bicep + deploy workflow | Key Vault references, SWA + Functions |
+| [#13](https://github.com/saquibrashid/agentic-coffee-tracker/issues/13) | Recommendations engine | UserPreferences → grounded LLM suggestions |
+| [#14](https://github.com/saquibrashid/agentic-coffee-tracker/issues/14) | Validate `/api/parse` LLM output against JSON schema | ajv; 422 on failure |
+| [#15](https://github.com/saquibrashid/agentic-coffee-tracker/issues/15) | Azure smoke + Application Insights | end-to-end with real Azure |
+| [#16](https://github.com/saquibrashid/agentic-coffee-tracker/issues/16) | Lighthouse PWA budget check in CI | perf / PWA / a11y budgets |
+| [#17](https://github.com/saquibrashid/agentic-coffee-tracker/issues/17) | Re-tighten TS + ESLint rules | remove `any`, re-enable `exactOptionalPropertyTypes` |
+
+## 💡 Ideas (not yet issues)
+
+- Voice capture (`EntrySource = 'voice'`)
+- Barcode capture
+- Sync engine (multi-device) — architecture deferred to v2
+- Background sync via Web Push for queued AI tasks
+- Localized number/date formatting and i18n
+
+## 📌 Workflow
+
+1. Pick an open issue and assign yourself.
+2. Branch: `feat/<short-name>`, `fix/<short-name>`, `chore/<short-name>`.
+3. PR closes the issue: `Closes #N`.
+4. CI must be green (lint, typecheck, build, unit, Playwright, a11y).
+5. Squash-merge into `main`; branch protection enforced.
