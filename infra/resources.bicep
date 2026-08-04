@@ -353,6 +353,11 @@ resource linkedBackend 'Microsoft.Web/staticSites/linkedBackends@2023-12-01' = i
 
 // ---------------------------------------------------------------------------
 // Synthetic availability check against the anonymous /api/health probe
+//
+// COST: billed per location per run, and it is the single largest line item in
+// this template — 3 locations every 5 minutes is ~26,000 runs/month (~$26).
+// Everything else here totals under a dollar. Lower Frequency or trim Locations
+// to cut it proportionally; see docs/deployment.md#what-this-costs.
 // ---------------------------------------------------------------------------
 
 resource availabilityTest 'Microsoft.Insights/webtests@2022-06-15' = {
