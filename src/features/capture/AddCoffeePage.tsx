@@ -59,7 +59,7 @@ export function AddCoffeePage() {
         resizeDataUrl(dataUrl, 1600),
         createThumbnail(dataUrl, 160),
       ]);
-      const blob = await dataUrlToBlob(resized.dataUrl);
+      const blob = dataUrlToBlob(resized.dataUrl);
 
       const now = new Date().toISOString();
       const photoId = ulid();

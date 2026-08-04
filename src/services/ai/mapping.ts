@@ -1,6 +1,6 @@
 /** Maps the LLM contract (`ParsedBean`) onto the local `CoffeeBean` record. */
 import type { ParsedBean } from '@/services/ai';
-import type { CoffeeBean, Origin, Process, RoastLevel } from '@/types';
+import type { CoffeeBean, Origin } from '@/types';
 
 function toOrigins(parsed: ParsedBean): Origin[] | undefined {
   const origins = parsed.origins
@@ -38,8 +38,8 @@ export function parsedBeanToUpdate(parsed: ParsedBean): Partial<CoffeeBean> {
   const origins = toOrigins(parsed);
   if (origins) update.origins = origins;
 
-  if (parsed.process) update.process = parsed.process as Process;
-  if (parsed.roastLevel) update.roastLevel = parsed.roastLevel as RoastLevel;
+  if (parsed.process) update.process = parsed.process;
+  if (parsed.roastLevel) update.roastLevel = parsed.roastLevel;
   if (parsed.varietals.length > 0) update.varietals = parsed.varietals;
   if (parsed.tastingNotes.length > 0) update.tastingNotes = parsed.tastingNotes;
   if (parsed.roasterDescription) update.roasterDescription = parsed.roasterDescription;

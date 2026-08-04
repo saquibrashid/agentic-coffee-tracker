@@ -102,7 +102,7 @@ export function validateRecommendations(input: unknown): RecommendationValidatio
       errors.push(`${path}/rationale must be a non-empty string`);
     }
     // A suggestion with no grounding is exactly the hallucination we are guarding against.
-    if (!isStringArray(item['basedOn']) || (item['basedOn'] as string[]).length === 0) {
+    if (!isStringArray(item['basedOn']) || (item['basedOn']).length === 0) {
       errors.push(`${path}/basedOn must list at least one preference it is grounded in`);
     }
     if (!isNullableString(item['origin'])) errors.push(`${path}/origin must be a string or null`);

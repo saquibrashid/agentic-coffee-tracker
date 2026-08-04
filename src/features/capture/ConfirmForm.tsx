@@ -86,16 +86,22 @@ export function ConfirmForm({ bean, rawText, schemaErrors }: ConfirmFormProps) {
     setSaving(true);
     setError(null);
     try {
-      await db.beans.update(bean.id, {
-        roaster: form.roaster.trim(),
-        name: form.name.trim(),
-        roastLevel: form.roastLevel,
-        process: form.process,
-        origins: splitList(form.origin).map((country) => ({ country })),
-        tastingNotes: splitList(form.tastingNotes),
-        roastDate: form.roastDate || undefined,
-        needsReview: false,
-        updatedAt: new Date().toISOString(),
+      // The callback form lets us *remove* roastDate when the field is cleared;
+      // an object spec can only ever assign it.
+      await db.beans.update(bean.id, (draft) => {
+        draft.roaster = form.roaster.trim();
+        draft.name = form.name.trim();
+        draft.roastLevel = form.roastLevel;
+        draft.process = form.process;
+        draft.origins = splitList(form.origin).map((country) => ({ country }));
+        draft.tastingNotes = splitList(form.tastingNotes);
+        if (form.roastDate) {
+          draft.roastDate = form.roastDate;
+        } else {
+          delete draft.roastDate;
+        }
+        draft.needsReview = false;
+        draft.updatedAt = new Date().toISOString();
       });
       void navigate(`/beans/${bean.id}`);
     } catch (err) {

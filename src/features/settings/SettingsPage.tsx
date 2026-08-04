@@ -8,7 +8,13 @@ export function SettingsPage() {
   const pending = useLiveQuery(() => db.pendingAiTasks.toArray(), []) ?? [];
 
   async function retryTask(id: string) {
-    await db.pendingAiTasks.update(id, { nextAttemptAt: undefined, attempts: 0 } as any);
+    // Callback form so the backoff timestamp is removed rather than set to
+    // undefined — the task becomes eligible on the next queue pass.
+    await db.pendingAiTasks.update(id, (draft) => {
+      delete draft.nextAttemptAt;
+      delete draft.lastError;
+      draft.attempts = 0;
+    });
   }
   async function cancelTask(id: string) {
     await db.pendingAiTasks.delete(id);
@@ -38,7 +44,7 @@ export function SettingsPage() {
         <CardContent>
           {pending.length === 0 && <p className="text-sm text-muted-foreground">No pending operations.</p>}
           <ul className="space-y-2">
-            {pending.map((t: any) => (
+            {pending.map((t) => (
               <li key={t.id} className="rounded border p-2 text-sm">
                 <div className="flex items-center justify-between">
                   <div>

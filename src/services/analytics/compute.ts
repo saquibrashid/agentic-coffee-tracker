@@ -1,5 +1,4 @@
 import { db } from '@/services/db';
-import type { CoffeeBean, Rating } from '@/types';
 
 export interface AnalyticsSummary {
   totalBeans: number;
@@ -11,8 +10,8 @@ export interface AnalyticsSummary {
 }
 
 export async function computeAnalytics(): Promise<AnalyticsSummary> {
-  const beans = (await db.beans.toArray()) as CoffeeBean[];
-  const ratings = (await db.ratings.toArray()) as Rating[];
+  const beans = (await db.beans.toArray());
+  const ratings = (await db.ratings.toArray());
 
   const totalBeans = beans.length;
   const totalRatings = ratings.length;

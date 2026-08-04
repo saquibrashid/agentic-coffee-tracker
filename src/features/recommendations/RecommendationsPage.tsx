@@ -102,11 +102,11 @@ export function RecommendationsPage() {
               <TasteRow label="Flavours" items={preferences?.favoriteFlavors ?? []} />
               <TasteRow
                 label="Roast levels"
-                items={(preferences?.favoriteRoastLevels ?? []) as RankedItem<string>[]}
+                items={(preferences?.favoriteRoastLevels ?? [])}
               />
               <TasteRow
                 label="Brew methods"
-                items={(preferences?.favoriteBrewTypes ?? []) as RankedItem<string>[]}
+                items={(preferences?.favoriteBrewTypes ?? [])}
               />
             </dl>
           )}
