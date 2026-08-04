@@ -10,8 +10,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
+    "build": "tsc -p tsconfig.build.json",
+    "watch": "tsc -p tsconfig.build.json -w",
     "prestart": "pnpm run build",
     "start": "func start",
     "dev": "concurrently -k -n tsc,func \"pnpm watch\" \"func start\"",
