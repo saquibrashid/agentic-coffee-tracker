@@ -15,9 +15,7 @@ export function SettingsPage() {
   }
   async function runQueueNow() {
     const mod = await import('@/services/queue/queueRunner');
-    // restart runner triggers an immediate drain
-    mod.stopQueueRunner();
-    mod.startQueueRunner();
+    await mod.runQueueNow();
   }
 
   return (

@@ -19,9 +19,12 @@ const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDiv
 );
 CardHeader.displayName = 'CardHeader';
 
-const CardTitle = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+// Renders a real <h2> rather than a <div>: card titles are the section headings
+// of each screen, and screen-reader users navigate by heading (WCAG 2.4.6).
+const CardTitle = React.forwardRef<HTMLHeadingElement, React.HTMLAttributes<HTMLHeadingElement>>(
   ({ className, ...props }, ref) => (
-    <div
+    // eslint-disable-next-line jsx-a11y/heading-has-content -- content arrives via {...props}.children
+    <h2
       ref={ref}
       className={cn('text-2xl font-semibold leading-none tracking-tight', className)}
       {...props}
