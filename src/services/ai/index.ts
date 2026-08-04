@@ -59,10 +59,51 @@ export interface ParseRequest {
   ocrText: string;
   model?: string;
 }
-export interface ParseResponse {
-  parsed: Record<string, unknown>; // shape matches LLM schema in specs/data-model.md
-  model: string;
+
+/** Mirrors the LLM output contract in specs/data-model.md. */
+export interface ParsedOrigin {
+  country: string | null;
+  region: string | null;
+  farm: string | null;
+  producer: string | null;
+  percentage: number | null;
 }
+export interface ParsedBean {
+  roaster: string | null;
+  name: string | null;
+  origins: ParsedOrigin[];
+  process: 'washed' | 'natural' | 'honey' | 'anaerobic' | 'wet-hulled' | 'other' | null;
+  roastLevel: 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark' | null;
+  tastingNotes: string[];
+  roastDate: string | null;
+  varietals: string[];
+  elevationMeters: { min: number | null; max: number | null } | null;
+  roasterDescription: string | null;
+  confidence: number;
+}
+export interface ParseResponse {
+  parsed: ParsedBean;
+  model: string;
+  rawText: string;
+}
+
+/** Body returned by `/api/parse` with HTTP 422 when the model breaks the schema. */
+export interface ParseSchemaErrorBody {
+  error: string;
+  details: string[];
+  model: string;
+  rawText: string;
+}
+
+/**
+ * `/api/parse` answers 422 when the model's JSON does not match the schema. That
+ * is an expected outcome, not a bug: callers should fall back to manual entry
+ * with `needsReview = true` rather than treating it as a transient failure.
+ */
+export function isSchemaError(err: unknown): err is ApiError & { body: ParseSchemaErrorBody } {
+  return err instanceof ApiError && err.status === 422;
+}
+
 export const parse = (req: ParseRequest): Promise<ParseResponse> => apiPost('/api/parse', req);
 
 // ---- Search ----

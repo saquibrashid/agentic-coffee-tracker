@@ -58,9 +58,24 @@ Max payload: 8 MB. Server downscales further if needed before calling Azure Visi
 ### `POST /api/parse`
 ```
 Request:  { ocrText: string, model?: string }
-Response: { parsed: <LLM Output schema>, model: string }
+Response: { parsed: <LLM Output schema>, model: string, rawText: string }
+Errors:   400 missing ocrText, 422 model output failed schema validation, 500 upstream
 ```
-Implements structured-outputs + 1 retry. See `data-model.md` for schema.
+Uses Azure OpenAI **structured outputs** (`response_format: json_schema`, `strict: true`)
+with the schema in `data-model.md`. The response is then re-validated server-side by
+`api/src/lib/beanSchema.ts` before it is returned — structured outputs are a strong
+hint, not a guarantee, and an unvalidated object would silently corrupt local data.
+
+Validation is forgiving about *omissions* (missing keys are backfilled with `null`/`[]`
+and `confidence` defaults to `0`) but strict about *wrong* values (bad types, unknown
+properties, out-of-enum `process`/`roastLevel`, `confidence` outside `0..1`).
+
+On failure the endpoint answers **422** with:
+```
+{ error: string, details: string[], model: string, rawText: string, rawContent: string }
+```
+This is an expected outcome, not a transient fault: the client must not retry it. It
+should save the bean with `needsReview = true` and surface `rawText` for manual entry.
 
 ### `POST /api/search`
 ```
