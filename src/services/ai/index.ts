@@ -131,3 +131,40 @@ export interface ScrapeResponse {
   sourceUrl: string;
 }
 export const scrape = (req: ScrapeRequest): Promise<ScrapeResponse> => apiPost('/api/scrape', req);
+
+// ---- Recommend ----
+export interface RankedSummaryItem {
+  value: string;
+  count: number;
+  averageScore: number;
+}
+export interface PreferenceSummary {
+  favoriteOrigins: RankedSummaryItem[];
+  favoriteRoasters: RankedSummaryItem[];
+  favoriteProcesses: RankedSummaryItem[];
+  favoriteRoastLevels: RankedSummaryItem[];
+  favoriteFlavors: RankedSummaryItem[];
+  favoriteBrewTypes: RankedSummaryItem[];
+  averageScore: number;
+  totalRatings: number;
+}
+export interface Recommendation {
+  title: string;
+  rationale: string;
+  basedOn: string[];
+  origin: string | null;
+  roastLevel: string | null;
+  process: string | null;
+  flavorNotes: string[];
+}
+export interface RecommendRequest {
+  preferences: PreferenceSummary;
+  max?: number;
+}
+export interface RecommendResponse {
+  recommendations: Recommendation[];
+  model: string;
+  reason?: 'insufficient-history';
+}
+export const recommend = (req: RecommendRequest): Promise<RecommendResponse> =>
+  apiPost('/api/recommend', req);
