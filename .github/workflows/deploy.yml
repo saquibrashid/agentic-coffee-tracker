@@ -1,0 +1,101 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# OIDC federated credentials — no long-lived cloud secrets in the repo.
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: azd up (dev)
+    runs-on: ubuntu-latest
+    environment: dev
+    env:
+      AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME || 'coffee-dev' }}
+      AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus2' }}
+      STATIC_WEB_APP_SKU: ${{ vars.STATIC_WEB_APP_SKU || 'Free' }}
+      AZURE_VISION_ENDPOINT: ${{ vars.AZURE_VISION_ENDPOINT }}
+      AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
+      AZURE_VISION_KEY: ${{ secrets.AZURE_VISION_KEY }}
+      AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+      BING_SEARCH_KEY: ${{ secrets.BING_SEARCH_KEY }}
+    steps:
+      - uses: actions/checkout@v6
+
+      # Everything below is skipped on forks and on repos that have never been
+      # wired to a subscription, so the workflow is green out of the box.
+      - name: Check Azure configuration
+        id: config
+        run: |
+          if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_SUBSCRIPTION_ID" ] && [ -n "$AZURE_TENANT_ID" ]; then
+            echo "ready=true" >> $GITHUB_OUTPUT
+          else
+            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "::notice::Azure repository variables are not set — skipping deploy. See docs/deployment.md."
+          fi
+
+      - name: Setup pnpm
+        if: steps.config.outputs.ready == 'true'
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        if: steps.config.outputs.ready == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install
+        if: steps.config.outputs.ready == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Install azd
+        if: steps.config.outputs.ready == 'true'
+        uses: Azure/setup-azd@v2
+
+      - name: Log in with federated credentials
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          azd auth login \
+            --client-id "$AZURE_CLIENT_ID" \
+            --federated-credential-provider github \
+            --tenant-id "$AZURE_TENANT_ID"
+
+      - name: Provision infrastructure
+        if: steps.config.outputs.ready == 'true'
+        run: azd provision --no-prompt
+
+      - name: Deploy application
+        if: steps.config.outputs.ready == 'true'
+        run: azd deploy --no-prompt
+
+      # Confirms the BFF is reachable and reports whether each integration is
+      # running live or in mock mode.
+      - name: Smoke test /api/health
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          API_URI=$(azd env get-value SERVICE_API_URI)
+          echo "Probing $API_URI/api/health"
+          for attempt in 1 2 3 4 5; do
+            if curl --fail --silent --show-error --max-time 20 "$API_URI/api/health" -o health.json; then
+              cat health.json
+              exit 0
+            fi
+            echo "Attempt $attempt failed; retrying in 15s..."
+            sleep 15
+          done
+          echo "::error::Health probe never returned 200."
+          exit 1

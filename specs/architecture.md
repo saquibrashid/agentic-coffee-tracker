@@ -11,7 +11,8 @@ This document covers the system topology, secrets handling, network boundaries, 
 │  Browser (PWA)               │  HTTPS  │  BFF (Azure Functions)     │
 │  React + TS + Vite           │ ──────▶ │  Node 20, Bicep-deployed   │
 │  IndexedDB (Dexie)           │         │  /api/ocr, /api/parse,     │
-│  Service Worker (Workbox)    │         │  /api/search, /api/scrape  │
+│  Service Worker (Workbox)    │         │  /api/search, /api/scrape, │
+│                              │         │  /api/recommend, /api/health│
 └──────────────┬───────────────┘         └─────────────┬──────────────┘
                │                                       │
                │                              ┌────────┴────────┐
@@ -111,6 +112,16 @@ availability; the model describes the *kind* of coffee to look for.
 Below `totalRatings < 3` the endpoint short-circuits to an empty list with
 `reason: 'insufficient-history'` rather than calling the model at all.
 
+### `GET /api/health`
+```
+Response: { status: 'ok', version, timestamp, services: { ocr, parse, search, recommend } }
+```
+
+The only **anonymous** endpoint; every other route uses function-key auth. Each
+service reports `'live'` when its credentials are present or `'mock'` when the
+endpoint will return deterministic synthetic data. Used by the deploy workflow's
+smoke test and by the Application Insights availability test.
+
 ---
 
 ## Secrets & Configuration
@@ -122,7 +133,14 @@ Below `totalRatings < 3` the endpoint short-circuits to an empty list with
 | `AZURE_OPENAI_DEPLOYMENT`     | Functions app | Model deployment name          |
 | `BING_SEARCH_KEY`             | Functions app | Key Vault reference            |
 | `ALLOWED_ORIGINS`             | Functions app | Comma-separated; SWA hostname  |
-| `VITE_API_BASE_URL`           | Client build  | Empty string in SWA (same-origin) |
+| `SCRAPE_ALLOWLIST`            | Functions app | Comma-separated hosts          |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Functions app | Set by Bicep; enables host telemetry |
+| `VITE_API_BASE_URL`           | Client build  | Empty on SWA Standard (linked backend); Function App URL on Free |
+
+Every AI secret is **optional**. Bicep only creates a Key Vault secret and its
+app setting when a value was supplied, and each endpoint falls back to a
+schema-shaped mock when its variables are absent — so a credential-free
+deployment is a supported configuration.
 
 **Local dev**: `.env.local` (gitignored) for Functions; `local.settings.json` template committed without values.
 
