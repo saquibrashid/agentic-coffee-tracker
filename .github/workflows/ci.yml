@@ -27,6 +27,25 @@ jobs:
             **/*.md
             !node_modules
 
+  # Catches Bicep syntax/type errors on PRs without needing a subscription.
+  infra:
+    name: Infra lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build Bicep templates
+        run: |
+          az bicep install
+          az bicep build --file infra/main.bicep --outfile /tmp/main.json
+      - name: Fail on Bicep linter warnings
+        run: |
+          output=$(az bicep build --file infra/main.bicep --outfile /tmp/main.json 2>&1 || true)
+          echo "$output"
+          if echo "$output" | grep -q "infra/.*: Warning"; then
+            echo "::error::Bicep linter reported warnings."
+            exit 1
+          fi
+
   # The full build job is gated on the project being scaffolded.
   # Until package.json exists at the repo root, this job is skipped automatically.
   build-and-test:

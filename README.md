@@ -54,17 +54,16 @@ See [`specs/architecture.md`](./specs/architecture.md) for the full rationale.
 
 ## 🚀 Getting started
 
-> The scaffold doesn't exist yet. These instructions describe what running the app **will** look like.
-
 ```bash
-# Prerequisites: Node 20+, pnpm (or npm), Azure Functions Core Tools v4
+# Prerequisites: Node 20+, pnpm, Azure Functions Core Tools v4
 
 # 1. Install dependencies
 pnpm install
 
 # 2. Configure local env
 cp api/local.settings.example.json api/local.settings.json
-# fill in Azure Vision / OpenAI / Bing keys
+# fill in Azure Vision / OpenAI / Bing keys — or leave them blank to run
+# entirely on deterministic mocks
 
 # 3. Run client + BFF in parallel
 pnpm dev          # Vite dev server on http://localhost:5173
@@ -74,6 +73,20 @@ pnpm dev:api      # Functions host on  http://localhost:7071
 pnpm test         # unit + component
 pnpm test:e2e     # Playwright
 ```
+
+No Azure credentials? Everything still works. Each BFF endpoint returns a schema-shaped mock when its keys are missing, and the SPA falls back to the same mocks when the BFF is unreachable (`VITE_ALLOW_MOCK_AI`, on by default in dev). See [`.env.example`](./.env.example).
+
+## ☁️ Deploy to Azure
+
+```bash
+azd auth login
+azd env new coffee-dev
+azd up
+```
+
+This provisions a Static Web App, a Flex Consumption Function App, Key Vault, and Application Insights — then deploys both services. A subscription is the only requirement; AI keys are optional.
+
+Full instructions, monitoring queries, and CI/CD setup are in [`docs/deployment.md`](./docs/deployment.md).
 
 ## 🗺️ Roadmap
 

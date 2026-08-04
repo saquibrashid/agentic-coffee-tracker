@@ -1,0 +1,33 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "environmentName": {
+      "value": "${AZURE_ENV_NAME}"
+    },
+    "location": {
+      "value": "${AZURE_LOCATION}"
+    },
+    "visionEndpoint": {
+      "value": "${AZURE_VISION_ENDPOINT=}"
+    },
+    "visionKey": {
+      "value": "${AZURE_VISION_KEY=}"
+    },
+    "openAiEndpoint": {
+      "value": "${AZURE_OPENAI_ENDPOINT=}"
+    },
+    "openAiKey": {
+      "value": "${AZURE_OPENAI_KEY=}"
+    },
+    "openAiDeployment": {
+      "value": "${AZURE_OPENAI_DEPLOYMENT=}"
+    },
+    "bingSearchKey": {
+      "value": "${BING_SEARCH_KEY=}"
+    },
+    "staticWebAppSkuName": {
+      "value": "${STATIC_WEB_APP_SKU=Free}"
+    }
+  }
+}

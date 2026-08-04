@@ -1,0 +1,36 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/Azure/azure-dev/main/schemas/v1.0/azure.yaml.json
+
+name: agentic-coffee-tracker
+metadata:
+  template: agentic-coffee-tracker@1.0.0
+
+infra:
+  provider: bicep
+  path: infra
+  module: main
+
+services:
+  api:
+    project: ./api
+    language: js
+    host: function
+    dist: dist
+
+  web:
+    project: .
+    language: js
+    host: staticwebapp
+    dist: dist
+
+hooks:
+  prepackage:
+    windows:
+      shell: pwsh
+      run: pnpm install --frozen-lockfile
+      interactive: false
+      continueOnError: false
+    posix:
+      shell: sh
+      run: pnpm install --frozen-lockfile
+      interactive: false
+      continueOnError: false
