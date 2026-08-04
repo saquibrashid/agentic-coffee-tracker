@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 
 import { HomePage } from '@/features/home/HomePage';
 import { AddCoffeePage } from '@/features/capture/AddCoffeePage';
-import { CaptureDemo } from '@/features/capture/CaptureDemo';
 import { BeanDetailPage } from '@/features/beans/BeanDetailPage';
 import { AnalyticsPage } from '@/features/analytics/AnalyticsPage';
 import { SummaryPage } from '@/features/summary/SummaryPage';
@@ -98,7 +97,6 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <HomePage /> },
       { path: 'add', element: <AddCoffeePage /> },
-      { path: 'capture-demo', element: <CaptureDemo /> },
       { path: 'beans/:beanId', element: <BeanDetailPage /> },
       { path: 'analytics', element: <AnalyticsPage /> },
       { path: 'summary', element: <SummaryPage /> },
