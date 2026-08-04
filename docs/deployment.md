@@ -111,6 +111,30 @@ dependencies
 | project timestamp, name, target, resultCode, duration
 ```
 
+## What this costs
+
+Rough monthly estimate for personal usage (US East, pay-as-you-go, USD). Prices drift — check the [pricing calculator](https://azure.microsoft.com/pricing/calculator/) before relying on these.
+
+| Resource | Default config | Est. / month |
+| --- | --- | --- |
+| App Insights availability test | 3 locations × every 5 min ≈ 26,000 runs | **~$26** |
+| Static Web App | `Free` SKU | $0 |
+| Function App | Flex Consumption; free grant covers 250k executions + 100k GB-s | $0 |
+| App Insights / Log Analytics | First 5 GB/month free; this app ingests ~100 MB | $0 |
+| Storage | Standard_LRS, a few MB deployment package | ~$0.10 |
+| Key Vault | $0.03 per 10k operations | <$0.01 |
+| **Total** | | **~$26** |
+
+The availability test is the entire bill. Everything else combined is under a dollar, because a personal-scale workload sits inside the Functions and Azure Monitor free grants.
+
+Knobs, in order of impact:
+
+- **Availability test** — `infra/resources.bicep`, the `availabilityTest` resource. Billing is per location per run, so cost scales linearly with both. Dropping to one location every 15 minutes costs ~$3/month; setting `Enabled: false` costs nothing. Three locations is the right default for a service people depend on, and overkill for a personal app — pick deliberately.
+- **`STATIC_WEB_APP_SKU=Standard`** — adds a flat **$9/month** in exchange for a linked backend (same-origin `/api`). The `Free` default works identically from the user's perspective; the SPA just makes a cross-origin call.
+- **AI credentials** — barely register. Azure AI Vision includes 5,000 free transactions/month, and a bag scan through Azure OpenAI costs a fraction of a cent. Expect pennies.
+
+> **Note:** Bing Search v7 is retired to new customers. If you cannot provision `BING_SEARCH_KEY`, leave it unset — `/api/search` falls back to its mock and nothing else breaks.
+
 ## CI/CD
 
 `.github/workflows/deploy.yml` runs `azd provision` + `azd deploy` on every push to `main`, then smoke-tests `/api/health`. It authenticates with OIDC federated credentials — no long-lived secrets.

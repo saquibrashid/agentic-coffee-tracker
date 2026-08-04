@@ -86,6 +86,8 @@ azd up
 
 This provisions a Static Web App, a Flex Consumption Function App, Key Vault, and Application Insights — then deploys both services. A subscription is the only requirement; AI keys are optional.
 
+Budget roughly **$26/month**, almost all of which is the Application Insights availability test (3 locations, every 5 minutes). Everything else lands under a dollar. See [cost expectations](./docs/deployment.md#what-this-costs) to tune it.
+
 Full instructions, monitoring queries, and CI/CD setup are in [`docs/deployment.md`](./docs/deployment.md).
 
 ## 🗺️ Roadmap
