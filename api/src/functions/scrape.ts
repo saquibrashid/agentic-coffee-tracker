@@ -32,6 +32,20 @@ function extractTextFromHtml(html: string): string {
     .slice(0, 8000);
 }
 
+/**
+ * `.example` is reserved by RFC 2606 and never resolves, so a request for one
+ * is unambiguously a mock. Every other endpoint degrades to a deterministic
+ * response without credentials; scrape has to do the same or the whole
+ * search -> scrape -> parse chain breaks on a credential-free deployment.
+ */
+function isMockHost(url: string): boolean {
+  try {
+    return new URL(url).hostname.toLowerCase().endsWith('.example');
+  } catch {
+    return false;
+  }
+}
+
 app.http('scrape', {
   methods: ['POST'],
   authLevel: 'function',
@@ -51,6 +65,17 @@ app.http('scrape', {
       }
 
       ctx.log('scrape invoked', { url: body.url });
+
+      if (isMockHost(body.url)) {
+        return json(200, {
+          extracted: {
+            rawText:
+              'Mock scrape: Mock Roaster — Ethiopia Yirgacheffe. Washed process, light roast. ' +
+              'Tasting notes: jasmine, bergamot, stone fruit. Grown at 1900-2100m.',
+          },
+          sourceUrl: body.url,
+        });
+      }
 
       const res = await fetch(body.url, { headers: { 'user-agent': 'AgenticCoffeeBot/0.1 (+https://github.com/saquibrashid/agentic-coffee-tracker)' } });
       if (!res.ok) {

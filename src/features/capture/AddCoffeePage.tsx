@@ -4,18 +4,20 @@
  * The bean row is written to IndexedDB *before* any network call, so an offline
  * capture is never lost; the AI work is queued and reconciled by the queue runner.
  */
-import { useState, type ChangeEvent } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { db } from '@/services/db';
 import { createThumbnail, dataUrlToBlob, resizeDataUrl } from '@/services/image/imagePipeline';
 import { extractBeanFromPhoto, PipelineUnavailableError } from '@/services/ai/pipeline';
 import { parsedBeanToUpdate } from '@/services/ai/mapping';
+import { EmptyPageError, enrichFromUrl } from '@/services/enrich';
+import { isSchemaError } from '@/services/ai';
 import { ConfirmForm } from './ConfirmForm';
 import type { CoffeeBean } from '@/types';
 import { ulid } from 'ulid';
 
-type Stage = 'idle' | 'processing' | 'extracting' | 'confirm' | 'queued';
+type Stage = 'idle' | 'processing' | 'extracting' | 'importing' | 'confirm' | 'queued';
 
 interface ConfirmState {
   bean: CoffeeBean;
@@ -37,12 +39,60 @@ export function AddCoffeePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [url, setUrl] = useState('');
 
   function reset() {
     setStage('idle');
     setPreview(null);
     setConfirmState(null);
     setError(null);
+    setUrl('');
+  }
+
+  /**
+   * URL import is the same shape as the photo path: persist a draft first, then
+   * enrich it, then hand the user the identical confirm step. Reusing
+   * `ConfirmForm` keeps the two entry points from drifting apart.
+   */
+  async function handleUrlImport(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    setError(null);
+    setStage('importing');
+
+    const now = new Date().toISOString();
+    const beanId = ulid();
+    const draft: CoffeeBean = {
+      id: beanId,
+      schemaVersion: 1,
+      roaster: 'Unknown',
+      name: 'Draft from link',
+      source: 'url-scrape',
+      sourceUrl: trimmed,
+      isArchived: false,
+      needsReview: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    try {
+      const enriched = await enrichFromUrl(trimmed);
+      await db.beans.add({ ...draft, ...parsedBeanToUpdate(enriched.parsed), sourceUrl: trimmed });
+      const bean = await db.beans.get(beanId);
+      setConfirmState({
+        bean: bean ?? draft,
+        rawText: enriched.rawText,
+      });
+      setStage('confirm');
+    } catch (err) {
+      // Nothing is written on failure — a half-created bean from a bad link is
+      // worse than no bean, because the user has no way to tell it apart.
+      if (err instanceof EmptyPageError) setError(err.message);
+      else if (isSchemaError(err)) setError('We could not make sense of that page.');
+      else setError(err instanceof Error ? err.message : 'Could not import from that link.');
+      setStage('idle');
+    }
   }
 
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
@@ -159,6 +209,32 @@ export function AddCoffeePage() {
                 {error}
               </p>
             )}
+
+            <div className="mt-6 border-t pt-4">
+              <form onSubmit={(e) => void handleUrlImport(e)}>
+                <label htmlFor="bean-url" className="mb-2 block text-sm font-medium">
+                  Or import from a link
+                </label>
+                <p className="mb-2 text-sm text-muted-foreground">
+                  Paste the roaster&apos;s product page and we&apos;ll read the details from there
+                  instead.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    id="bean-url"
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://roaster.example/coffee"
+                    value={url}
+                    onChange={(e) => setUrl(e.target.value)}
+                    className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  />
+                  <Button type="submit" variant="outline" disabled={url.trim() === ''}>
+                    Import
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
@@ -170,9 +246,13 @@ export function AddCoffeePage() {
           />
         )}
 
-        {(stage === 'processing' || stage === 'extracting') && (
+        {(stage === 'processing' || stage === 'extracting' || stage === 'importing') && (
           <p role="status" className="text-sm text-muted-foreground">
-            {stage === 'processing' ? 'Preparing your photo…' : 'Reading the label…'}
+            {stage === 'processing'
+              ? 'Preparing your photo…'
+              : stage === 'importing'
+                ? 'Reading that page…'
+                : 'Reading the label…'}
           </p>
         )}
 

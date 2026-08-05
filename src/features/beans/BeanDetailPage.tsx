@@ -5,6 +5,7 @@ import { ulid } from 'ulid';
 import { db } from '@/services/db';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { EnrichPanel } from './EnrichPanel';
 import type { BrewType, Rating } from '@/types';
 
 // Ordered for the picker; the union in @/types is the source of truth, so a new
@@ -55,7 +56,17 @@ export function BeanDetailPage() {
             <h3 className="text-sm font-medium">Attributes</h3>
             <p className="text-sm text-muted-foreground">Roast: {bean.roastLevel || '—'}</p>
             <p className="text-sm text-muted-foreground">Origins: {(bean.origins ?? []).map((o) => o.country).join(', ') || '—'}</p>
+            {bean.sourceUrl && (
+              <p className="break-all text-xs text-muted-foreground">
+                Source:{' '}
+                <a href={bean.sourceUrl} target="_blank" rel="noreferrer" className="underline">
+                  {bean.sourceUrl}
+                </a>
+              </p>
+            )}
           </div>
+
+          <EnrichPanel bean={bean} />
 
           <div>
             <h3 className="text-sm font-medium">Ratings</h3>
