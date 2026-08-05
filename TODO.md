@@ -21,6 +21,9 @@ High-level roadmap for the Agentic Coffee Tracker. Detailed work items live in [
 - Deployment: azd + Bicep (SWA, Flex Consumption Functions, Key Vault, App Insights), OIDC deploy workflow, `/api/health`
 - Route-level code splitting; Lighthouse perf/a11y budgets enforced in CI
 - Strict TypeScript across the whole repo (`exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`) and no `any` in application code
+- Settings: storage usage + **Delete all data** (IndexedDB, Cache Storage, service worker) behind a typed confirmation
+- Bean library (`/beans`): browse, search, filter (roast / process / needs-review / archived) and sort
+- Web enrichment: `/api/search` + `/api/scrape` surfaced as an opt-in field diff on Bean Detail, plus import-from-URL on the capture page
 
 ## 🟡 Next up
 
