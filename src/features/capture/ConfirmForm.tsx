@@ -9,25 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { db } from '@/services/db';
 import type { CoffeeBean, Process, RoastLevel } from '@/types';
-
-const ROAST_LEVELS: RoastLevel[] = [
-  'light',
-  'medium-light',
-  'medium',
-  'medium-dark',
-  'dark',
-  'unknown',
-];
-
-const PROCESSES: Process[] = [
-  'washed',
-  'natural',
-  'honey',
-  'anaerobic',
-  'wet-hulled',
-  'other',
-  'unknown',
-];
+import { PROCESSES, ROAST_LEVELS } from '@/services/beans/library';
 
 export interface ConfirmFormProps {
   bean: CoffeeBean;
