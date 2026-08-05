@@ -59,6 +59,8 @@ See [`specs/architecture.md`](./specs/architecture.md) for the full rationale.
 
 # 1. Install dependencies
 pnpm install
+# Packages resolve through the Microsoft feed proxy configured in .npmrc,
+# not the public npm registry.
 
 # 2. Configure local env
 cp api/local.settings.example.json api/local.settings.json
