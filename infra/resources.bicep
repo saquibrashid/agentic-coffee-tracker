@@ -383,7 +383,12 @@ resource availabilityTest 'Microsoft.Insights/webtests@2022-06-15' = {
       { Id: 'emea-nl-ams-azr' }
     ]
     Request: {
-      RequestUrl: 'https://${functionApp.properties.defaultHostName}/api/health'
+      // Linking the backend enables Easy Auth on the Function App, so its own
+      // hostname answers 401 to a synthetic probe. Probe the front door the
+      // real clients use instead.
+      RequestUrl: useLinkedBackend
+        ? 'https://${staticWebApp.properties.defaultHostname}/api/health'
+        : 'https://${functionApp.properties.defaultHostName}/api/health'
       HttpVerb: 'GET'
       ParseDependentRequests: false
     }

@@ -66,7 +66,7 @@ azd deploy web       # SPA only
 ## Verify the deployment
 
 ```bash
-curl "$(azd env get-value SERVICE_API_URI)/api/health"
+curl "$(azd env get-value SERVICE_WEB_URI)/api/health"
 ```
 
 ```json
@@ -78,7 +78,9 @@ curl "$(azd env get-value SERVICE_API_URI)/api/health"
 }
 ```
 
-`live` means the endpoint has real credentials; `mock` means it will return synthetic data. `/api/health` is the only anonymous endpoint — the rest use function-key auth.
+`live` means the endpoint has real credentials; `mock` means it will return synthetic data.
+
+Note that the check goes through `SERVICE_WEB_URI`, not `SERVICE_API_URI`. Linking the Function App as a Static Web Apps backend turns on Easy Auth for it, so the `*.azurewebsites.net` URL answers `401` to everyone — the Static Web App front door is the only supported way in. That is also why every function is `authLevel: 'anonymous'`: linked backends cannot forward a function key, and the Easy Auth lockdown replaces it.
 
 Then open the SPA:
 

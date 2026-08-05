@@ -30,8 +30,8 @@ param openAiDeployment string = ''
 @description('Optional. Bing Web Search key. Stored in Key Vault, never in app settings.')
 param bingSearchKey string = ''
 
-@description('Comma-separated hosts the /api/scrape endpoint is allowed to fetch.')
-param scrapeAllowlist string = 'bluebottlecoffee.com,counterculturecoffee.com,intelligentsiacoffee.com'
+@description('Comma-separated hosts the /api/scrape endpoint is allowed to fetch. `*.example` is reserved by RFC 2606, never resolves, and enables the credential-free mock path.')
+param scrapeAllowlist string = '*.example,bluebottlecoffee.com,counterculturecoffee.com,intelligentsiacoffee.com'
 
 @allowed(['Free', 'Standard'])
 @description('Static Web App SKU. Standard adds linked backends (same-origin /api) but is not free.')

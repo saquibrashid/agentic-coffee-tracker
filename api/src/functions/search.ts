@@ -28,7 +28,10 @@ async function callBingSearch(roaster: string, name: string, max: number): Promi
 
 app.http('search', {
   methods: ['POST'],
-  authLevel: 'function',
+  // Anonymous by design: Static Web Apps linked backends cannot forward a
+  // function key, and the link enables Easy Auth on the Function App so the
+  // only caller that can reach it is the Static Web App front door.
+  authLevel: 'anonymous',
   route: 'search',
   handler: async (req: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     try {

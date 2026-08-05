@@ -8,7 +8,15 @@ import globals from 'globals';
 
 export default tseslint.config(
   {
-    ignores: ['dist', 'node_modules', 'api/dist', 'api/node_modules', 'playwright-report', 'coverage'],
+    ignores: [
+      'dist',
+      'node_modules',
+      'api/dist',
+      'api/deploy',
+      'api/node_modules',
+      'playwright-report',
+      'coverage',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -64,5 +72,9 @@ export default tseslint.config(
   {
     files: ['**/*.{js,mjs,cjs}'],
     ...tseslint.configs.disableTypeChecked,
+    languageOptions: {
+      ...tseslint.configs.disableTypeChecked.languageOptions,
+      globals: { ...globals.node },
+    },
   },
 );

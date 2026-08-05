@@ -10,11 +10,29 @@ infra:
   module: main
 
 services:
+  # `project: .` (not ./api) so azd restores through the root pnpm workspace —
+  # ./api has no lockfile of its own, which made azd fall back to npm and walk
+  # into pnpm's symlinked store. `dist` points at the staged Function zip root.
   api:
-    project: ./api
+    project: .
     language: js
     host: function
-    dist: dist
+    dist: api/deploy
+    # The staged package already vendors its production dependencies from the
+    # local pnpm store, so there is nothing for a remote npm install to do.
+    remoteBuild: false
+    hooks:
+      prepackage:
+        windows:
+          shell: pwsh
+          run: pnpm --filter ./api run build; pnpm --filter ./api run package
+          interactive: false
+          continueOnError: false
+        posix:
+          shell: sh
+          run: pnpm --filter ./api run build && pnpm --filter ./api run package
+          interactive: false
+          continueOnError: false
 
   web:
     project: .

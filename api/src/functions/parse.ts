@@ -55,7 +55,10 @@ async function callAzureOpenAi(ocrText: string, model?: string): Promise<RawPars
 
 app.http('parse', {
   methods: ['POST'],
-  authLevel: 'function',
+  // Anonymous by design: Static Web Apps linked backends cannot forward a
+  // function key, and the link enables Easy Auth on the Function App so the
+  // only caller that can reach it is the Static Web App front door.
+  authLevel: 'anonymous',
   route: 'parse',
   handler: async (req: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     try {

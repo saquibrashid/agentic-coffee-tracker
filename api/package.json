@@ -11,6 +11,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
+    "package": "node scripts/package.mjs",
     "watch": "tsc -p tsconfig.build.json -w",
     "prestart": "pnpm run build",
     "start": "func start",
