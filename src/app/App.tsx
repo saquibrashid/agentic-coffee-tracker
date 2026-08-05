@@ -109,6 +109,10 @@ const router = createBrowserRouter([
         lazy: async () => ({ Component: (await import('@/features/capture/AddCoffeePage')).AddCoffeePage }),
       },
       {
+        path: 'beans',
+        lazy: async () => ({ Component: (await import('@/features/beans/BeansLibraryPage')).BeansLibraryPage }),
+      },
+      {
         path: 'beans/:beanId',
         lazy: async () => ({ Component: (await import('@/features/beans/BeanDetailPage')).BeanDetailPage }),
       },

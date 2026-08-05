@@ -9,6 +9,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function HomePage() {
   const beans = useLiveQuery(() => db.beans.orderBy('createdAt').reverse().limit(6).toArray(), []);
+  const totalBeans = useLiveQuery(() => db.beans.count(), []);
 
   // Loading
   if (beans === undefined) {
@@ -62,6 +63,13 @@ export function HomePage() {
             </li>
           ))}
         </ul>
+        <div className="mt-3">
+          <Button asChild variant="outline">
+            <Link to="/beans">
+              View all {totalBeans ?? beans.length} beans
+            </Link>
+          </Button>
+        </div>
       </section>
     </div>
   );
