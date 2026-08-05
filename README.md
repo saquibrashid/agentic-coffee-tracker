@@ -93,7 +93,7 @@ Full instructions, monitoring queries, and CI/CD setup are in [`docs/deployment.
 ## 🗺️ Roadmap
 
 - **v1** — capture, OCR/LLM parsing, ratings, analytics, monthly summaries, export, recommendations
-- **v1.5** — barcode scan, voice input, URL scrape entry
+- **v1.5** — barcode scan, voice input
 - **v2** — Microsoft + Apple ID login, Azure cloud sync, café drink tracking, embeddings/vector search, native iOS app
 
 ## 🔒 Privacy
