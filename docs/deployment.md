@@ -11,15 +11,37 @@ Supporting resources: Log Analytics workspace, Application Insights (workspace-b
 
 Everything is defined in `infra/main.bicep` (subscription scope) and `infra/resources.bicep` (resource-group scope), orchestrated by `azure.yaml`.
 
-## Zero-credential deploys are supported
+## AI services are provisioned for you
 
-Every AI parameter (`visionKey`, `openAiKey`, `bingSearchKey`, …) defaults to an empty string. When a key is absent:
+`azd provision` creates an Azure AI Vision account and an Azure OpenAI account with a `gpt-4o`
+deployment, so `/api/ocr`, `/api/parse`, and `/api/recommend` are **live on a first deploy** with no
+manual setup. Two things to know:
 
-- no Key Vault secret is created for it,
-- no corresponding app setting is added to the Function App,
-- the BFF endpoint returns a deterministic, schema-shaped mock response.
+- **Azure AI Vision `F0` is limited to one free account per subscription per region.** A second
+  environment in the same region will fail to provision until you set `visionSkuName=S1` (paid) or
+  pick another region.
+- **Bing Search is not provisioned** — Bing Search v7 is retired to new customers. `/api/search`
+  stays on its mock unless you bring your own `BING_SEARCH_KEY`, and nothing else breaks.
 
-That means you can deploy the whole app with only a subscription and still click through the entire flow. Add credentials later and re-run `azd provision` to switch the affected endpoints to live.
+Every AI parameter also accepts a bring-your-own value (`visionEndpoint`/`visionKey`,
+`openAiEndpoint`/`openAiKey`/`openAiDeployment`). Set one and the provisioned account is bypassed in
+favour of yours.
+
+If an endpoint ever *does* fall back to its mock, the capture screen says so explicitly rather than
+presenting fixtures as a real read of your bag.
+
+### Why `gpt-4o` and not a smaller model
+
+Worth recording, because the obvious cheaper choices all fail:
+
+| Model | Why not |
+| --- | --- |
+| `gpt-4o-mini` (`2024-07-18`) | Deployment is rejected with `ServiceModelDeprecating`. |
+| `gpt-4.1-mini` | No `GlobalStandard` quota — only the batch tiers. |
+| `gpt-5-mini` | Rejects `temperature`, and `parse.ts`/`recommend.ts` send `temperature: 0` for determinism. Usable only with code changes. |
+
+`gpt-4o` (`2024-11-20`) deploys cleanly, needs no code change, and costs a fraction of a cent per
+scan.
 
 ## One-time setup
 
@@ -30,7 +52,7 @@ azd env new coffee-dev
 azd env set AZURE_LOCATION eastus2
 ```
 
-Optional — supply real AI credentials:
+Optional — bring your own AI resources instead of the provisioned ones:
 
 ```bash
 azd env set AZURE_VISION_ENDPOINT   https://<your-vision>.cognitiveservices.azure.com/
@@ -74,11 +96,16 @@ curl "$(azd env get-value SERVICE_WEB_URI)/api/health"
   "status": "ok",
   "version": "0.1.0",
   "timestamp": "2025-01-01T00:00:00.000Z",
-  "services": { "ocr": "mock", "parse": "mock", "search": "mock", "recommend": "mock" }
+  "services": { "ocr": "live", "parse": "live", "search": "mock", "recommend": "live" }
 }
 ```
 
-`live` means the endpoint has real credentials; `mock` means it will return synthetic data.
+`live` means the endpoint has real credentials; `mock` means it will return synthetic data. `search`
+is expected to be `mock` (see above).
+
+> **Gotcha:** a Flex Consumption Function App does **not** pick up new app settings on its own. If
+> `/api/health` still says `mock` right after adding credentials, run
+> `az functionapp restart -g <rg> -n <function-app>` and check again.
 
 Note that the check goes through `SERVICE_WEB_URI`, not `SERVICE_API_URI`. Linking the Function App as a Static Web Apps backend turns on Easy Auth for it, so the `*.azurewebsites.net` URL answers `401` to everyone — the Static Web App front door is the only supported way in. That is also why every function is `authLevel: 'anonymous'`: linked backends cannot forward a function key, and the Easy Auth lockdown replaces it.
 
@@ -125,7 +152,9 @@ Rough monthly estimate for personal usage (US East, pay-as-you-go, USD). Prices 
 | App Insights / Log Analytics | First 5 GB/month free; this app ingests ~100 MB | $0 |
 | Storage | Standard_LRS, a few MB deployment package | ~$0.10 |
 | Key Vault | $0.03 per 10k operations | <$0.01 |
-| **Total** | | **~$26** |
+| Azure AI Vision | `F0`: 5,000 transactions/month free | $0 |
+| Azure OpenAI (`gpt-4o`) | Pay-per-token; a bag scan is ~1k tokens | ~$0.50 |
+| **Total** | | **~$27** |
 
 The availability test is the entire bill. Everything else combined is under a dollar, because a personal-scale workload sits inside the Functions and Azure Monitor free grants.
 
@@ -133,7 +162,7 @@ Knobs, in order of impact:
 
 - **Availability test** — `infra/resources.bicep`, the `availabilityTest` resource. Billing is per location per run, so cost scales linearly with both. Dropping to one location every 15 minutes costs ~$3/month; setting `Enabled: false` costs nothing. Three locations is the right default for a service people depend on, and overkill for a personal app — pick deliberately.
 - **`STATIC_WEB_APP_SKU=Standard`** — adds a flat **$9/month** in exchange for a linked backend (same-origin `/api`). The `Free` default works identically from the user's perspective; the SPA just makes a cross-origin call.
-- **AI credentials** — barely register. Azure AI Vision includes 5,000 free transactions/month, and a bag scan through Azure OpenAI costs a fraction of a cent. Expect pennies.
+- **AI services** — barely register. Azure AI Vision `F0` includes 5,000 free transactions/month, and a bag scan through Azure OpenAI costs a fraction of a cent. Expect pennies. Note the `F0` one-per-subscription-per-region limit if you stand up a second environment.
 
 > **Note:** Bing Search v7 is retired to new customers. If you cannot provision `BING_SEARCH_KEY`, leave it unset — `/api/search` falls back to its mock and nothing else breaks.
 

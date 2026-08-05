@@ -49,7 +49,8 @@ export interface OcrRequest {
 }
 export interface OcrResponse {
   rawText: string;
-  provider: 'azure-vision';
+  /** `mock-vision` means the BFF has no Azure AI Vision credentials and returned a fixture. */
+  provider: 'azure-vision' | 'mock-vision';
   providerVersion?: string;
 }
 export const ocr = (req: OcrRequest): Promise<OcrResponse> => apiPost('/api/ocr', req);

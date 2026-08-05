@@ -46,8 +46,21 @@ describe('extractBeanFromPhoto', () => {
     expect(result.usedMock).toBe(false);
   });
 
-  it('flags low-confidence results for review', async () => {
-    ocr.mockResolvedValue({ rawText: 'blurry', provider: 'azure-vision' });
+  it('flags a server-side mock OCR provider as synthetic', async () => {
+    ocr.mockResolvedValue({ rawText: 'Mock OCR: Bag label', provider: 'mock-vision' });
+    parse.mockResolvedValue({ parsed, model: 'gpt-4o', rawText: 'Mock OCR: Bag label' });
+
+    await expect(extractBeanFromPhoto(blob)).resolves.toMatchObject({ usedMock: true });
+  });
+
+  it('flags a server-side mock parse model as synthetic', async () => {
+    ocr.mockResolvedValue({ rawText: 'ONYX GEOMETRY', provider: 'azure-vision' });
+    parse.mockResolvedValue({ parsed, model: 'mock-model', rawText: 'ONYX GEOMETRY' });
+
+    await expect(extractBeanFromPhoto(blob)).resolves.toMatchObject({ usedMock: true });
+  });
+
+  it('flags low-confidence results for review', async () => {    ocr.mockResolvedValue({ rawText: 'blurry', provider: 'azure-vision' });
     parse.mockResolvedValue({ parsed: { ...parsed, confidence: 0.2 }, model: 'gpt-4o', rawText: 'blurry' });
 
     await expect(extractBeanFromPhoto(blob)).resolves.toMatchObject({ needsReview: true });

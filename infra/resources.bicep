@@ -18,6 +18,17 @@ param openAiDeployment string
 param bingSearchKey string
 param scrapeAllowlist string
 
+@description('SKU for the Azure AI Vision account. F0 is free (5,000 transactions/month) but a subscription may only hold one F0 Computer Vision account — use S1 for a second environment.')
+param visionSkuName string = 'F0'
+
+@description('Model deployed for bag parsing. Must support strict structured outputs, which /api/parse relies on. Note that the gpt-5 family rejects the `temperature` parameter the BFF sends, so switching to it needs a code change.')
+param openAiModelName string = 'gpt-4o'
+
+param openAiModelVersion string = '2024-11-20'
+
+@description('Thousands of tokens per minute for the model deployment.')
+param openAiCapacity int = 10
+
 @allowed(['Free', 'Standard'])
 @description('Static Web App SKU. Standard is required for linked backends.')
 param staticWebAppSkuName string
@@ -32,15 +43,27 @@ var abbrev = {
   logAnalytics: 'log-${resourceToken}'
   appInsights: 'appi-${resourceToken}'
   staticWebApp: 'stapp-${resourceToken}'
+  vision: 'vision-${resourceToken}'
+  openAi: 'oai-${resourceToken}'
 }
 
 var deploymentContainerName = 'deploymentpackage'
 
-// Secrets are only provisioned when a value was supplied. The BFF falls back to
-// deterministic mocks when a key is absent, so a credential-free deployment is a
-// supported, fully working configuration.
-var hasVision = !empty(visionKey) && !empty(visionEndpoint)
-var hasOpenAi = !empty(openAiKey) && !empty(openAiEndpoint) && !empty(openAiDeployment)
+// The AI accounts below are always provisioned, so the app can actually read a
+// coffee bag on a fresh deployment. Supplying visionEndpoint/openAiEndpoint (and
+// their keys) overrides them with a bring-your-own resource instead.
+//
+// Because the accounts always exist, referencing them here is unconditional and
+// avoids the `if()` short-circuit pitfalls of conditionally-deployed resources.
+var effectiveVisionEndpoint = empty(visionEndpoint) ? vision.properties.endpoint : visionEndpoint
+var effectiveVisionKey = empty(visionKey) ? vision.listKeys().key1 : visionKey
+var effectiveOpenAiEndpoint = empty(openAiEndpoint) ? openAi.properties.endpoint : openAiEndpoint
+var effectiveOpenAiKey = empty(openAiKey) ? openAi.listKeys().key1 : openAiKey
+var effectiveOpenAiDeployment = empty(openAiDeployment) ? openAiModelName : openAiDeployment
+
+// The BFF still falls back to deterministic mocks when a key is absent, which is
+// what local development runs on. In Azure the credentials are always present,
+// so the Vision/OpenAI secrets and settings below are unconditional.
 var hasBing = !empty(bingSearchKey)
 
 // ---------------------------------------------------------------------------
@@ -102,6 +125,52 @@ resource deploymentContainer 'Microsoft.Storage/storageAccounts/blobServices/con
 }
 
 // ---------------------------------------------------------------------------
+// Azure AI — Vision reads the bag label, OpenAI turns that text into fields
+// ---------------------------------------------------------------------------
+
+resource vision 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
+  name: abbrev.vision
+  location: location
+  tags: tags
+  kind: 'ComputerVision'
+  sku: { name: visionSkuName }
+  properties: {
+    // Required for the account to get its own *.cognitiveservices.azure.com
+    // hostname, which the imageanalysis REST call is issued against.
+    customSubDomainName: abbrev.vision
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+resource openAi 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
+  name: abbrev.openAi
+  location: location
+  tags: tags
+  kind: 'OpenAI'
+  sku: { name: 'S0' }
+  properties: {
+    customSubDomainName: abbrev.openAi
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+resource openAiModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
+  parent: openAi
+  name: openAiModelName
+  sku: {
+    name: 'GlobalStandard'
+    capacity: openAiCapacity
+  }
+  properties: {
+    model: {
+      format: 'OpenAI'
+      name: openAiModelName
+      version: openAiModelVersion
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Key Vault
 // ---------------------------------------------------------------------------
 
@@ -119,16 +188,16 @@ resource keyVault 'Microsoft.KeyVault/vaults@2023-07-01' = {
   }
 }
 
-resource visionKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (hasVision) {
+resource visionKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
   name: 'azure-vision-key'
-  properties: { value: visionKey }
+  properties: { value: effectiveVisionKey }
 }
 
-resource openAiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (hasOpenAi) {
+resource openAiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
   name: 'azure-openai-key'
-  properties: { value: openAiKey }
+  properties: { value: effectiveOpenAiKey }
 }
 
 resource bingKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (hasBing) {
@@ -184,21 +253,21 @@ var baseAppSettings = [
   }
 ]
 
-var visionSettings = hasVision ? [
+var visionSettings = [
   {
     name: 'AZURE_VISION_ENDPOINT'
-    value: visionEndpoint
+    value: effectiveVisionEndpoint
   }
   {
     name: 'AZURE_VISION_KEY'
     value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/azure-vision-key/)'
   }
-] : []
+]
 
-var openAiSettings = hasOpenAi ? [
+var openAiSettings = [
   {
     name: 'AZURE_OPENAI_ENDPOINT'
-    value: openAiEndpoint
+    value: effectiveOpenAiEndpoint
   }
   {
     name: 'AZURE_OPENAI_KEY'
@@ -206,9 +275,9 @@ var openAiSettings = hasOpenAi ? [
   }
   {
     name: 'AZURE_OPENAI_DEPLOYMENT'
-    value: openAiDeployment
+    value: effectiveOpenAiDeployment
   }
-] : []
+]
 
 var bingSettings = hasBing ? [
   {
@@ -272,6 +341,12 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
     deploymentContainer
     storageBlobDataOwner
     keyVaultSecretsUser
+    // The app settings resolve these by Key Vault URI at startup. Without an
+    // explicit dependency the secrets can lag the app, which resolves to an
+    // empty value and silently drops the BFF into mock mode.
+    visionKeySecret
+    openAiKeySecret
+    openAiModelDeployment
   ]
 }
 
