@@ -101,7 +101,7 @@ Full instructions, monitoring queries, and CI/CD setup are in [`docs/deployment.
 - All user data lives locally in IndexedDB.
 - Photos are sent to Azure Vision and Azure OpenAI **only for the duration of processing**; the BFF logs no request bodies.
 - EXIF is stripped from images before forwarding.
-- Settings → Reset wipes IndexedDB, Cache Storage, and unregisters the service worker.
+- Settings → Danger zone → **Delete all data** wipes IndexedDB, deletes every Cache Storage entry, and unregisters the service worker. It is gated behind a typed confirmation because the deletion is unrecoverable — export first.
 
 See [`SECURITY.md`](./SECURITY.md) for vulnerability reporting.
 

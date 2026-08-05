@@ -1,8 +1,16 @@
+import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/services/db';
 import { exportCsv, exportJson, exportJsonWithPhotos } from '@/services/export/exporter';
+import {
+  RESET_CONFIRMATION_PHRASE,
+  formatBytes,
+  getStorageEstimate,
+  resetAllData,
+  type StorageEstimateSummary,
+} from '@/services/storage/reset';
 
 export function SettingsPage() {
   const pending = useLiveQuery(() => db.pendingAiTasks.toArray(), []) ?? [];
@@ -68,16 +76,94 @@ export function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>About</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            See <code>specs/ui.md §7</code>. Storage usage and reset land here.
-          </p>
-        </CardContent>
-      </Card>
+      <DangerZone />
     </div>
+  );
+}
+
+function DangerZone() {
+  const [estimate, setEstimate] = useState<StorageEstimateSummary | null>(null);
+  const [confirmation, setConfirmation] = useState('');
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const refreshEstimate = useCallback(() => {
+    void getStorageEstimate().then(setEstimate);
+  }, []);
+
+  useEffect(refreshEstimate, [refreshEstimate]);
+
+  const unlocked = confirmation.trim().toUpperCase() === RESET_CONFIRMATION_PHRASE;
+
+  async function handleReset() {
+    setBusy(true);
+    setStatus('Deleting local data…');
+    const result = await resetAllData();
+    if (result.errors.length > 0) {
+      // Surface the failure instead of reloading, otherwise the user would see
+      // a seemingly-clean app and never learn that some data survived.
+      setStatus(`Reset incomplete: ${result.errors.join('; ')}. Try again.`);
+      setBusy(false);
+      setConfirmation('');
+      refreshEstimate();
+      return;
+    }
+    setStatus('Local data deleted. Reloading…');
+    window.location.href = '/';
+  }
+
+  return (
+    <Card className="border-destructive/50">
+      <CardHeader>
+        <CardTitle className="text-destructive">Danger zone</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <h3 className="text-sm font-medium">Storage used</h3>
+          <p className="text-sm text-muted-foreground">
+            {estimate === null
+              ? 'Checking…'
+              : estimate.supported
+                ? `${formatBytes(estimate.usageBytes)} of ${formatBytes(estimate.quotaBytes)} available`
+                : 'Your browser does not report storage usage.'}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <h3 className="text-sm font-medium">Delete all data</h3>
+          <p className="text-sm text-muted-foreground">
+            This permanently removes every coffee, rating and photo from this device, along with
+            cached files and the offline service worker. Nothing is stored on a server, so anything
+            you have not exported above is unrecoverable.
+          </p>
+          <label htmlFor="reset-confirm" className="block text-sm font-medium">
+            Type <code>{RESET_CONFIRMATION_PHRASE}</code> to confirm
+          </label>
+          <input
+            id="reset-confirm"
+            type="text"
+            autoComplete="off"
+            value={confirmation}
+            onChange={(e) => setConfirmation(e.target.value)}
+            disabled={busy}
+            className="h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          />
+          <div>
+            <Button
+              variant="destructive"
+              disabled={!unlocked || busy}
+              onClick={() => void handleReset()}
+            >
+              Delete all data
+            </Button>
+          </div>
+          {status && (
+            <p role="status" className="text-sm text-destructive">
+              {status}
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
