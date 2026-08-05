@@ -34,6 +34,7 @@ logs/
 
 # --- Azure Functions ---
 api/local.settings.json
+api/deploy/
 api/bin/
 api/obj/
 .azure/
