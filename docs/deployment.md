@@ -13,7 +13,7 @@ Everything is defined in `infra/main.bicep` (subscription scope) and `infra/reso
 
 ## AI services are provisioned for you
 
-`azd provision` creates an Azure AI Vision account and an Azure OpenAI account with a `gpt-4o`
+`azd provision` creates an Azure AI Vision account and an Azure AI Foundry account with a `gpt-4o`
 deployment, so `/api/ocr`, `/api/parse`, and `/api/recommend` are **live on a first deploy** with no
 manual setup. Two things to know:
 
@@ -44,6 +44,36 @@ history are not retained in the service-side response store.
 
 Authentication is the `api-key` header, with the key delivered as a Key Vault reference. Managed
 identity is **not** required for the AI calls.
+
+### The account is a Foundry resource, not a classic Azure OpenAI one
+
+`infra/resources.bicep` provisions the account as `kind: 'AIServices'` with
+`allowProjectManagement: true`, plus a `Microsoft.CognitiveServices/accounts/projects` child named
+`coffee-tracker` (override with the `openAiProjectName` parameter).
+
+This is the current resource model. The older `kind: 'OpenAI'` account is not deprecated and has no
+announced retirement date, but it renders only in the classic Azure OpenAI portal — the new Foundry
+portal works in terms of *projects*, so an account without one appears to be missing or empty there.
+Microsoft is also auto-upgrading eligible classic accounts, so doing it deliberately is preferable to
+being migrated unannounced.
+
+Three things this template pins on purpose:
+
+- **`disableLocalAuth: false`.** Microsoft's upgrade guidance shows `true`, which would disable API
+  keys and break the Key Vault reference the Function App authenticates with.
+- **A system-assigned identity on the account.** Required by the Foundry resource model. This is an
+  identity *on the Cognitive Services account*; the BFF still authenticates with an API key, so it
+  does not make managed identity a prerequisite for the application.
+- **`AZURE_OPENAI_ENDPOINT` is built as `https://<account>.openai.azure.com/`, not read from
+  `properties.endpoint`.** On an `AIServices` account that property returns the generic
+  `*.cognitiveservices.azure.com` hostname. Both currently answer `/openai/v1/responses`, but only
+  `*.openai.azure.com` is documented for that data plane.
+
+Upgrading an existing account is an in-place `Modify` — run `azd provision`. The resource name,
+endpoint, keys, and model deployments are all preserved, and no application code changes.
+
+Avoid the **Standard agent** setup when adding to this resource: it provisions customer-owned Cosmos
+DB, AI Search, and Storage, which carry real idle cost. A plain account plus project does not.
 
 ### Why `gpt-4o` and not a smaller model
 
