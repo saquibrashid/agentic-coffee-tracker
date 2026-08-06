@@ -30,8 +30,8 @@ param openAiDeployment string = ''
 @description('Optional. Bing Web Search key. Stored in Key Vault, never in app settings.')
 param bingSearchKey string = ''
 
-@description('Comma-separated hosts the /api/scrape endpoint is allowed to fetch. `*.example` is reserved by RFC 2606, never resolves, and enables the credential-free mock path.')
-param scrapeAllowlist string = '*.example,bluebottlecoffee.com,counterculturecoffee.com,intelligentsiacoffee.com'
+@description('Optional. Comma-separated hosts the /api/scrape endpoint may fetch. Empty (the default) allows any publicly routable host, which is what lets enrichment read arbitrary roaster storefronts; the endpoint still refuses private, loopback, and link-local addresses on every redirect hop. Set this to pin the deployment to a fixed set of stores.')
+param scrapeAllowlist string = ''
 
 @allowed(['Free', 'Standard'])
 @description('Static Web App SKU. Standard adds linked backends (same-origin /api) but is not free.')
