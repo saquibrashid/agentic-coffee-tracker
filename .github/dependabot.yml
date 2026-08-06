@@ -1,29 +1,29 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    labels: ["chore", "dependencies"]
+    labels: ['chore', 'dependencies']
 
   - package-ecosystem: npm
-    directory: "/"
+    directory: '/'
     schedule:
       interval: weekly
     open-pull-requests-limit: 10
-    labels: ["chore", "dependencies"]
+    labels: ['chore', 'dependencies']
     groups:
       types:
-        patterns: ["@types/*"]
+        patterns: ['@types/*']
       eslint:
-        patterns: ["eslint*", "@typescript-eslint/*"]
+        patterns: ['eslint*', '@typescript-eslint/*']
       testing:
-        patterns: ["vitest", "@vitest/*", "@testing-library/*", "playwright", "@playwright/*"]
+        patterns: ['vitest', '@vitest/*', '@testing-library/*', 'playwright', '@playwright/*']
 
   - package-ecosystem: npm
-    directory: "/api"
+    directory: '/api'
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    labels: ["chore", "dependencies", "area:api"]
+    labels: ['chore', 'dependencies', 'area:api']

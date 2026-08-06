@@ -28,7 +28,14 @@ const COLUMN_ALIASES: Record<string, string[]> = {
   roastLevel: ['roast', 'roastlevel'],
   process: ['process', 'processing', 'processmethod'],
   origin: ['origin', 'origins', 'country'],
-  tastingNotes: ['tastingnotes', 'flavournotes', 'flavornotes', 'flavours', 'flavors', 'notesonbag'],
+  tastingNotes: [
+    'tastingnotes',
+    'flavournotes',
+    'flavornotes',
+    'flavours',
+    'flavors',
+    'notesonbag',
+  ],
 };
 
 /** Columns without which a row cannot become a rating. */
@@ -389,7 +396,10 @@ export function planCsvImport(text: string, existing: ExistingData): ImportPlan 
 
     const dedupeKey = ratingKey(bean.id, ratedAt, brewType, score);
     if (seenRatings.has(dedupeKey)) {
-      plan.duplicates.push({ line, message: `${roaster} — ${name} (${score}/5) already recorded.` });
+      plan.duplicates.push({
+        line,
+        message: `${roaster} — ${name} (${score}/5) already recorded.`,
+      });
       continue;
     }
     seenRatings.add(dedupeKey);

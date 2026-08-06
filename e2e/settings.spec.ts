@@ -24,8 +24,6 @@ test.describe('Settings danger zone', () => {
   test('reports storage usage', async ({ page }) => {
     await page.goto('/settings');
     await expect(page.getByText(/Storage used/i)).toBeVisible();
-    await expect(
-      page.getByText(/available|does not report storage usage/i).first(),
-    ).toBeVisible();
+    await expect(page.getByText(/available|does not report storage usage/i).first()).toBeVisible();
   });
 });

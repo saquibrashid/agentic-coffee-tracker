@@ -100,14 +100,8 @@ export function RecommendationsPage() {
               <TasteRow label="Origins" items={preferences?.favoriteOrigins ?? []} />
               <TasteRow label="Roasters" items={preferences?.favoriteRoasters ?? []} />
               <TasteRow label="Flavours" items={preferences?.favoriteFlavors ?? []} />
-              <TasteRow
-                label="Roast levels"
-                items={(preferences?.favoriteRoastLevels ?? [])}
-              />
-              <TasteRow
-                label="Brew methods"
-                items={(preferences?.favoriteBrewTypes ?? [])}
-              />
+              <TasteRow label="Roast levels" items={preferences?.favoriteRoastLevels ?? []} />
+              <TasteRow label="Brew methods" items={preferences?.favoriteBrewTypes ?? []} />
             </dl>
           )}
         </CardContent>

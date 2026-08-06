@@ -37,18 +37,18 @@ specs/
 
 ## 🧰 Planned tech stack
 
-| Layer | Choice |
-|---|---|
-| Frontend | **React 18 + TypeScript + Vite** as a **PWA** |
-| Styling | **Tailwind CSS** + **shadcn/ui** (Radix primitives) + **lucide-react** icons |
-| Charts | Recharts (lazy-loaded) |
-| Local storage | **IndexedDB** via **Dexie 4** |
-| Backend (BFF) | **Azure Functions** (Node 20, TypeScript, v4 model) |
-| AI services | Azure AI Vision (OCR), Azure OpenAI (parsing + summaries), Bing Web Search |
-| Hosting | Azure Static Web Apps (Standard) |
-| IaC | Bicep (`/infra`) |
-| Testing | Vitest, Testing Library, Playwright, axe-core |
-| Accessibility | WCAG 2.1 AA target |
+| Layer         | Choice                                                                       |
+| ------------- | ---------------------------------------------------------------------------- |
+| Frontend      | **React 18 + TypeScript + Vite** as a **PWA**                                |
+| Styling       | **Tailwind CSS** + **shadcn/ui** (Radix primitives) + **lucide-react** icons |
+| Charts        | Recharts (lazy-loaded)                                                       |
+| Local storage | **IndexedDB** via **Dexie 4**                                                |
+| Backend (BFF) | **Azure Functions** (Node 20, TypeScript, v4 model)                          |
+| AI services   | Azure AI Vision (OCR), Azure OpenAI (parsing + summaries), Bing Web Search   |
+| Hosting       | Azure Static Web Apps (Standard)                                             |
+| IaC           | Bicep (`/infra`)                                                             |
+| Testing       | Vitest, Testing Library, Playwright, axe-core                                |
+| Accessibility | WCAG 2.1 AA target                                                           |
 
 See [`specs/architecture.md`](./specs/architecture.md) for the full rationale.
 

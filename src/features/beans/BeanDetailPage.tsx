@@ -111,7 +111,9 @@ export function BeanDetailPage() {
           <div>
             <h3 className="text-sm font-medium">Attributes</h3>
             <p className="text-sm text-muted-foreground">Roast: {bean.roastLevel || '—'}</p>
-            <p className="text-sm text-muted-foreground">Origins: {(bean.origins ?? []).map((o) => o.country).join(', ') || '—'}</p>
+            <p className="text-sm text-muted-foreground">
+              Origins: {(bean.origins ?? []).map((o) => o.country).join(', ') || '—'}
+            </p>
             {bean.sourceUrl && (
               <p className="break-all text-xs text-muted-foreground">
                 Source:{' '}
@@ -154,7 +156,10 @@ export function BeanDetailPage() {
 }
 
 function RatingsList({ beanId }: { beanId: string }) {
-  const ratings = useLiveQuery(() => db.ratings.where('beanId').equals(beanId).reverse().toArray(), [beanId]);
+  const ratings = useLiveQuery(
+    () => db.ratings.where('beanId').equals(beanId).reverse().toArray(),
+    [beanId],
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
 
   if (ratings === undefined) return <Skeleton className="h-24" />;
@@ -374,7 +379,7 @@ function AddRatingForm({ beanId }: { beanId: string }) {
   }
 
   return (
-    <div className="space-y-2 mt-2">
+    <div className="mt-2 space-y-2">
       <div className="flex gap-2">
         <select
           value={score}
@@ -401,9 +406,21 @@ function AddRatingForm({ beanId }: { beanId: string }) {
           ))}
         </select>
       </div>
-      <textarea value={notes} onChange={(e)=>setNotes(e.target.value)} className="w-full rounded border p-2" aria-label="Tasting notes" placeholder="Tasting notes (optional)" />
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        className="w-full rounded border p-2"
+        aria-label="Tasting notes"
+        placeholder="Tasting notes (optional)"
+      />
       <div className="flex justify-end">
-        <button onClick={onAdd} disabled={saving} className="rounded bg-primary px-3 py-2 text-white">{saving ? 'Adding…' : 'Add rating'}</button>
+        <button
+          onClick={onAdd}
+          disabled={saving}
+          className="rounded bg-primary px-3 py-2 text-white"
+        >
+          {saving ? 'Adding…' : 'Add rating'}
+        </button>
       </div>
     </div>
   );

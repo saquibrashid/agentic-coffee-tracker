@@ -1,8 +1,8 @@
 ---
 name: 📐 Spec gap or ambiguity
 about: Something in the specs is missing, contradictory, or unclear
-title: "[spec] "
-labels: ["spec", "needs-triage"]
+title: '[spec] '
+labels: ['spec', 'needs-triage']
 assignees: []
 ---
 

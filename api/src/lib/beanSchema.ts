@@ -135,7 +135,14 @@ export function normalizeParsedBean(input: unknown): unknown {
   if (!isPlainObject(input)) return input;
   const obj: Record<string, unknown> = { ...input };
 
-  for (const key of ['roaster', 'name', 'process', 'roastLevel', 'roastDate', 'roasterDescription']) {
+  for (const key of [
+    'roaster',
+    'name',
+    'process',
+    'roastLevel',
+    'roastDate',
+    'roasterDescription',
+  ]) {
     if (obj[key] === undefined) obj[key] = null;
   }
   for (const key of ['origins', 'tastingNotes', 'varietals']) {

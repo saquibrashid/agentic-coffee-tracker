@@ -8,10 +8,10 @@ for (const route of routes) {
     await page.goto(route);
     // Wait for page to settle
     await page.waitForLoadState('networkidle');
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa'])
-      .analyze();
-    const critical = results.violations.filter((v) => v.impact === 'critical' || v.impact === 'serious');
+    const results = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa']).analyze();
+    const critical = results.violations.filter(
+      (v) => v.impact === 'critical' || v.impact === 'serious',
+    );
     if (critical.length > 0) {
       console.log('Accessibility violations on', route, JSON.stringify(critical, null, 2));
     }

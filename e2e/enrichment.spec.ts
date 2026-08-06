@@ -44,7 +44,13 @@ async function stubEnrichmentApi(page: Page) {
           roaster: 'Mock Roaster',
           name: 'Yirgacheffe',
           origins: [
-            { country: 'Ethiopia', region: 'Yirgacheffe', farm: null, producer: null, percentage: null },
+            {
+              country: 'Ethiopia',
+              region: 'Yirgacheffe',
+              farm: null,
+              producer: null,
+              percentage: null,
+            },
           ],
           process: 'washed',
           roastLevel: 'light',
@@ -78,7 +84,9 @@ test.describe('Web enrichment', () => {
     await expect(page).toHaveURL(/\/beans\//, { timeout: 15000 });
   });
 
-  test('applies only the fields the user accepts, preserving their own values', async ({ page }) => {
+  test('applies only the fields the user accepts, preserving their own values', async ({
+    page,
+  }) => {
     await stubEnrichmentApi(page);
     await page.goto('/add');
     await page.getByLabel(/import from a link/i).fill('https://mockroaster.example/geometry');

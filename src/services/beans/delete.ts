@@ -27,7 +27,11 @@ export async function summariseDeletion(beanIds: string[]): Promise<DeletionSumm
     ...doomedRatings.flatMap((r) => (r.cupPhotoId ? [r.cupPhotoId] : [])),
   ]);
 
-  return { beans: beans.filter(Boolean).length, ratings: doomedRatings.length, photos: photos.size };
+  return {
+    beans: beans.filter(Boolean).length,
+    ratings: doomedRatings.length,
+    photos: photos.size,
+  };
 }
 
 export async function deleteBeans(beanIds: string[]): Promise<DeletionSummary> {

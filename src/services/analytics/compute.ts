@@ -10,8 +10,8 @@ export interface AnalyticsSummary {
 }
 
 export async function computeAnalytics(): Promise<AnalyticsSummary> {
-  const beans = (await db.beans.toArray());
-  const ratings = (await db.ratings.toArray());
+  const beans = await db.beans.toArray();
+  const ratings = await db.ratings.toArray();
 
   const totalBeans = beans.length;
   const totalRatings = ratings.length;

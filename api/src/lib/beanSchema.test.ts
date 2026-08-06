@@ -12,9 +12,7 @@ import {
 const valid = {
   roaster: 'Onyx',
   name: 'Geometry',
-  origins: [
-    { country: 'Ethiopia', region: 'Guji', farm: null, producer: null, percentage: 60 },
-  ],
+  origins: [{ country: 'Ethiopia', region: 'Guji', farm: null, producer: null, percentage: 60 }],
   process: 'washed',
   roastLevel: 'medium-light',
   tastingNotes: ['peach', 'jasmine'],

@@ -1,4 +1,9 @@
-import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
+import {
+  app,
+  type HttpRequest,
+  type HttpResponseInit,
+  type InvocationContext,
+} from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
 import { safeFetch, UnsafeUrlError } from '../lib/safeFetch.js';
 import { callResponses, getOpenAiConfig, parseJsonOutput } from '../lib/openai.js';
@@ -104,7 +109,11 @@ function stripHtml(html: string): string {
  * Most specialty roasters run Shopify, which exposes a predictable JSON search
  * endpoint. When it answers, the results are real products with real URLs.
  */
-export async function searchShopify(domain: string, query: string, max: number): Promise<SearchHit[]> {
+export async function searchShopify(
+  domain: string,
+  query: string,
+  max: number,
+): Promise<SearchHit[]> {
   const params = new URLSearchParams({
     q: query,
     'resources[type]': 'product',

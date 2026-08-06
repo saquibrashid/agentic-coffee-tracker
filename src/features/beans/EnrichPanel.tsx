@@ -206,7 +206,11 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
                 ))}
               </ul>
               <div className="flex gap-2">
-                <Button size="sm" disabled={selected.size === 0} onClick={() => void applySelected()}>
+                <Button
+                  size="sm"
+                  disabled={selected.size === 0}
+                  onClick={() => void applySelected()}
+                >
                   Apply {selected.size} {selected.size === 1 ? 'change' : 'changes'}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={restart}>

@@ -2,10 +2,10 @@
 
 Agentic Coffee Tracker deploys to Azure as two services:
 
-| Service | Azure resource | azd service name |
-| --- | --- | --- |
-| SPA (Vite/React PWA) | Static Web App | `web` |
-| BFF (Azure Functions v4, Node 20) | Function App on Flex Consumption | `api` |
+| Service                           | Azure resource                   | azd service name |
+| --------------------------------- | -------------------------------- | ---------------- |
+| SPA (Vite/React PWA)              | Static Web App                   | `web`            |
+| BFF (Azure Functions v4, Node 20) | Function App on Flex Consumption | `api`            |
 
 Supporting resources: Log Analytics workspace, Application Insights (workspace-based) with a synthetic availability test, Storage account (Functions runtime + deployment package), Key Vault (RBAC) for AI keys, and a user-assigned managed identity used for both storage and Key Vault access.
 
@@ -42,7 +42,7 @@ Every AI parameter also accepts a bring-your-own value (`visionEndpoint`/`vision
 `openAiEndpoint`/`openAiKey`/`openAiDeployment`). Set one and the provisioned account is bypassed in
 favour of yours.
 
-If an endpoint ever *does* fall back to its mock, the capture screen says so explicitly rather than
+If an endpoint ever _does_ fall back to its mock, the capture screen says so explicitly rather than
 presenting fixtures as a real read of your bag.
 
 ### Which Azure OpenAI API the BFF calls
@@ -67,7 +67,7 @@ identity is **not** required for the AI calls.
 
 This is the current resource model. The older `kind: 'OpenAI'` account is not deprecated and has no
 announced retirement date, but it renders only in the classic Azure OpenAI portal — the new Foundry
-portal works in terms of *projects*, so an account without one appears to be missing or empty there.
+portal works in terms of _projects_, so an account without one appears to be missing or empty there.
 Microsoft is also auto-upgrading eligible classic accounts, so doing it deliberately is preferable to
 being migrated unannounced.
 
@@ -76,7 +76,7 @@ Three things this template pins on purpose:
 - **`disableLocalAuth: false`.** Microsoft's upgrade guidance shows `true`, which would disable API
   keys and break the Key Vault reference the Function App authenticates with.
 - **A system-assigned identity on the account.** Required by the Foundry resource model. This is an
-  identity *on the Cognitive Services account*; the BFF still authenticates with an API key, so it
+  identity _on the Cognitive Services account_; the BFF still authenticates with an API key, so it
   does not make managed identity a prerequisite for the application.
 - **`AZURE_OPENAI_ENDPOINT` is built as `https://<account>.openai.azure.com/`, not read from
   `properties.endpoint`.** On an `AIServices` account that property returns the generic
@@ -93,11 +93,11 @@ DB, AI Search, and Storage, which carry real idle cost. A plain account plus pro
 
 Worth recording, because the obvious cheaper choices all fail:
 
-| Model | Why not |
-| --- | --- |
-| `gpt-4o-mini` (`2024-07-18`) | Deployment is rejected with `ServiceModelDeprecating`. |
-| `gpt-4.1-mini` | No `GlobalStandard` quota — only the batch tiers. |
-| `gpt-5-mini` | Rejects `temperature`, and `parse.ts`/`recommend.ts` send `temperature: 0` for determinism. Usable only with code changes. |
+| Model                        | Why not                                                                                                                    |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `gpt-4o-mini` (`2024-07-18`) | Deployment is rejected with `ServiceModelDeprecating`.                                                                     |
+| `gpt-4.1-mini`               | No `GlobalStandard` quota — only the batch tiers.                                                                          |
+| `gpt-5-mini`                 | Rejects `temperature`, and `parse.ts`/`recommend.ts` send `temperature: 0` for determinism. Usable only with code changes. |
 
 `gpt-4o` (`2024-11-20`) deploys cleanly, needs no code change, and costs a fraction of a cent per
 scan.
@@ -127,7 +127,7 @@ Optional — upgrade the Static Web App so the SPA reaches the BFF same-origin:
 azd env set STATIC_WEB_APP_SKU Standard
 ```
 
-`Standard` provisions a *linked backend*, which proxies `https://<swa-host>/api/*` to the Function App. The SPA then needs no API base URL and makes no cross-origin requests. `Free` (the default) is zero-cost; the SPA calls the Function App directly and `VITE_API_BASE_URL` is populated with the Function App URL.
+`Standard` provisions a _linked backend_, which proxies `https://<swa-host>/api/*` to the Function App. The SPA then needs no API base URL and makes no cross-origin requests. `Free` (the default) is zero-cost; the SPA calls the Function App directly and `VITE_API_BASE_URL` is populated with the Function App URL.
 
 ## Deploy
 
@@ -202,17 +202,17 @@ dependencies
 
 Rough monthly estimate for personal usage (US East, pay-as-you-go, USD). Prices drift — check the [pricing calculator](https://azure.microsoft.com/pricing/calculator/) before relying on these.
 
-| Resource | Default config | Est. / month |
-| --- | --- | --- |
-| App Insights availability test | 3 locations × every 5 min ≈ 26,000 runs | **~$26** |
-| Static Web App | `Free` SKU | $0 |
-| Function App | Flex Consumption; free grant covers 250k executions + 100k GB-s | $0 |
-| App Insights / Log Analytics | First 5 GB/month free; this app ingests ~100 MB | $0 |
-| Storage | Standard_LRS, a few MB deployment package | ~$0.10 |
-| Key Vault | $0.03 per 10k operations | <$0.01 |
-| Azure AI Vision | `F0`: 5,000 transactions/month free | $0 |
-| Azure OpenAI (`gpt-4o`) | Pay-per-token; a bag scan is ~1k tokens | ~$0.50 |
-| **Total** | | **~$27** |
+| Resource                       | Default config                                                  | Est. / month |
+| ------------------------------ | --------------------------------------------------------------- | ------------ |
+| App Insights availability test | 3 locations × every 5 min ≈ 26,000 runs                         | **~$26**     |
+| Static Web App                 | `Free` SKU                                                      | $0           |
+| Function App                   | Flex Consumption; free grant covers 250k executions + 100k GB-s | $0           |
+| App Insights / Log Analytics   | First 5 GB/month free; this app ingests ~100 MB                 | $0           |
+| Storage                        | Standard_LRS, a few MB deployment package                       | ~$0.10       |
+| Key Vault                      | $0.03 per 10k operations                                        | <$0.01       |
+| Azure AI Vision                | `F0`: 5,000 transactions/month free                             | $0           |
+| Azure OpenAI (`gpt-4o`)        | Pay-per-token; a bag scan is ~1k tokens                         | ~$0.50       |
+| **Total**                      |                                                                 | **~$27**     |
 
 The availability test is the entire bill. Everything else combined is under a dollar, because a personal-scale workload sits inside the Functions and Azure Monitor free grants.
 
@@ -230,15 +230,15 @@ Knobs, in order of impact:
 
 The job skips itself unless these repository **variables** are set:
 
-| Variable | Purpose |
-| --- | --- |
-| `AZURE_CLIENT_ID` | App registration used for OIDC |
-| `AZURE_TENANT_ID` | Directory tenant |
-| `AZURE_SUBSCRIPTION_ID` | Target subscription |
-| `AZURE_ENV_NAME` | azd environment name (default `coffee-dev`) |
-| `AZURE_LOCATION` | Azure region (default `eastus2`) |
-| `STATIC_WEB_APP_SKU` | `Free` or `Standard` (default `Free`) |
-| `AZURE_VISION_ENDPOINT`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT` | Non-secret AI config |
+| Variable                                                                    | Purpose                                     |
+| --------------------------------------------------------------------------- | ------------------------------------------- |
+| `AZURE_CLIENT_ID`                                                           | App registration used for OIDC              |
+| `AZURE_TENANT_ID`                                                           | Directory tenant                            |
+| `AZURE_SUBSCRIPTION_ID`                                                     | Target subscription                         |
+| `AZURE_ENV_NAME`                                                            | azd environment name (default `coffee-dev`) |
+| `AZURE_LOCATION`                                                            | Azure region (default `eastus2`)            |
+| `STATIC_WEB_APP_SKU`                                                        | `Free` or `Standard` (default `Free`)       |
+| `AZURE_VISION_ENDPOINT`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT` | Non-secret AI config                        |
 
 Keys go in repository **secrets**: `AZURE_VISION_KEY`, `AZURE_OPENAI_KEY`.
 

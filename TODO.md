@@ -27,8 +27,8 @@ High-level roadmap for the Agentic Coffee Tracker. Detailed work items live in [
 
 ## 🟡 Next up
 
-| # | Issue | Notes |
-|---|-------|-------|
+| #                                                                       | Issue                              | Notes                                                             |
+| ----------------------------------------------------------------------- | ---------------------------------- | ----------------------------------------------------------------- |
 | [#15](https://github.com/saquibrashid/agentic-coffee-tracker/issues/15) | Azure smoke + Application Insights | IaC and probes are in place; needs a real subscription to execute |
 
 ## 💡 Ideas (not yet issues)

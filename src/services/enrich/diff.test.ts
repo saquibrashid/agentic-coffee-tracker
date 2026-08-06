@@ -28,7 +28,9 @@ function parsed(overrides: Partial<ParsedBean> = {}): ParsedBean {
   return {
     roaster: 'Onyx Coffee Lab',
     name: 'Geometry',
-    origins: [{ country: 'Ethiopia', region: 'Guji', farm: null, producer: null, percentage: null }],
+    origins: [
+      { country: 'Ethiopia', region: 'Guji', farm: null, producer: null, percentage: null },
+    ],
     process: 'washed',
     roastLevel: 'light',
     tastingNotes: ['peach', 'jasmine'],
@@ -149,7 +151,10 @@ describe('defaultSelection', () => {
 });
 
 describe('applyProposals', () => {
-  const options = { sourceUrl: 'https://roaster.example/geometry', now: '2026-06-01T00:00:00.000Z' };
+  const options = {
+    sourceUrl: 'https://roaster.example/geometry',
+    now: '2026-06-01T00:00:00.000Z',
+  };
 
   it('writes only the fields the user accepted', () => {
     const selected = new Set<EnrichableField>(['tastingNotes', 'process']);

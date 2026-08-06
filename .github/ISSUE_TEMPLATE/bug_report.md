@@ -1,8 +1,8 @@
 ---
 name: 🐛 Bug report
 about: Something isn't working as expected
-title: "[bug] "
-labels: ["bug", "needs-triage"]
+title: '[bug] '
+labels: ['bug', 'needs-triage']
 assignees: []
 ---
 

@@ -68,7 +68,9 @@ export async function planJsonImport(text: string): Promise<JsonImportPlan> {
   const ratingIds = new Set(existingRatings.map((r) => r.id));
   const photoIds = new Set(existingPhotos.map((p) => p.id));
 
-  const newBeans = beans.filter((b) => isRecord(b) && typeof b.id === 'string' && !beanIds.has(b.id));
+  const newBeans = beans.filter(
+    (b) => isRecord(b) && typeof b.id === 'string' && !beanIds.has(b.id),
+  );
   for (const bean of newBeans) beanIds.add(bean.id);
 
   const candidateRatings = ratings.filter(

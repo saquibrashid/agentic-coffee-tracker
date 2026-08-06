@@ -13,7 +13,9 @@ import {
 
 const EMPTY: ExistingData = { beans: [], ratings: [] };
 
-function bean(overrides: Partial<CoffeeBean> & Pick<CoffeeBean, 'id' | 'roaster' | 'name'>): CoffeeBean {
+function bean(
+  overrides: Partial<CoffeeBean> & Pick<CoffeeBean, 'id' | 'roaster' | 'name'>,
+): CoffeeBean {
   return {
     schemaVersion: 1,
     source: 'manual',
@@ -182,9 +184,10 @@ describe('planCsvImport', () => {
   });
 
   it('accepts alternative column names', () => {
-    const csv = ['Brand,Bean Name,Stars,Brew Method,Date Tried', 'Onyx,Geometry,5,V60,2025-03-14'].join(
-      '\n',
-    );
+    const csv = [
+      'Brand,Bean Name,Stars,Brew Method,Date Tried',
+      'Onyx,Geometry,5,V60,2025-03-14',
+    ].join('\n');
 
     const plan = planCsvImport(csv, EMPTY);
 

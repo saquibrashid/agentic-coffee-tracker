@@ -24,7 +24,15 @@ type Preview =
 /** How many example lines to show before collapsing to a count. */
 const ISSUE_PREVIEW_LIMIT = 5;
 
-function IssueList({ title, issues, tone }: { title: string; issues: ImportIssue[]; tone: string }) {
+function IssueList({
+  title,
+  issues,
+  tone,
+}: {
+  title: string;
+  issues: ImportIssue[];
+  tone: string;
+}) {
   if (issues.length === 0) return null;
   const shown = issues.slice(0, ISSUE_PREVIEW_LIMIT);
   return (

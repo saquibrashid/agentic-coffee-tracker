@@ -8,7 +8,12 @@ async function seedBeans(page: Page) {
   await page.goto('/');
   // The app owns the schema, so wait for its first render to prove Dexie has
   // finished creating the object stores before writing into them.
-  await expect(page.getByRole('heading', { level: 2 }).or(page.getByText(/welcome to your coffee log/i)).first()).toBeVisible();
+  await expect(
+    page
+      .getByRole('heading', { level: 2 })
+      .or(page.getByText(/welcome to your coffee log/i))
+      .first(),
+  ).toBeVisible();
 
   await page.evaluate(async () => {
     async function openDb(): Promise<IDBDatabase> {
@@ -28,13 +33,33 @@ async function seedBeans(page: Page) {
     const db = await openDb();
     const now = new Date().toISOString();
     const beans = [
-      { id: 'seed-1', name: 'Yirgacheffe', roaster: 'Blue Bottle', createdAt: '2026-03-01T00:00:00.000Z' },
+      {
+        id: 'seed-1',
+        name: 'Yirgacheffe',
+        roaster: 'Blue Bottle',
+        createdAt: '2026-03-01T00:00:00.000Z',
+      },
       { id: 'seed-2', name: 'Huila', roaster: 'Onyx', createdAt: '2026-02-01T00:00:00.000Z' },
-      { id: 'seed-3', name: 'Kirinyaga', roaster: 'Tim Wendelboe', createdAt: '2026-01-05T00:00:00.000Z' },
-      { id: 'seed-4', name: 'Sidamo', roaster: 'Counter Culture', createdAt: '2026-01-04T00:00:00.000Z' },
+      {
+        id: 'seed-3',
+        name: 'Kirinyaga',
+        roaster: 'Tim Wendelboe',
+        createdAt: '2026-01-05T00:00:00.000Z',
+      },
+      {
+        id: 'seed-4',
+        name: 'Sidamo',
+        roaster: 'Counter Culture',
+        createdAt: '2026-01-04T00:00:00.000Z',
+      },
       { id: 'seed-5', name: 'Antigua', roaster: 'Verve', createdAt: '2026-01-03T00:00:00.000Z' },
       { id: 'seed-6', name: 'Gesha', roaster: 'Ceremony', createdAt: '2026-01-02T00:00:00.000Z' },
-      { id: 'seed-7', name: 'Buried Treasure', roaster: 'Sey', createdAt: '2026-01-01T00:00:00.000Z' },
+      {
+        id: 'seed-7',
+        name: 'Buried Treasure',
+        roaster: 'Sey',
+        createdAt: '2026-01-01T00:00:00.000Z',
+      },
     ];
     const tx = db.transaction('beans', 'readwrite');
     const store = tx.objectStore('beans');
@@ -88,7 +113,10 @@ test.describe('Bean library', () => {
     await search.fill('nothing matches this');
     await expect(page.getByText(/no beans match your filters/i)).toBeVisible();
 
-    await page.getByRole('button', { name: /clear filters/i }).first().click();
+    await page
+      .getByRole('button', { name: /clear filters/i })
+      .first()
+      .click();
     await expect(rows).toHaveCount(7);
   });
 
@@ -140,7 +168,10 @@ test.describe('Bean library', () => {
     await page.getByRole('checkbox', { name: /select gesha/i }).check();
     await expect(page.getByText('2 selected')).toBeVisible();
 
-    await page.getByRole('button', { name: /^remove$/i }).first().click();
+    await page
+      .getByRole('button', { name: /^remove$/i })
+      .first()
+      .click();
     await page.getByRole('dialog').getByRole('button', { name: 'Remove' }).click();
 
     await expect(page.getByRole('list', { name: 'Beans' }).getByRole('listitem')).toHaveCount(5);
