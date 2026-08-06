@@ -27,6 +27,9 @@ param openAiModelVersion string = '2024-11-20'
 @description('Thousands of tokens per minute for the model deployment.')
 param openAiCapacity int = 10
 
+@description('Name of the Foundry project created under the Azure OpenAI account. The new Foundry portal only surfaces projects, not bare accounts.')
+param openAiProjectName string = 'coffee-tracker'
+
 @allowed(['Free', 'Standard'])
 @description('Static Web App SKU. Standard is required for linked backends.')
 param staticWebAppSkuName string
@@ -55,7 +58,15 @@ var deploymentContainerName = 'deploymentpackage'
 // avoids the `if()` short-circuit pitfalls of conditionally-deployed resources.
 var effectiveVisionEndpoint = empty(visionEndpoint) ? vision.properties.endpoint : visionEndpoint
 var effectiveVisionKey = empty(visionKey) ? vision.listKeys().key1 : visionKey
-var effectiveOpenAiEndpoint = empty(openAiEndpoint) ? openAi.properties.endpoint : openAiEndpoint
+// Deliberately NOT openAi.properties.endpoint. On a Foundry ('AIServices')
+// account that property returns the generic *.cognitiveservices.azure.com
+// hostname, whereas the documented base URL for the /openai/v1 data plane is
+// *.openai.azure.com. Both currently answer, but only the latter is contractual,
+// and pinning it keeps AZURE_OPENAI_ENDPOINT byte-identical to its pre-upgrade
+// value. The hostname is derived from customSubDomainName, set on the account
+// below to this same name.
+var provisionedOpenAiEndpoint = 'https://${abbrev.openAi}.openai.azure.com/'
+var effectiveOpenAiEndpoint = empty(openAiEndpoint) ? provisionedOpenAiEndpoint : openAiEndpoint
 var effectiveOpenAiKey = empty(openAiKey) ? openAi.listKeys().key1 : openAiKey
 var effectiveOpenAiDeployment = empty(openAiDeployment) ? openAiModelName : openAiDeployment
 
@@ -139,19 +150,49 @@ resource vision 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
   }
 }
 
-resource openAi 'Microsoft.CognitiveServices/accounts@2023-05-01' = {
+// A Foundry resource (kind 'AIServices' with project management enabled) is the
+// current shape of an Azure OpenAI account. Accounts still on kind 'OpenAI' work
+// but only render in the classic portal, so this template provisions the modern
+// kind and a project child. The endpoint, keys and deployments are identical
+// either way — the BFF keeps calling {endpoint}/openai/v1/responses with an
+// api-key header, so no application code depends on this choice.
+resource openAi 'Microsoft.CognitiveServices/accounts@2026-05-01' = {
   name: abbrev.openAi
   location: location
   tags: tags
-  kind: 'OpenAI'
+  kind: 'AIServices'
   sku: { name: 'S0' }
+  // Required by the Foundry resource model. This identity belongs to the
+  // account itself; the BFF still authenticates with an API key, so nothing
+  // here makes managed identity a prerequisite for the application.
+  identity: { type: 'SystemAssigned' }
   properties: {
+    // Preserved from the pre-upgrade account so the existing
+    // https://<abbrev.openAi>.openai.azure.com hostname keeps resolving.
     customSubDomainName: abbrev.openAi
     publicNetworkAccess: 'Enabled'
+    allowProjectManagement: true
+    // The upgrade guidance defaults this to true, which would break the
+    // api-key auth the Function App relies on via Key Vault.
+    disableLocalAuth: false
   }
 }
 
-resource openAiModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2023-05-01' = {
+// The new Foundry portal works in terms of projects, not bare accounts. Without
+// this child the resource is invisible there even though it is fully functional.
+resource openAiProject 'Microsoft.CognitiveServices/accounts/projects@2026-05-01' = {
+  parent: openAi
+  name: openAiProjectName
+  location: location
+  tags: tags
+  identity: { type: 'SystemAssigned' }
+  properties: {
+    displayName: openAiProjectName
+    description: 'Foundry project for the Agentic Coffee Tracker BFF.'
+  }
+}
+
+resource openAiModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2026-05-01' = {
   parent: openAi
   name: openAiModelName
   sku: {
