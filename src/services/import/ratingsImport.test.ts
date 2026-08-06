@@ -217,6 +217,15 @@ describe('planCsvImport', () => {
     expect(plan.warnings).toHaveLength(1);
   });
 
+  it('defaults a blank brew to latte without warning', () => {
+    const csv = [HEADER, 'Onyx,Geometry,5,,2025-03-14,'].join('\n');
+
+    const plan = planCsvImport(csv, EMPTY);
+
+    expect(plan.newRatings[0]?.brewType).toBe('latte');
+    expect(plan.warnings).toHaveLength(0);
+  });
+
   it('defaults a missing date to now and warns', () => {
     const csv = [HEADER, 'Onyx,Geometry,5,espresso,,'].join('\n');
 

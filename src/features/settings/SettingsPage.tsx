@@ -13,8 +13,28 @@ import {
   type StorageEstimateSummary,
 } from '@/services/storage/reset';
 
+const TASK_LABELS: Record<string, string> = {
+  ocr: 'Reading a bag photo',
+  'llm-parse': 'Reading a bag photo',
+  'web-enrich': 'Looking up details',
+  recommendation: 'Refreshing recommendations',
+};
+
 export function SettingsPage() {
   const pending = useLiveQuery(() => db.pendingAiTasks.toArray(), []) ?? [];
+  // A bulk import can queue one task per coffee, so "web-enrich ×40" with no
+  // names would be unreadable. Resolve each task back to the coffee it is for.
+  const beanNames =
+    useLiveQuery(async () => {
+      const beans = await db.beans.toArray();
+      return new Map(beans.map((bean) => [bean.id, `${bean.roaster} — ${bean.name}`]));
+    }, []) ?? new Map<string, string>();
+
+  function describeTask(task: { type: string; beanId?: string }): string {
+    const label = TASK_LABELS[task.type] ?? task.type;
+    const bean = task.beanId ? beanNames.get(task.beanId) : undefined;
+    return bean ? `${label} — ${bean}` : label;
+  }
 
   async function retryTask(id: string) {
     // Callback form so the backoff timestamp is removed rather than set to
@@ -59,7 +79,7 @@ export function SettingsPage() {
               <li key={t.id} className="rounded border p-2 text-sm">
                 <div className="flex items-center justify-between">
                   <div>
-                    <div className="font-medium">{t.type}</div>
+                    <div className="font-medium">{describeTask(t)}</div>
                     <div className="text-xs text-muted-foreground">
                       attempts: {t.attempts} {t.nextAttemptAt ? `· next: ${new Date(t.nextAttemptAt).toLocaleString()}` : ''}
                     </div>
