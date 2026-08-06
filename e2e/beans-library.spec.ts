@@ -98,4 +98,60 @@ test.describe('Bean library', () => {
     const first = page.getByRole('list', { name: 'Beans' }).getByRole('listitem').first();
     await expect(first).toContainText('Antigua');
   });
+
+  test('removes a selected bean after confirmation', async ({ page }) => {
+    await page.goto('/beans');
+    const rows = page.getByRole('list', { name: 'Beans' }).getByRole('listitem');
+    await expect(rows).toHaveCount(7);
+
+    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByRole('checkbox', { name: /select huila/i }).check();
+    await expect(page.getByText('1 selected')).toBeVisible();
+
+    await page.getByRole('button', { name: /remove/i }).click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toContainText(/permanently removes 1 coffee/i);
+    await dialog.getByRole('button', { name: 'Remove' }).click();
+
+    await expect(rows).toHaveCount(6);
+    await expect(page.getByText('Huila')).toBeHidden();
+    // The removal must survive a reload, or it only ever happened in React state.
+    await page.reload();
+    await expect(page.getByRole('list', { name: 'Beans' }).getByRole('listitem')).toHaveCount(6);
+  });
+
+  test('cancelling the confirmation keeps the bean', async ({ page }) => {
+    await page.goto('/beans');
+    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByRole('checkbox', { name: /select huila/i }).check();
+    await page.getByRole('button', { name: /remove/i }).click();
+
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+
+    await expect(page.getByRole('list', { name: 'Beans' }).getByRole('listitem')).toHaveCount(7);
+    await expect(page.getByText('Huila')).toBeVisible();
+  });
+
+  test('removes several beans at once', async ({ page }) => {
+    await page.goto('/beans');
+    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByRole('checkbox', { name: /select huila/i }).check();
+    await page.getByRole('checkbox', { name: /select gesha/i }).check();
+    await expect(page.getByText('2 selected')).toBeVisible();
+
+    await page.getByRole('button', { name: /^remove$/i }).first().click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Remove' }).click();
+
+    await expect(page.getByRole('list', { name: 'Beans' }).getByRole('listitem')).toHaveCount(5);
+  });
+
+  test('selection mode does not navigate away when a row is tapped', async ({ page }) => {
+    await page.goto('/beans');
+    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByText('Huila').click();
+
+    await expect(page).toHaveURL(/\/beans$/);
+    await expect(page.getByText('1 selected')).toBeVisible();
+  });
 });
