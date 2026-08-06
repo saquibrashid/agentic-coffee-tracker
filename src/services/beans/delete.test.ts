@@ -113,6 +113,32 @@ describe('deleteBeans', () => {
     expect(await db.photos.get('shared')).toBeUndefined();
   });
 
+  it('removes the cup photos of the ratings that go with the bean', async () => {
+    await db.beans.add(bean('b1', { photoId: 'bag1' }));
+    await db.photos.bulkAdd([photo('bag1'), photo('cup1')]);
+    await db.ratings.add({ ...rating('r1', 'b1'), cupPhotoId: 'cup1' });
+
+    const summary = await deleteBeans(['b1']);
+
+    expect(summary.photos).toBe(2);
+    expect(await db.photos.get('cup1')).toBeUndefined();
+    expect(await db.photos.get('bag1')).toBeUndefined();
+  });
+
+  it('keeps a cup photo a rating on a surviving bean still uses', async () => {
+    await db.beans.bulkAdd([bean('b1'), bean('b2')]);
+    await db.photos.add(photo('cup1'));
+    await db.ratings.bulkAdd([
+      { ...rating('r1', 'b1'), cupPhotoId: 'cup1' },
+      { ...rating('r2', 'b2'), cupPhotoId: 'cup1' },
+    ]);
+
+    const summary = await deleteBeans(['b1']);
+
+    expect(summary.photos).toBe(0);
+    expect(await db.photos.get('cup1')).toBeDefined();
+  });
+
   it('deletes several beans at once', async () => {
     await db.beans.bulkAdd([bean('b1'), bean('b2'), bean('b3')]);
     await db.ratings.bulkAdd([rating('r1', 'b1'), rating('r3', 'b3')]);
