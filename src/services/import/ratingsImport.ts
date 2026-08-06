@@ -1,7 +1,22 @@
 import { ulid } from 'ulid';
 import { db } from '@/services/db';
-import type { BrewType, CoffeeBean, Origin, Process, Rating, RoastLevel } from '@/types';
+import { beanNeedsEnrichment } from '@/services/enrich/autoEnrich';
+import { DEFAULT_BREW_TYPE } from '@/services/ratings/brewTypes';
+import type {
+  BrewType,
+  CoffeeBean,
+  Origin,
+  PendingAiTask,
+  Process,
+  Rating,
+  RoastLevel,
+} from '@/types';
 import { normaliseHeader, parseCsv, type CsvRow } from './csv';
+
+export interface ApplyOptions {
+  /** Queue a web lookup for every imported coffee that is missing metadata. */
+  enrich?: boolean;
+}
 
 /**
  * Bulk import of an existing rating history from a spreadsheet.
@@ -345,10 +360,12 @@ export function planCsvImport(text: string, existing: ExistingData): ImportPlan 
     const rawBrew = cell(row, 'brewType');
     let brewType = parseBrewType(rawBrew);
     if (rawBrew && !brewType) {
+      // A brew that was stated but not recognised stays "other" so the bad value
+      // remains visible; only an *absent* brew falls back to the default.
       plan.warnings.push({ line, message: `Unrecognised brew "${rawBrew}", stored as "other".` });
       brewType = 'other';
     }
-    if (!brewType) brewType = 'other';
+    if (!brewType) brewType = DEFAULT_BREW_TYPE;
 
     const rawDate = cell(row, 'ratedAt');
     let ratedAt = parseDate(rawDate);
@@ -435,13 +452,38 @@ export async function loadExistingData(): Promise<ExistingData> {
 /**
  * Commits a plan. Beans and ratings go in together so a failure part-way cannot
  * leave ratings pointing at coffees that were never written.
+ *
+ * When `enrich` is set, every imported coffee still missing metadata gets a
+ * `web-enrich` task. The lookups deliberately happen *after* the commit rather
+ * than during it: a spreadsheet of 200 cups would otherwise take minutes and
+ * fail entirely offline, whereas the queue is durable, retries on its own, and
+ * leaves the history usable immediately.
  */
-export async function applyImportPlan(plan: ImportPlan): Promise<void> {
+export async function applyImportPlan(plan: ImportPlan, options: ApplyOptions = {}): Promise<void> {
   if (plan.newBeans.length === 0 && plan.newRatings.length === 0) return;
-  await db.transaction('rw', [db.beans, db.ratings], async () => {
+
+  const toEnrich = options.enrich ? plan.newBeans.filter(beanNeedsEnrichment) : [];
+  const now = new Date().toISOString();
+  const tasks: PendingAiTask[] = toEnrich.map((bean) => ({
+    id: ulid(),
+    schemaVersion: 1,
+    type: 'web-enrich',
+    payload: { reason: 'bulk-import' },
+    beanId: bean.id,
+    attempts: 0,
+    createdAt: now,
+  }));
+
+  await db.transaction('rw', [db.beans, db.ratings, db.pendingAiTasks], async () => {
     if (plan.newBeans.length > 0) await db.beans.bulkAdd(plan.newBeans);
     if (plan.newRatings.length > 0) await db.ratings.bulkAdd(plan.newRatings);
+    if (tasks.length > 0) await db.pendingAiTasks.bulkAdd(tasks);
   });
+}
+
+/** How many imported coffees would be queued for a web lookup. */
+export function countEnrichable(plan: ImportPlan): number {
+  return plan.newBeans.filter(beanNeedsEnrichment).length;
 }
 
 /** A ready-to-fill file, so nobody has to guess the column names. */
@@ -449,6 +491,7 @@ export const CSV_TEMPLATE = [
   '# Agentic Coffee Tracker — rating import template',
   '# One row per cup you drank. Only roaster, coffee and score are required.',
   '# score accepts 4, 4/5, 8/10 or stars. date accepts 2025-03-14 or 3/14/2025.',
+  '# A blank brew is recorded as a latte.',
   'roaster,coffee,score,brew,date,notes,roast,process,origin,tasting notes',
   '"Anchorhead Coffee","Bali Kintamani",5,espresso,2025-03-14,"Syrupy, great as a cortado",medium,natural,Indonesia,"strawberry; cocoa; orange"',
   '"Onyx Coffee Lab","Southern Weather",4,pour-over,2025-03-16,,medium-light,washed,"Colombia; Ethiopia","chocolate; citrus"',

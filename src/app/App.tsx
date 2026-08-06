@@ -6,6 +6,7 @@ import {
   BarChart3,
   Calendar,
   Sparkles,
+  ScanSearch,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -61,9 +62,10 @@ function Shell() {
         aria-label="Primary"
         className="sticky bottom-0 z-30 border-t bg-background/95 backdrop-blur"
       >
-        <ul className="container grid grid-cols-6">
+        <ul className="container grid grid-cols-7">
           <NavItem to="/" icon={<Home />} label="Home" />
           <NavItem to="/add" icon={<Plus />} label="Add" />
+          <NavItem to="/predict" icon={<ScanSearch />} label="Check" />
           <NavItem to="/for-you" icon={<Sparkles />} label="For you" />
           <NavItem to="/analytics" icon={<BarChart3 />} label="Analytics" />
           <NavItem to="/summary" icon={<Calendar />} label="Summary" />
@@ -134,6 +136,10 @@ const router = createBrowserRouter([
           Component: (await import('@/features/recommendations/RecommendationsPage'))
             .RecommendationsPage,
         }),
+      },
+      {
+        path: 'predict',
+        lazy: async () => ({ Component: (await import('@/features/predict/PredictPage')).PredictPage }),
       },
       {
         path: 'summary',

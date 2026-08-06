@@ -130,6 +130,30 @@ Add rating form validation: score required (1–10 step 0.5), brew type required
 
 ---
 
+## 4b. Will I like it? (`/predict`)
+
+- A pre-purchase check on a coffee the user has **not** tried. Nothing on this screen is written to
+  the library: a coffee they decided against must not end up in the history skewing later answers.
+- Three ways in — a bag photo (OCR + parse), a link to the product page, or typing the details — all
+  of which converge on the *same editable form* rather than each producing a verdict directly. OCR is
+  often imperfect, so the user corrects it before the verdict is drawn; re-checking costs nothing
+  because the estimate is computed locally.
+- The verdict is arithmetic on the user's own ratings, not a model call. It works offline, costs
+  nothing, cannot invent a preference they never expressed, and shows its working: every claim cites
+  a real count and average ("Coffees from Ethiopia average 4.6/5 across 7 cups").
+- Shows a predicted score out of 5, a confidence percentage, the evidence for and against, which
+  values the history says nothing about, and which attributes were left blank.
+- The estimate is shrunk toward the user's own average in proportion to how much evidence there is,
+  so a single 5-star cup cannot produce a confident rave.
+- Below a confidence floor the verdict is always "could go either way", explicitly described as a
+  shrug rather than an answer.
+- **Empty state:** under three ratings the screen explains that it needs some history first and
+  points at bulk import, rather than showing a confident-looking number derived from noise.
+- Editing any field clears the verdict on screen, which would otherwise describe a different coffee
+  than the one in the form.
+
+---
+
 ## 5. Analytics
 
 | State   | UI                                                                                                |
@@ -190,6 +214,16 @@ Trigger rules:
 - Nothing is written until the user confirms a plan showing what will be added, what was skipped as
   already recorded, and which rows failed — each with its line number.
 - Re-importing the same file is a no-op: ratings de-duplicate on coffee + day + brew + score.
+- A blank `brew` column is recorded as a latte; a brew that was *stated* but not recognised is stored
+  as `other` and warned about, so a bad value stays visible rather than being quietly assumed away.
+- When imported coffees are missing origin, process, roast level or tasting notes, the preview offers
+  to look those up on the web (on by default) and reports how many coffees that covers. The lookups
+  are queued rather than run inline: a large spreadsheet would otherwise take minutes and fail
+  entirely offline, whereas the queue is durable and retries on its own.
+- Enrichment only ever fills **empty** fields. Anything in the file is kept exactly as written, so a
+  wrong match can add stray metadata but can never overwrite the user's own history.
+- A lookup that fails deterministically (no product page, unreadable page) is dropped rather than
+  retried forever; the coffee simply keeps what it was imported with.
 - On success the preference profile is recomputed, so recommendations reflect the imported history
   immediately.
 

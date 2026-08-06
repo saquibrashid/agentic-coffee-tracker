@@ -10,33 +10,12 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
+import { BREW_TYPE_OPTIONS, DEFAULT_BREW_TYPE, brewLabel } from '@/services/ratings/brewTypes';
 import { EnrichPanel } from './EnrichPanel';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import type { BrewType, Rating } from '@/types';
 
-// Ordered for the picker; the union in @/types is the source of truth, so a new
-// brew type fails to compile here until it is offered to the user.
-const BREW_TYPE_OPTIONS: { value: BrewType; label: string }[] = [
-  { value: 'drip', label: 'Drip' },
-  { value: 'espresso', label: 'Espresso' },
-  { value: 'pour-over', label: 'Pour-over' },
-  { value: 'latte', label: 'Latte' },
-  { value: 'iced-latte', label: 'Iced latte' },
-  { value: 'cappuccino', label: 'Cappuccino' },
-  { value: 'cortado', label: 'Cortado' },
-  { value: 'americano', label: 'Americano' },
-  { value: 'french-press', label: 'French press' },
-  { value: 'aeropress', label: 'AeroPress' },
-  { value: 'moka', label: 'Moka' },
-  { value: 'cold-brew', label: 'Cold brew' },
-  { value: 'other', label: 'Other' },
-];
-
 const SCORE_OPTIONS = [5, 4, 3, 2, 1];
-
-function brewLabel(value: BrewType): string {
-  return BREW_TYPE_OPTIONS.find((o) => o.value === value)?.label ?? value;
-}
 
 export function BeanDetailPage() {
   const { beanId } = useParams<{ beanId: string }>();
@@ -350,7 +329,7 @@ function EditRatingForm({
 
 function AddRatingForm({ beanId }: { beanId: string }) {
   const [score, setScore] = useState(4);
-  const [brewType, setBrewType] = useState<BrewType>('drip');
+  const [brewType, setBrewType] = useState<BrewType>(DEFAULT_BREW_TYPE);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 

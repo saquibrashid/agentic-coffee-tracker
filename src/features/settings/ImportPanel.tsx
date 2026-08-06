@@ -9,6 +9,7 @@ import {
 } from '@/services/import/jsonImport';
 import {
   applyImportPlan,
+  countEnrichable,
   CSV_TEMPLATE,
   ImportFormatError,
   loadExistingData,
@@ -69,6 +70,9 @@ export function ImportPanel() {
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Defaults on: a spreadsheet almost never carries origin/process/roast, and
+  // those are exactly the fields the preference engine reasons over.
+  const [enrich, setEnrich] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
 
   function reset() {
@@ -115,10 +119,14 @@ export function ImportPanel() {
     setError(null);
     try {
       if (preview.kind === 'csv') {
-        await applyImportPlan(preview.plan);
+        const queued = enrich ? countEnrichable(preview.plan) : 0;
+        await applyImportPlan(preview.plan, { enrich });
         setStatus(
           `Imported ${preview.plan.newRatings.length} rating${preview.plan.newRatings.length === 1 ? '' : 's'} ` +
-            `across ${preview.plan.newBeans.length} new coffee${preview.plan.newBeans.length === 1 ? '' : 's'}.`,
+            `across ${preview.plan.newBeans.length} new coffee${preview.plan.newBeans.length === 1 ? '' : 's'}.` +
+            (queued > 0
+              ? ` Looking up details for ${queued} of them in the background — check back shortly.`
+              : ''),
         );
       } else {
         await applyJsonImportPlan(preview.plan);
@@ -220,6 +228,26 @@ export function ImportPanel() {
                   issues={preview.plan.errors}
                   tone="text-destructive"
                 />
+                {countEnrichable(preview.plan) > 0 && (
+                  <label className="flex items-start gap-2 rounded-md bg-muted/50 p-2 text-sm">
+                    <input
+                      id="import-enrich"
+                      type="checkbox"
+                      className="mt-0.5"
+                      checked={enrich}
+                      onChange={(e) => setEnrich(e.target.checked)}
+                    />
+                    <span>
+                      Look up missing details for {countEnrichable(preview.plan)} coffee
+                      {countEnrichable(preview.plan) === 1 ? '' : 's'}
+                      <span className="block text-xs text-muted-foreground">
+                        Searches the web for origin, process, roast level and tasting notes after the
+                        import finishes. Only empty fields are filled — anything in your file is kept
+                        as you wrote it.
+                      </span>
+                    </span>
+                  </label>
+                )}
               </>
             ) : (
               <ul className="space-y-0.5 text-sm">
