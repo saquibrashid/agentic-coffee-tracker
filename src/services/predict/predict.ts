@@ -148,7 +148,8 @@ export function buildIndex(beans: CoffeeBean[], ratings: Rating[]): PredictionIn
     if (!bean) continue;
 
     if (bean.roaster) accumulate(index.roasters, bean.roaster, score);
-    if (bean.process && bean.process !== 'unknown') accumulate(index.processes, bean.process, score);
+    if (bean.process && bean.process !== 'unknown')
+      accumulate(index.processes, bean.process, score);
     if (bean.roastLevel && bean.roastLevel !== 'unknown') {
       accumulate(index.roastLevels, bean.roastLevel, score);
     }

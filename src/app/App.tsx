@@ -139,7 +139,9 @@ const router = createBrowserRouter([
       },
       {
         path: 'predict',
-        lazy: async () => ({ Component: (await import('@/features/predict/PredictPage')).PredictPage }),
+        lazy: async () => ({
+          Component: (await import('@/features/predict/PredictPage')).PredictPage,
+        }),
       },
       {
         path: 'summary',

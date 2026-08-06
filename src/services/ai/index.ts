@@ -90,7 +90,8 @@ export interface OcrResponse {
   provider: 'azure-vision' | 'mock-vision';
   providerVersion?: string;
 }
-export const ocr = (req: OcrRequest): Promise<OcrResponse> => apiPost('/api/ocr', req, MODEL_TIMEOUT_MS);
+export const ocr = (req: OcrRequest): Promise<OcrResponse> =>
+  apiPost('/api/ocr', req, MODEL_TIMEOUT_MS);
 
 // ---- Parse ----
 export interface ParseRequest {

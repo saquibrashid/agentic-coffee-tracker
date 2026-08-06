@@ -1,6 +1,12 @@
 /** Wires the pure predictor to the local library. */
 import { db } from '@/services/db';
-import { buildIndex, predict, type Candidate, type Prediction, type PredictionIndex } from './predict';
+import {
+  buildIndex,
+  predict,
+  type Candidate,
+  type Prediction,
+  type PredictionIndex,
+} from './predict';
 
 /**
  * Fewer ratings than this and the answer is arithmetic on noise. The UI should

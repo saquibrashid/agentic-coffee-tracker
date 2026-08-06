@@ -241,9 +241,9 @@ export function ImportPanel() {
                       Look up missing details for {countEnrichable(preview.plan)} coffee
                       {countEnrichable(preview.plan) === 1 ? '' : 's'}
                       <span className="block text-xs text-muted-foreground">
-                        Searches the web for origin, process, roast level and tasting notes after the
-                        import finishes. Only empty fields are filled — anything in your file is kept
-                        as you wrote it.
+                        Searches the web for origin, process, roast level and tasting notes after
+                        the import finishes. Only empty fields are filled — anything in your file is
+                        kept as you wrote it.
                       </span>
                     </span>
                   </label>

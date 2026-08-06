@@ -229,8 +229,8 @@ describe('explain', () => {
     expect(
       explain({ kind: 'origin', label: 'Ethiopia', count: 7, averageScore: 4.57, delta: 0.4 }),
     ).toBe('Coffees from Ethiopia average 4.6/5 across 7 cups.');
-    expect(
-      explain({ kind: 'roaster', label: 'Onyx', count: 1, averageScore: 5, delta: 1 }),
-    ).toBe('You have rated 1 cup from Onyx at 5.0/5.');
+    expect(explain({ kind: 'roaster', label: 'Onyx', count: 1, averageScore: 5, delta: 1 })).toBe(
+      'You have rated 1 cup from Onyx at 5.0/5.',
+    );
   });
 });

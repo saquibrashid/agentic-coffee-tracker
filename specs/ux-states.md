@@ -135,7 +135,7 @@ Add rating form validation: score required (1–10 step 0.5), brew type required
 - A pre-purchase check on a coffee the user has **not** tried. Nothing on this screen is written to
   the library: a coffee they decided against must not end up in the history skewing later answers.
 - Three ways in — a bag photo (OCR + parse), a link to the product page, or typing the details — all
-  of which converge on the *same editable form* rather than each producing a verdict directly. OCR is
+  of which converge on the _same editable form_ rather than each producing a verdict directly. OCR is
   often imperfect, so the user corrects it before the verdict is drawn; re-checking costs nothing
   because the estimate is computed locally.
 - The verdict is arithmetic on the user's own ratings, not a model call. It works offline, costs
@@ -214,7 +214,7 @@ Trigger rules:
 - Nothing is written until the user confirms a plan showing what will be added, what was skipped as
   already recorded, and which rows failed — each with its line number.
 - Re-importing the same file is a no-op: ratings de-duplicate on coffee + day + brew + score.
-- A blank `brew` column is recorded as a latte; a brew that was *stated* but not recognised is stored
+- A blank `brew` column is recorded as a latte; a brew that was _stated_ but not recognised is stored
   as `other` and warned about, so a bad value stays visible rather than being quietly assumed away.
 - When imported coffees are missing origin, process, roast level or tasting notes, the preview offers
   to look those up on the web (on by default) and reports how many coffees that covers. The lookups
