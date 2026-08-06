@@ -62,8 +62,10 @@ Request:  { ocrText: string, model?: string }
 Response: { parsed: <LLM Output schema>, model: string, rawText: string }
 Errors:   400 missing ocrText, 422 model output failed schema validation, 500 upstream
 ```
-Uses Azure OpenAI **structured outputs** (`response_format: json_schema`, `strict: true`)
-with the schema in `data-model.md`. The response is then re-validated server-side by
+Uses Azure OpenAI **structured outputs** with the schema in `data-model.md`, sent over the
+v1 Responses API (`POST {endpoint}/openai/v1/responses`, `text.format` = `json_schema`
+with `strict: true`) via the shared client in `api/src/lib/openai.ts`. The response is
+then re-validated server-side by
 `api/src/lib/beanSchema.ts` before it is returned — structured outputs are a strong
 hint, not a guarantee, and an unvalidated object would silently corrupt local data.
 
@@ -131,9 +133,8 @@ smoke test and by the Application Insights availability test.
 | `AZURE_VISION_ENDPOINT`/`KEY` | Functions app | Stored in Key Vault reference  |
 | `AZURE_OPENAI_ENDPOINT`/`KEY` | Functions app | Key Vault reference            |
 | `AZURE_OPENAI_DEPLOYMENT`     | Functions app | Model deployment name          |
-| `BING_SEARCH_KEY`             | Functions app | Key Vault reference            |
+| `SCRAPE_ALLOWLIST`            | Functions app | Comma-separated hosts; empty allows any public host |
 | `ALLOWED_ORIGINS`             | Functions app | Comma-separated; SWA hostname  |
-| `SCRAPE_ALLOWLIST`            | Functions app | Comma-separated hosts          |
 | `APPLICATIONINSIGHTS_CONNECTION_STRING` | Functions app | Set by Bicep; enables host telemetry |
 | `VITE_API_BASE_URL`           | Client build  | Empty on SWA Standard (linked backend); Function App URL on Free |
 

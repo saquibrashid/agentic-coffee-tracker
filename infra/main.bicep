@@ -26,10 +26,6 @@ param openAiKey string = ''
 @description('Optional. Azure OpenAI chat deployment name. Defaults to the model this template deploys.')
 param openAiDeployment string = ''
 
-@secure()
-@description('Optional. Bing Web Search key. Stored in Key Vault, never in app settings.')
-param bingSearchKey string = ''
-
 @description('Optional. Comma-separated hosts the /api/scrape endpoint may fetch. Empty (the default) allows any publicly routable host, which is what lets enrichment read arbitrary roaster storefronts; the endpoint still refuses private, loopback, and link-local addresses on every redirect hop. Set this to pin the deployment to a fixed set of stores.')
 param scrapeAllowlist string = ''
 
@@ -58,7 +54,6 @@ module resources 'resources.bicep' = {
     openAiEndpoint: openAiEndpoint
     openAiKey: openAiKey
     openAiDeployment: openAiDeployment
-    bingSearchKey: bingSearchKey
     scrapeAllowlist: scrapeAllowlist
     staticWebAppSkuName: staticWebAppSkuName
   }

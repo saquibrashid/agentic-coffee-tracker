@@ -20,8 +20,9 @@ manual setup. Two things to know:
 - **Azure AI Vision `F0` is limited to one free account per subscription per region.** A second
   environment in the same region will fail to provision until you set `visionSkuName=S1` (paid) or
   pick another region.
-- **Bing Search is not provisioned** — Bing Search v7 is retired to new customers. `/api/search`
-  stays on its mock unless you bring your own `BING_SEARCH_KEY`, and nothing else breaks.
+- **No general web search API is used.** Bing Search v7 is retired to new customers, so `/api/search`
+  resolves a roaster to its storefront domain with the model and then queries that store's own
+  product search. No extra key, no extra cost.
 
 Every AI parameter also accepts a bring-your-own value (`visionEndpoint`/`visionKey`,
 `openAiEndpoint`/`openAiKey`/`openAiDeployment`). Set one and the provisioned account is bypassed in
@@ -29,6 +30,20 @@ favour of yours.
 
 If an endpoint ever *does* fall back to its mock, the capture screen says so explicitly rather than
 presenting fixtures as a real read of your bag.
+
+### Which Azure OpenAI API the BFF calls
+
+The BFF calls the **v1 API** — `POST {endpoint}/openai/v1/responses` — not the older
+`/openai/deployments/{deployment}/chat/completions` route. The v1 surface takes no dated
+`api-version`, so there is no version string to keep current, and it still supports **strict**
+structured outputs (`text.format` with `"strict": true`), which `/api/parse` and `/api/recommend`
+depend on to guarantee schema-shaped output.
+
+All calls go through `api/src/lib/openai.ts`. Requests set `"store": false` so bag text and taste
+history are not retained in the service-side response store.
+
+Authentication is the `api-key` header, with the key delivered as a Key Vault reference. Managed
+identity is **not** required for the AI calls.
 
 ### Why `gpt-4o` and not a smaller model
 
@@ -60,7 +75,6 @@ azd env set AZURE_VISION_KEY        <key>
 azd env set AZURE_OPENAI_ENDPOINT   https://<your-openai>.openai.azure.com/
 azd env set AZURE_OPENAI_DEPLOYMENT gpt-4o
 azd env set AZURE_OPENAI_KEY        <key>
-azd env set BING_SEARCH_KEY         <key>
 ```
 
 Optional — upgrade the Static Web App so the SPA reaches the BFF same-origin:
@@ -164,7 +178,7 @@ Knobs, in order of impact:
 - **`STATIC_WEB_APP_SKU=Standard`** — adds a flat **$9/month** in exchange for a linked backend (same-origin `/api`). The `Free` default works identically from the user's perspective; the SPA just makes a cross-origin call.
 - **AI services** — barely register. Azure AI Vision `F0` includes 5,000 free transactions/month, and a bag scan through Azure OpenAI costs a fraction of a cent. Expect pennies. Note the `F0` one-per-subscription-per-region limit if you stand up a second environment.
 
-> **Note:** Bing Search v7 is retired to new customers. If you cannot provision `BING_SEARCH_KEY`, leave it unset — `/api/search` falls back to its mock and nothing else breaks.
+> **Note:** `/api/search` needs no search-API key. It asks the model for the roaster's storefront domain and then queries that store's own product search, so its only cost is the model call.
 
 ## CI/CD
 
@@ -182,7 +196,7 @@ The job skips itself unless these repository **variables** are set:
 | `STATIC_WEB_APP_SKU` | `Free` or `Standard` (default `Free`) |
 | `AZURE_VISION_ENDPOINT`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT` | Non-secret AI config |
 
-Keys go in repository **secrets**: `AZURE_VISION_KEY`, `AZURE_OPENAI_KEY`, `BING_SEARCH_KEY`.
+Keys go in repository **secrets**: `AZURE_VISION_KEY`, `AZURE_OPENAI_KEY`.
 
 Configure the federated credential in one step:
 

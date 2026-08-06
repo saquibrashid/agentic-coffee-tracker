@@ -1,6 +1,12 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
 import {
+  callResponses,
+  getOpenAiConfig,
+  parseJsonOutput,
+  type OpenAiConfig,
+} from '../lib/openai.js';
+import {
   RECOMMENDATION_SCHEMA,
   mockRecommendations,
   validateRecommendations,
@@ -20,42 +26,23 @@ function isPreferenceSummary(value: unknown): value is PreferenceSummary {
   return Array.isArray(v['favoriteOrigins']) && typeof v['totalRatings'] === 'number';
 }
 
-async function callAzureOpenAi(summary: PreferenceSummary, max: number): Promise<{ parsed: unknown; model: string }> {
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT!.replace(/\/$/, '');
-  const key = process.env.AZURE_OPENAI_KEY!;
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT!;
-  const apiVersion = process.env.AZURE_OPENAI_API_VERSION || '2024-08-01-preview';
-  const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages: [
-        { role: 'system', content: RECOMMEND_SYSTEM_PROMPT },
-        {
-          role: 'user',
-          content: `Suggest at most ${max} coffees for this taste profile:\n\n${JSON.stringify(summary)}`,
-        },
-      ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: { name: 'recommendations', strict: true, schema: RECOMMENDATION_SCHEMA },
-      },
-      temperature: 0.4,
-    }),
+async function callAzureOpenAi(
+  config: OpenAiConfig,
+  summary: PreferenceSummary,
+  max: number,
+): Promise<{ parsed: unknown; model: string }> {
+  const result = await callResponses(config, {
+    system: RECOMMEND_SYSTEM_PROMPT,
+    user: `Suggest at most ${max} coffees for this taste profile:\n\n${JSON.stringify(summary)}`,
+    format: {
+      type: 'json_schema',
+      name: 'recommendations',
+      strict: true,
+      schema: RECOMMENDATION_SCHEMA,
+    },
+    temperature: 0.4,
   });
-  if (!res.ok) throw new Error(`Azure OpenAI returned ${res.status}: ${await res.text()}`);
-
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const content = data.choices?.[0]?.message?.content ?? '';
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content || '{}');
-  } catch {
-    parsed = undefined;
-  }
-  return { parsed, model: deployment };
+  return { parsed: parseJsonOutput(result.text), model: result.model };
 }
 
 app.http('recommend', {
@@ -79,17 +66,13 @@ app.http('recommend', {
         return json(200, { recommendations: [], model: 'none', reason: 'insufficient-history' });
       }
 
-      const useAzure = Boolean(
-        process.env.AZURE_OPENAI_ENDPOINT &&
-          process.env.AZURE_OPENAI_KEY &&
-          process.env.AZURE_OPENAI_DEPLOYMENT,
-      );
+      const openAi = getOpenAiConfig();
 
       let candidate: unknown;
       let model: string;
 
-      if (useAzure) {
-        const result = await callAzureOpenAi(summary, max);
+      if (openAi) {
+        const result = await callAzureOpenAi(openAi, summary, max);
         candidate = result.parsed;
         model = result.model;
       } else {

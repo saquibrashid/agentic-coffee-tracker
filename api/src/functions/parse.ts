@@ -1,6 +1,12 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
 import {
+  callResponses,
+  getOpenAiConfig,
+  parseJsonOutput,
+  type OpenAiConfig,
+} from '../lib/openai.js';
+import {
   PARSED_BEAN_SCHEMA,
   mockParsedBean,
   validateParsedBean,
@@ -20,37 +26,28 @@ interface RawParseResult {
   rawContent: string;
 }
 
-async function callAzureOpenAi(ocrText: string, model?: string): Promise<RawParseResult> {
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT!.replace(/\/$/, '');
-  const key = process.env.AZURE_OPENAI_KEY!;
-  const deployment = model || process.env.AZURE_OPENAI_DEPLOYMENT!;
-  const apiVersion = process.env.AZURE_OPENAI_API_VERSION || '2024-08-01-preview';
-  const url = `${endpoint}/openai/deployments/${deployment}/chat/completions?api-version=${apiVersion}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'api-key': key, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages: [
-        { role: 'system', content: PARSE_SYSTEM_PROMPT },
-        { role: 'user', content: `Extract a bean object from this OCR text:\n\n${ocrText}` },
-      ],
-      response_format: {
-        type: 'json_schema',
-        json_schema: { name: 'parsed_bean', strict: true, schema: PARSED_BEAN_SCHEMA },
-      },
-      temperature: 0,
-    }),
+async function callAzureOpenAi(
+  config: OpenAiConfig,
+  ocrText: string,
+  model?: string,
+): Promise<RawParseResult> {
+  const result = await callResponses(config, {
+    system: PARSE_SYSTEM_PROMPT,
+    user: `Extract a bean object from this OCR text:\n\n${ocrText}`,
+    format: {
+      type: 'json_schema',
+      name: 'parsed_bean',
+      strict: true,
+      schema: PARSED_BEAN_SCHEMA,
+    },
+    temperature: 0,
+    ...(model ? { model } : {}),
   });
-  if (!res.ok) throw new Error(`Azure OpenAI returned ${res.status}: ${await res.text()}`);
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const rawContent = data.choices?.[0]?.message?.content ?? '';
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(rawContent || '{}');
-  } catch {
-    parsed = undefined;
-  }
-  return { parsed, model: deployment, rawContent };
+  return {
+    parsed: parseJsonOutput(result.text),
+    model: result.model,
+    rawContent: result.text,
+  };
 }
 
 app.http('parse', {
@@ -68,18 +65,15 @@ app.http('parse', {
       }
       ctx.log('parse invoked', { length: body.ocrText.length });
 
-      const useAzure = Boolean(
-        process.env.AZURE_OPENAI_ENDPOINT &&
-          process.env.AZURE_OPENAI_KEY &&
-          process.env.AZURE_OPENAI_DEPLOYMENT,
-      );
+      const openAi = getOpenAiConfig();
 
       let candidate: unknown;
       let model: string;
       let rawContent = '';
 
-      if (useAzure) {
+      if (openAi) {
         const result = await callAzureOpenAi(
+          openAi,
           body.ocrText,
           typeof body.model === 'string' ? body.model : undefined,
         );

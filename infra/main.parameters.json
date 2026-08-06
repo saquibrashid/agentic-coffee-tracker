@@ -23,9 +23,6 @@
     "openAiDeployment": {
       "value": "${AZURE_OPENAI_DEPLOYMENT=}"
     },
-    "bingSearchKey": {
-      "value": "${BING_SEARCH_KEY=}"
-    },
     "staticWebAppSkuName": {
       "value": "${STATIC_WEB_APP_SKU=Free}"
     }
