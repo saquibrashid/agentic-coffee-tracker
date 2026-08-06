@@ -23,6 +23,7 @@ interface ConfirmState {
   bean: CoffeeBean;
   rawText?: string;
   schemaErrors?: string[];
+  usedMock?: boolean;
 }
 
 function readFileAsDataUrl(file: File): Promise<string> {
@@ -158,6 +159,7 @@ export function AddCoffeePage() {
         setConfirmState({
           bean: bean ?? { ...draft, ...update },
           rawText: result.rawText,
+          usedMock: result.usedMock,
           ...(result.schemaErrors ? { schemaErrors: result.schemaErrors } : {}),
         });
         setStage('confirm');
@@ -273,6 +275,7 @@ export function AddCoffeePage() {
             bean={confirmState.bean}
             {...(confirmState.rawText ? { rawText: confirmState.rawText } : {})}
             {...(confirmState.schemaErrors ? { schemaErrors: confirmState.schemaErrors } : {})}
+            {...(confirmState.usedMock ? { usedMock: true } : {})}
           />
         )}
       </CardContent>

@@ -9,21 +9,21 @@ param environmentName string
 @description('Primary location for all resources.')
 param location string
 
-@description('Optional. Azure AI Vision endpoint. Leave empty to run the BFF in mock mode.')
+@description('Optional. Bring-your-own Azure AI Vision endpoint. Leave empty to use the account this template provisions.')
 param visionEndpoint string = ''
 
 @secure()
 @description('Optional. Azure AI Vision key. Stored in Key Vault, never in app settings.')
 param visionKey string = ''
 
-@description('Optional. Azure OpenAI endpoint. Leave empty to run the BFF in mock mode.')
+@description('Optional. Bring-your-own Azure OpenAI endpoint. Leave empty to use the account this template provisions.')
 param openAiEndpoint string = ''
 
 @secure()
 @description('Optional. Azure OpenAI key. Stored in Key Vault, never in app settings.')
 param openAiKey string = ''
 
-@description('Optional. Azure OpenAI chat deployment name, e.g. gpt-4o.')
+@description('Optional. Azure OpenAI chat deployment name. Defaults to the model this template deploys.')
 param openAiDeployment string = ''
 
 @secure()

@@ -16,6 +16,12 @@ export interface ConfirmFormProps {
   /** Raw OCR text, shown when the AI could not produce a usable result. */
   rawText?: string;
   schemaErrors?: string[];
+  /**
+   * True when these values are synthetic rather than read from the photo. Shown
+   * prominently: silently presenting fixtures as a real read is the single most
+   * misleading thing this screen can do.
+   */
+  usedMock?: boolean;
 }
 
 interface FormState {
@@ -50,7 +56,7 @@ function splitList(value: string): string[] {
 const inputClass =
   'w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
-export function ConfirmForm({ bean, rawText, schemaErrors }: ConfirmFormProps) {
+export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFormProps) {
   const navigate = useNavigate();
   const [form, setForm] = useState<FormState>(() => toFormState(bean));
   const [saving, setSaving] = useState(false);
@@ -100,6 +106,19 @@ export function ConfirmForm({ bean, rawText, schemaErrors }: ConfirmFormProps) {
 
   return (
     <form onSubmit={(e) => void onSubmit(e)} className="space-y-4">
+      {usedMock && (
+        <div
+          role="alert"
+          className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm dark:border-amber-400/40"
+        >
+          <p className="font-medium">These are sample values, not your bag.</p>
+          <p className="text-muted-foreground">
+            AI bag scanning isn&apos;t configured, so the fields below were filled with placeholder
+            data. Replace them with the real details before saving.
+          </p>
+        </div>
+      )}
+
       {schemaErrors && schemaErrors.length > 0 && (
         <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
           <p className="font-medium">We couldn&apos;t read this bag reliably.</p>

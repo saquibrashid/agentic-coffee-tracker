@@ -34,9 +34,19 @@ export interface ExtractionResult {
   /** True when the model output was unusable and the user must fill fields in manually. */
   needsReview: boolean;
   schemaErrors?: string[];
-  /** True when the local mock stood in for the BFF (dev convenience only). */
+  /**
+   * True when any part of this result is synthetic rather than a real read of
+   * the photo — either the local mock stood in for an unreachable BFF, or the
+   * BFF itself has no AI credentials and answered with fixtures.
+   *
+   * The UI must never present a `usedMock` result as if it came from the bag.
+   */
   usedMock: boolean;
 }
+
+/** The BFF reports these when it is running without AI credentials. */
+const MOCK_OCR_PROVIDER = 'mock-vision';
+const MOCK_PARSE_MODEL = 'mock-model';
 
 /**
  * `true` when the frontend should fall back to local mocks instead of failing.
@@ -72,6 +82,7 @@ export async function extractBeanFromPhoto(blob: Blob): Promise<ExtractionResult
   try {
     const ocrResponse = await ocr({ imageBase64, mimeType: blob.type || 'image/webp' });
     rawText = ocrResponse.rawText;
+    if (ocrResponse.provider === MOCK_OCR_PROVIDER) usedMock = true;
   } catch (err) {
     if (!isRetryable(err)) throw err;
     if (!ALLOW_MOCK_FALLBACK) throw new PipelineUnavailableError(err);
@@ -86,7 +97,7 @@ export async function extractBeanFromPhoto(blob: Blob): Promise<ExtractionResult
       parsed: parseResponse.parsed,
       model: parseResponse.model,
       needsReview: (parseResponse.parsed.confidence ?? 0) < 0.6,
-      usedMock,
+      usedMock: usedMock || parseResponse.model === MOCK_PARSE_MODEL,
     };
   } catch (err) {
     if (isSchemaError(err)) {
