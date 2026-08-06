@@ -10,6 +10,17 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '';
 const APP_VERSION = '0.1.0';
 
+/**
+ * Ceiling on a single BFF call. Without one, an unreachable or wedged backend
+ * leaves the request pending forever: the queue runner awaits it while holding
+ * the `queue-runner` Web Lock, so every later interval tick is a no-op and the
+ * whole offline reconciliation loop stalls until the tab is closed. A timeout
+ * converts that into an ordinary retryable failure with backoff.
+ */
+const DEFAULT_TIMEOUT_MS = 20_000;
+/** Model-backed endpoints legitimately take longer than a plain HTTP hop. */
+const MODEL_TIMEOUT_MS = 60_000;
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -21,15 +32,41 @@ export class ApiError extends Error {
   }
 }
 
-async function apiPost<TResp>(path: string, body: unknown): Promise<TResp> {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-app-version': APP_VERSION,
-    },
-    body: JSON.stringify(body),
-  });
+/** A call that never came back. Transient by definition, so callers retry it. */
+export class ApiTimeoutError extends Error {
+  constructor(
+    readonly path: string,
+    readonly timeoutMs: number,
+  ) {
+    super(`POST ${path} timed out after ${timeoutMs}ms`);
+    this.name = 'ApiTimeoutError';
+  }
+}
+
+async function apiPost<TResp>(
+  path: string,
+  body: unknown,
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<TResp> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-app-version': APP_VERSION,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (controller.signal.aborted) throw new ApiTimeoutError(path, timeoutMs);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   if (!res.ok) {
     let payload: unknown;
     try {
@@ -53,7 +90,7 @@ export interface OcrResponse {
   provider: 'azure-vision' | 'mock-vision';
   providerVersion?: string;
 }
-export const ocr = (req: OcrRequest): Promise<OcrResponse> => apiPost('/api/ocr', req);
+export const ocr = (req: OcrRequest): Promise<OcrResponse> => apiPost('/api/ocr', req, MODEL_TIMEOUT_MS);
 
 // ---- Parse ----
 export interface ParseRequest {
@@ -105,7 +142,8 @@ export function isSchemaError(err: unknown): err is ApiError & { body: ParseSche
   return err instanceof ApiError && err.status === 422;
 }
 
-export const parse = (req: ParseRequest): Promise<ParseResponse> => apiPost('/api/parse', req);
+export const parse = (req: ParseRequest): Promise<ParseResponse> =>
+  apiPost('/api/parse', req, MODEL_TIMEOUT_MS);
 
 // ---- Search ----
 export interface SearchRequest {
@@ -168,4 +206,4 @@ export interface RecommendResponse {
   reason?: 'insufficient-history';
 }
 export const recommend = (req: RecommendRequest): Promise<RecommendResponse> =>
-  apiPost('/api/recommend', req);
+  apiPost('/api/recommend', req, MODEL_TIMEOUT_MS);
