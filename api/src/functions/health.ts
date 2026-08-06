@@ -35,7 +35,9 @@ app.http('health', {
       services: {
         ocr: modeOf('AZURE_VISION_ENDPOINT', 'AZURE_VISION_KEY'),
         parse: openAi,
-        search: modeOf('BING_SEARCH_KEY'),
+        // Search resolves the roaster's storefront with the model, then queries
+        // that store directly, so it is live whenever the model is.
+        search: openAi,
         recommend: openAi,
       },
     };

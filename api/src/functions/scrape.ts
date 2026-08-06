@@ -1,21 +1,28 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
+import { safeFetch, UnsafeUrlError } from '../lib/safeFetch.js';
 
 interface ScrapeRequest {
   url?: unknown;
 }
 
-const DEFAULT_ALLOWLIST = ['*.example', 'bluebottlecoffee.com', 'counterculturecoffee.com', 'intelligentsiacoffee.com'];
+/**
+ * An optional stricter override. Left unset, any publicly routable host is
+ * fetchable and safety rests on the address checks in `safeFetch` — which is
+ * what makes enrichment work against roasters nobody hardcoded. Set it to pin
+ * the deployment to a fixed set of stores.
+ */
+function allowlist(): string[] {
+  return (process.env.SCRAPE_ALLOWLIST?.split(',').map((s) => s.trim()) ?? []).filter(Boolean);
+}
 
-function isAllowed(url: string, allowlist: string[]): boolean {
+function isAllowed(url: string, patterns: string[]): boolean {
+  if (patterns.length === 0) return true;
   try {
     const host = new URL(url).hostname.toLowerCase();
-    return allowlist.some((pattern) => {
-      if (pattern.startsWith('*.')) {
-        return host.endsWith(pattern.slice(1));
-      }
-      return host === pattern;
-    });
+    return patterns.some((pattern) =>
+      pattern.startsWith('*.') ? host.endsWith(pattern.slice(1)) : host === pattern,
+    );
   } catch {
     return false;
   }
@@ -60,11 +67,8 @@ app.http('scrape', {
         return errorResponse(ctx, 400, 'url is required');
       }
 
-      const allowlist = (process.env.SCRAPE_ALLOWLIST?.split(',').map((s) => s.trim()) || DEFAULT_ALLOWLIST).filter(
-        Boolean,
-      );
-      if (!isAllowed(body.url, allowlist)) {
-        return errorResponse(ctx, 400, `URL host is not in allowlist`);
+      if (!isAllowed(body.url, allowlist())) {
+        return errorResponse(ctx, 400, 'URL host is not in allowlist');
       }
 
       ctx.log('scrape invoked', { url: body.url });
@@ -80,19 +84,19 @@ app.http('scrape', {
         });
       }
 
-      const res = await fetch(body.url, { headers: { 'user-agent': 'AgenticCoffeeBot/0.1 (+https://github.com/saquibrashid/agentic-coffee-tracker)' } });
-      if (!res.ok) {
+      const res = await safeFetch(body.url);
+      if (res.status !== 200) {
         return errorResponse(ctx, 502, `Fetch returned ${res.status}`);
       }
-      const html = await res.text();
-      const text = extractTextFromHtml(html);
 
-      // If Azure OpenAI is configured, call /api/parse-equivalent inline. For brevity we return the text.
       return json(200, {
-        extracted: { rawText: text },
-        sourceUrl: body.url,
+        extracted: { rawText: extractTextFromHtml(res.body) },
+        // The URL after redirects, so the recorded source is where the text
+        // actually came from rather than where we started looking.
+        sourceUrl: res.finalUrl,
       });
     } catch (err) {
+      if (err instanceof UnsafeUrlError) return errorResponse(ctx, 400, err.message, err);
       return errorResponse(ctx, 500, 'Scrape failed', err);
     }
   },
