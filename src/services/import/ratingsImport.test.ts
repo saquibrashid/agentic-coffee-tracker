@@ -13,7 +13,9 @@ import {
 
 const EMPTY: ExistingData = { beans: [], ratings: [] };
 
-function bean(overrides: Partial<CoffeeBean> & Pick<CoffeeBean, 'id' | 'roaster' | 'name'>): CoffeeBean {
+function bean(
+  overrides: Partial<CoffeeBean> & Pick<CoffeeBean, 'id' | 'roaster' | 'name'>,
+): CoffeeBean {
   return {
     schemaVersion: 1,
     source: 'manual',
@@ -27,7 +29,7 @@ function bean(overrides: Partial<CoffeeBean> & Pick<CoffeeBean, 'id' | 'roaster'
 
 function rating(overrides: Partial<Rating> & Pick<Rating, 'id' | 'beanId'>): Rating {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     score: 4,
     brewType: 'espresso',
     ratedAt: '2025-03-14T12:00:00.000Z',
@@ -44,18 +46,19 @@ describe('parseScore', () => {
     expect(parseScore('4')).toBe(4);
   });
 
-  it('rescales an out-of-N score onto 1-5', () => {
-    expect(parseScore('8/10')).toBe(4);
-    expect(parseScore('4/5')).toBe(4);
+  it('rescales an out-of-N score onto 1-10', () => {
+    expect(parseScore('8/10')).toBe(8);
+    expect(parseScore('4/5')).toBe(8);
   });
 
-  it('counts filled stars', () => {
-    expect(parseScore('★★★★☆')).toBe(4);
+  it('counts filled stars as being out of five', () => {
+    expect(parseScore('★★★★☆')).toBe(8);
   });
 
-  it('rounds decimals', () => {
-    expect(parseScore('4.5')).toBe(5);
+  it('snaps decimals to the nearest half-step', () => {
+    expect(parseScore('4.5')).toBe(4.5);
     expect(parseScore('3.2')).toBe(3);
+    expect(parseScore('8.4')).toBe(8.5);
   });
 
   it('returns null when there is no number at all', () => {
@@ -159,11 +162,11 @@ describe('planCsvImport', () => {
   it('reports bad rows by line number and still imports the good ones', () => {
     const csv = [
       HEADER,
-      'Onyx,Southern Weather,4,espresso,2025-03-14,',
-      ',No Roaster,4,espresso,2025-03-14,',
+      'Onyx,Southern Weather,8,espresso,2025-03-14,',
+      ',No Roaster,8,espresso,2025-03-14,',
       'Onyx,Unreadable Score,lovely,espresso,2025-03-14,',
-      'Onyx,Bad Date,4,espresso,last tuesday,',
-      'Onyx,Out Of Range,9,espresso,2025-03-14,',
+      'Onyx,Bad Date,8,espresso,last tuesday,',
+      'Onyx,Out Of Range,11,espresso,2025-03-14,',
     ].join('\n');
 
     const plan = planCsvImport(csv, EMPTY);
@@ -182,9 +185,10 @@ describe('planCsvImport', () => {
   });
 
   it('accepts alternative column names', () => {
-    const csv = ['Brand,Bean Name,Stars,Brew Method,Date Tried', 'Onyx,Geometry,5,V60,2025-03-14'].join(
-      '\n',
-    );
+    const csv = [
+      'Brand,Bean Name,Stars,Brew Method,Date Tried',
+      'Onyx,Geometry,5,V60,2025-03-14',
+    ].join('\n');
 
     const plan = planCsvImport(csv, EMPTY);
 
@@ -209,7 +213,7 @@ describe('planCsvImport', () => {
   });
 
   it('falls back to "other" for an unknown brew and says so', () => {
-    const csv = [HEADER, 'Onyx,Geometry,5,turkish,2025-03-14,'].join('\n');
+    const csv = [HEADER, 'Onyx,Geometry,9,turkish,2025-03-14,'].join('\n');
 
     const plan = planCsvImport(csv, EMPTY);
 
@@ -218,7 +222,7 @@ describe('planCsvImport', () => {
   });
 
   it('defaults a blank brew to latte without warning', () => {
-    const csv = [HEADER, 'Onyx,Geometry,5,,2025-03-14,'].join('\n');
+    const csv = [HEADER, 'Onyx,Geometry,9,,2025-03-14,'].join('\n');
 
     const plan = planCsvImport(csv, EMPTY);
 

@@ -10,9 +10,9 @@ import { test, expect, type Page } from '@playwright/test';
 
 const CSV = [
   'roaster,coffee,score,brew,date,notes',
-  'Onyx Coffee Lab,Southern Weather,4,espresso,2025-03-14,"bright, juicy"',
-  'Onyx Coffee Lab,Southern Weather,5,pour-over,2025-03-15,',
-  'Anchorhead Coffee,Bali Kintamani,5,espresso,2025-03-16,',
+  'Onyx Coffee Lab,Southern Weather,8,espresso,2025-03-14,"bright, juicy"',
+  'Onyx Coffee Lab,Southern Weather,10,pour-over,2025-03-15,',
+  'Anchorhead Coffee,Bali Kintamani,10,espresso,2025-03-16,',
   'Broken Row,No Score,,espresso,2025-03-17,',
 ].join('\n');
 
@@ -118,5 +118,10 @@ test.describe('bulk import', () => {
 
     await page.goto('/beans');
     await expect(page.getByText('Restored Bean')).toBeVisible();
+
+    // The backup was taken on the old 1–5 scale, so 5 must come back as 10/10
+    // rather than being restored verbatim as a mediocre score.
+    await page.getByText('Restored Bean').click();
+    await expect(page.getByText('10/10')).toBeVisible();
   });
 });

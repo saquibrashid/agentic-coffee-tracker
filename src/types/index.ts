@@ -99,9 +99,11 @@ export interface BrewParams {
 
 export interface Rating {
   id: string;
-  schemaVersion: 1;
+  /** v1 scored 1–5; v2 scores 1–10 in half-steps. See services/ratings/scale.ts. */
+  schemaVersion: 2;
   beanId: string;
 
+  /** 1–10, half-steps allowed. */
   score: number;
   brewType: BrewType;
   notes?: string;

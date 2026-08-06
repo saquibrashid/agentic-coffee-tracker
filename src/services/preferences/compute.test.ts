@@ -20,7 +20,7 @@ function bean(id: string, over: Partial<CoffeeBean> = {}): CoffeeBean {
 function rating(beanId: string, score: number, over: Partial<Rating> = {}): Rating {
   return {
     id: `${beanId}-${score}-${Math.random()}`,
-    schemaVersion: 1,
+    schemaVersion: 2,
     beanId,
     score,
     brewType: 'espresso',
