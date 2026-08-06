@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/services/db';
 import { exportCsv, exportJson, exportJsonWithPhotos } from '@/services/export/exporter';
+import { ImportPanel } from './ImportPanel';
 import {
   RESET_CONFIRMATION_PHRASE,
   formatBytes,
@@ -44,6 +45,8 @@ export function SettingsPage() {
           <Button variant="outline" onClick={() => void exportJsonWithPhotos()}>Export JSON + photos</Button>
         </CardContent>
       </Card>
+
+      <ImportPanel />
 
       <Card>
         <CardHeader>

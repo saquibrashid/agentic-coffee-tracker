@@ -153,12 +153,29 @@ Trigger rules:
 | Empty    | N/A.                                                                                        |
 | Error    | Per-action inline error.                                                                    |
 | Offline  | All settings work; "Check for updates" disabled.                                            |
-| Success  | Sections: Export, Pending operations, Storage usage, Diagnostics, Reset, About.             |
+| Success  | Sections: Export, Import, Pending operations, Storage usage, Diagnostics, Reset, About.     |
 
 ### Export
 - Buttons: "Export CSV", "Export JSON", "Export JSON + photos (zip)".
 - Show progress for zips > 1s.
 - Verify download started; on failure offer "Copy to clipboard" for JSON.
+
+### Import
+- One file picker accepting `.csv` and `.json`; the format is sniffed from the content, not the
+  extension, because files shared through chat apps routinely lose their suffix.
+- **CSV** is a rating history: one row per cup. `roaster`, `coffee` and `score` are required;
+  `brew`, `date`, `notes`, `roast`, `process`, `origin` and `tasting notes` are optional. Column
+  names are matched loosely (`Brew Method` = `brew_method` = `brewtype`). "Download CSV template"
+  produces a filled example.
+- Coffees are derived by grouping rows on roaster + name, compared case- and whitespace-insensitively,
+  so a coffee rated five times becomes one bean with five ratings.
+- **JSON** restores a backup from the Export buttons above. It merges by id and never overwrites, so
+  restoring over a library that has moved on cannot destroy newer entries.
+- Nothing is written until the user confirms a plan showing what will be added, what was skipped as
+  already recorded, and which rows failed — each with its line number.
+- Re-importing the same file is a no-op: ratings de-duplicate on coffee + day + brew + score.
+- On success the preference profile is recomputed, so recommendations reflect the imported history
+  immediately.
 
 ### Pending operations
 - Lists `pendingAiTasks` with type, age, attempts, last error.
