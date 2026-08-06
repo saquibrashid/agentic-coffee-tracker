@@ -1,6 +1,7 @@
 import { app, type HttpRequest, type HttpResponseInit, type InvocationContext } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
 import { safeFetch, UnsafeUrlError } from '../lib/safeFetch.js';
+import { callResponses, getOpenAiConfig, parseJsonOutput } from '../lib/openai.js';
 
 interface SearchRequest {
   roaster?: unknown;
@@ -43,41 +44,27 @@ const DOMAIN_SYSTEM_PROMPT = [
 ].join(' ');
 
 async function guessRoasterDomains(roaster: string, ctx: InvocationContext): Promise<string[]> {
-  const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
-  const key = process.env.AZURE_OPENAI_KEY;
-  const deployment = process.env.AZURE_OPENAI_DEPLOYMENT;
-  if (!endpoint || !key || !deployment) return [];
+  const config = getOpenAiConfig();
+  if (!config) return [];
 
-  const url = `${endpoint.replace(/\/$/, '')}/openai/deployments/${deployment}/chat/completions?api-version=2024-10-21`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'api-key': key },
-    signal: AbortSignal.timeout(20_000),
-    body: JSON.stringify({
-      messages: [
-        { role: 'system', content: DOMAIN_SYSTEM_PROMPT },
-        { role: 'user', content: `Roaster: ${roaster}` },
-      ],
+  let content: string;
+  try {
+    const result = await callResponses(config, {
+      system: DOMAIN_SYSTEM_PROMPT,
+      user: `Roaster: ${roaster}`,
+      format: { type: 'json_object' },
       temperature: 0,
-      response_format: { type: 'json_object' },
-    }),
-  });
-  if (!res.ok) {
-    ctx.warn('domain lookup failed', { status: res.status });
+      timeoutMs: 20_000,
+    });
+    content = result.text;
+  } catch (err) {
+    ctx.warn('domain lookup failed', { error: err instanceof Error ? err.message : String(err) });
     return [];
   }
-
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  const content = data.choices?.[0]?.message?.content;
   if (!content) return [];
 
-  let parsed: DomainGuess;
-  try {
-    parsed = JSON.parse(content) as DomainGuess;
-  } catch {
-    return [];
-  }
-  if (!Array.isArray(parsed.domains)) return [];
+  const parsed = parseJsonOutput(content) as DomainGuess | undefined;
+  if (!parsed || !Array.isArray(parsed.domains)) return [];
 
   return parsed.domains
     .filter((d): d is string => typeof d === 'string')
@@ -179,7 +166,7 @@ app.http('search', {
 
       // Without a model there is no way to resolve a roaster to a domain, so the
       // endpoint degrades to its fixture like every other unconfigured endpoint.
-      if (!process.env.AZURE_OPENAI_KEY) {
+      if (!getOpenAiConfig()) {
         return json(200, {
           results: mockResults(body.roaster, body.name),
           provider: 'mock-search',

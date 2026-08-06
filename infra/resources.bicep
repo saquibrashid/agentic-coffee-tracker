@@ -14,8 +14,6 @@ param openAiEndpoint string
 @secure()
 param openAiKey string
 param openAiDeployment string
-@secure()
-param bingSearchKey string
 param scrapeAllowlist string
 
 @description('SKU for the Azure AI Vision account. F0 is free (5,000 transactions/month) but a subscription may only hold one F0 Computer Vision account — use S1 for a second environment.')
@@ -64,7 +62,6 @@ var effectiveOpenAiDeployment = empty(openAiDeployment) ? openAiModelName : open
 // The BFF still falls back to deterministic mocks when a key is absent, which is
 // what local development runs on. In Azure the credentials are always present,
 // so the Vision/OpenAI secrets and settings below are unconditional.
-var hasBing = !empty(bingSearchKey)
 
 // ---------------------------------------------------------------------------
 // Observability
@@ -200,12 +197,6 @@ resource openAiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   properties: { value: effectiveOpenAiKey }
 }
 
-resource bingKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (hasBing) {
-  parent: keyVault
-  name: 'bing-search-key'
-  properties: { value: bingSearchKey }
-}
-
 // ---------------------------------------------------------------------------
 // Function App (BFF) on Flex Consumption
 // ---------------------------------------------------------------------------
@@ -279,13 +270,6 @@ var openAiSettings = [
   }
 ]
 
-var bingSettings = hasBing ? [
-  {
-    name: 'BING_SEARCH_KEY'
-    value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/bing-search-key/)'
-  }
-] : []
-
 resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   name: abbrev.functionApp
   location: location
@@ -334,7 +318,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         ]
         supportCredentials: false
       }
-      appSettings: concat(baseAppSettings, visionSettings, openAiSettings, bingSettings)
+      appSettings: concat(baseAppSettings, visionSettings, openAiSettings)
     }
   }
   dependsOn: [
