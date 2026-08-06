@@ -11,6 +11,20 @@ Supporting resources: Log Analytics workspace, Application Insights (workspace-b
 
 Everything is defined in `infra/main.bicep` (subscription scope) and `infra/resources.bicep` (resource-group scope), orchestrated by `azure.yaml`.
 
+## Client-side routes need `staticwebapp.config.json`
+
+`public/staticwebapp.config.json` is copied into `dist/` by Vite and tells Static Web Apps to serve
+`index.html` for any path it does not recognise as a file.
+
+Without it, only `/` works: loading, refreshing or bookmarking `/beans`, `/settings` or `/analytics`
+returns a **404 from the CDN**, because those paths only exist inside the React router and there is no
+matching file on disk. The dev server does this fallback automatically, so the failure appears only
+once deployed — it will not show up in `pnpm dev` or in Playwright.
+
+The `exclude` list matters: without it the fallback also swallows missing assets, turning a genuine
+404 into an HTML page served with a JS content type. `/api/*` is excluded so the linked-backend proxy
+to the Function App keeps working.
+
 ## AI services are provisioned for you
 
 `azd provision` creates an Azure AI Vision account and an Azure AI Foundry account with a `gpt-4o`
