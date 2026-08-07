@@ -256,6 +256,33 @@ Configure the federated credential in one step:
 azd pipeline config --provider github
 ```
 
+Answer **yes** when it offers to create `azure-dev.yml` — declining aborts the whole
+flow, so the identity and repository variables never get created. Then **delete**
+that generated file and decline the final "commit and push" prompt: `deploy.yml`
+already does everything it would, and two workflows triggering on `push: main`
+would race each other with concurrent `azd deploy` runs.
+
+> **`azd pipeline config` alone is not enough for this repo.** It registers federated
+> credentials for the `ref:refs/heads/main` and `pull_request` subjects only, but the
+> deploy job runs with `environment: dev`, which changes the OIDC token's subject to
+> `repo:<owner>/<repo>:environment:dev`. Without a matching credential the login step
+> fails with `AADSTS700213: No matching federated identity record found`. Add it once:
+>
+> ```bash
+> az identity federated-credential create \
+>   --name "<repo>-env-dev" \
+>   --identity-name msi-agentic-coffee-tracker \
+>   --resource-group rg-coffee-dev \
+>   --issuer https://token.actions.githubusercontent.com \
+>   --subject "repo:<owner>/<repo>:environment:dev" \
+>   --audiences api://AzureADTokenExchange
+> ```
+>
+> If that returns `RequestDisallowedByAzure` about MFA, the `az` CLI's cached token
+> predates an MFA sign-in. Either re-run `az login`, or reuse the token `azd` already
+> holds and `PUT` the credential through the ARM REST API
+> (`.../federatedIdentityCredentials/<name>?api-version=2023-01-31`).
+
 ## Tear down
 
 ```bash
