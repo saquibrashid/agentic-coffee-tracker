@@ -52,6 +52,32 @@ Open a [feature request](./.github/ISSUE_TEMPLATE/feature_request.md). Reference
 | Branch naming          | `<kind>/<short-description>`                                                                                 |
 | Accessibility          | WCAG 2.1 AA — verified by `axe-core` and a keyboard-only walkthrough                                         |
 
+### TypeScript 6 and 7 side by side
+
+`tsc` is **TypeScript 7** (the native Go port — roughly 3x faster here: a cold
+`tsc -b --noEmit` drops from ~6.1s to ~2.0s).
+
+TypeScript 7.0 ships without a programmatic API, and `typescript-eslint` refuses
+to load against it outright ([typescript-eslint#10940][ts-eslint-7]). Per the
+[TypeScript 7.0 announcement][ts7], both versions are installed side by side via
+npm aliases in `package.json`:
+
+```jsonc
+"typescript": "npm:@typescript/typescript6@^6.0.2", // the API, used by typescript-eslint
+"@typescript/native": "npm:typescript@^7.0.2"       // the fast `tsc` binary
+```
+
+So `npx tsc` is 7.x and `npx tsc6` is 6.x. Anything importing `typescript`
+programmatically resolves to 6.x and keeps working.
+
+**Do not "simplify" this to a single `typescript` dependency** — pointing it at
+7.x breaks `pnpm lint` with `typescript-eslint does not support TS 7.0`. Once
+typescript-eslint supports TS 7 (expected against the new 7.1 API), drop the
+`@typescript/native` alias and set `typescript` back to `^7`.
+
+[ts7]: https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/#running-side-by-side-with-typescript-60
+[ts-eslint-7]: https://github.com/typescript-eslint/typescript-eslint/issues/10940
+
 ### Architectural rules
 
 - Components never call `fetch` directly — always via `services/ai/*`.
