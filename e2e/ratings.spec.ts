@@ -47,9 +47,9 @@ async function seedBeanWithRatings(page: Page) {
     });
     tx.objectStore('ratings').put({
       id: 'rating-1',
-      schemaVersion: 1,
+      schemaVersion: 2,
       beanId: 'rated-1',
-      score: 3,
+      score: 6,
       brewType: 'drip',
       notes: 'a bit flat',
       ratedAt: '2026-03-02T00:00:00.000Z',
@@ -58,9 +58,9 @@ async function seedBeanWithRatings(page: Page) {
     });
     tx.objectStore('ratings').put({
       id: 'rating-2',
-      schemaVersion: 1,
+      schemaVersion: 2,
       beanId: 'rated-1',
-      score: 5,
+      score: 10,
       brewType: 'espresso',
       ratedAt: '2026-03-03T00:00:00.000Z',
       createdAt: '2026-03-03T00:00:00.000Z',
@@ -86,82 +86,82 @@ test.describe('Ratings on a bean', () => {
   test('edits a rating in place', async ({ page }) => {
     await page
       .getByRole('listitem')
-      .filter({ hasText: '3 / 5' })
+      .filter({ hasText: '6/10' })
       .getByRole('button', { name: /edit rating/i })
       .click();
 
     // The row is now a form; scope every control to it so the add-rating form
     // below cannot be driven by mistake.
     const form = page.getByRole('form', { name: 'Edit rating' });
-    await form.getByLabel('Score').selectOption('4');
+    await form.getByLabel('Score').selectOption('8');
     await form.getByLabel('Brew type').selectOption('latte');
     await form.getByLabel('Tasting notes').fill('better with milk');
     await form.getByRole('button', { name: /save rating/i }).click();
 
-    const updated = page.getByRole('listitem').filter({ hasText: '4 / 5' });
+    const updated = page.getByRole('listitem').filter({ hasText: '8/10' });
     await expect(updated).toContainText('Latte');
     await expect(updated).toContainText('better with milk');
-    await expect(page.getByRole('listitem').filter({ hasText: '3 / 5' })).toHaveCount(0);
+    await expect(page.getByRole('listitem').filter({ hasText: '6/10' })).toHaveCount(0);
   });
 
   test('an edit survives a reload', async ({ page }) => {
     await page
       .getByRole('listitem')
-      .filter({ hasText: '3 / 5' })
+      .filter({ hasText: '6/10' })
       .getByRole('button', { name: /edit rating/i })
       .click();
 
     const form = page.getByRole('form', { name: 'Edit rating' });
-    await form.getByLabel('Score').selectOption('2');
+    await form.getByLabel('Score').selectOption('4');
     await form.getByRole('button', { name: /save rating/i }).click();
 
-    await expect(page.getByRole('listitem').filter({ hasText: '2 / 5' })).toBeVisible();
+    await expect(page.getByRole('listitem').filter({ hasText: '4/10' })).toBeVisible();
 
     await page.reload();
-    await expect(page.getByRole('listitem').filter({ hasText: '2 / 5' })).toBeVisible();
+    await expect(page.getByRole('listitem').filter({ hasText: '4/10' })).toBeVisible();
   });
 
   test('cancelling an edit leaves the rating untouched', async ({ page }) => {
     await page
       .getByRole('listitem')
-      .filter({ hasText: '3 / 5' })
+      .filter({ hasText: '6/10' })
       .getByRole('button', { name: /edit rating/i })
       .click();
 
     const form = page.getByRole('form', { name: 'Edit rating' });
-    await form.getByLabel('Score').selectOption('1');
+    await form.getByLabel('Score').selectOption('2');
     await form.getByRole('button', { name: /^cancel$/i }).click();
 
-    await expect(page.getByRole('listitem').filter({ hasText: '3 / 5' })).toBeVisible();
-    await expect(page.getByRole('listitem').filter({ hasText: '1 / 5' })).toHaveCount(0);
+    await expect(page.getByRole('listitem').filter({ hasText: '6/10' })).toBeVisible();
+    await expect(page.getByRole('listitem').filter({ hasText: '2/10' })).toHaveCount(0);
   });
 
   test('deletes a single rating and leaves the other', async ({ page }) => {
     await page
       .getByRole('listitem')
-      .filter({ hasText: '3 / 5' })
+      .filter({ hasText: '6/10' })
       .getByRole('button', { name: /delete rating/i })
       .click();
 
     await expect(page.getByRole('heading', { name: /remove this rating\?/i })).toBeVisible();
     await page.getByRole('button', { name: /^remove$/i }).click();
 
-    await expect(page.getByRole('listitem').filter({ hasText: '3 / 5' })).toHaveCount(0);
-    await expect(page.getByRole('listitem').filter({ hasText: '5 / 5' })).toBeVisible();
+    await expect(page.getByRole('listitem').filter({ hasText: '6/10' })).toHaveCount(0);
+    await expect(page.getByRole('listitem').filter({ hasText: '10/10' })).toBeVisible();
 
     await page.reload();
-    await expect(page.getByRole('listitem').filter({ hasText: '3 / 5' })).toHaveCount(0);
+    await expect(page.getByRole('listitem').filter({ hasText: '6/10' })).toHaveCount(0);
   });
 
   test('cancelling the delete keeps the rating', async ({ page }) => {
     await page
       .getByRole('listitem')
-      .filter({ hasText: '3 / 5' })
+      .filter({ hasText: '6/10' })
       .getByRole('button', { name: /delete rating/i })
       .click();
     await page.getByRole('button', { name: /^cancel$/i }).click();
 
-    await expect(page.getByRole('listitem').filter({ hasText: '3 / 5' })).toBeVisible();
+    await expect(page.getByRole('listitem').filter({ hasText: '6/10' })).toBeVisible();
   });
 
   test('removes the whole coffee from its detail page and returns to the library', async ({

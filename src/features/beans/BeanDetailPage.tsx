@@ -10,12 +10,13 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
+import { DEFAULT_SCORE, SCORE_CHOICES, formatOutOf, formatScore } from '@/services/ratings/scale';
 import { BREW_TYPE_OPTIONS, DEFAULT_BREW_TYPE, brewLabel } from '@/services/ratings/brewTypes';
 import { EnrichPanel } from './EnrichPanel';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import type { BrewType, Rating } from '@/types';
 
-const SCORE_OPTIONS = [5, 4, 3, 2, 1];
+const SCORE_OPTIONS = SCORE_CHOICES;
 
 export function BeanDetailPage() {
   const { beanId } = useParams<{ beanId: string }>();
@@ -90,7 +91,9 @@ export function BeanDetailPage() {
           <div>
             <h3 className="text-sm font-medium">Attributes</h3>
             <p className="text-sm text-muted-foreground">Roast: {bean.roastLevel || '—'}</p>
-            <p className="text-sm text-muted-foreground">Origins: {(bean.origins ?? []).map((o) => o.country).join(', ') || '—'}</p>
+            <p className="text-sm text-muted-foreground">
+              Origins: {(bean.origins ?? []).map((o) => o.country).join(', ') || '—'}
+            </p>
             {bean.sourceUrl && (
               <p className="break-all text-xs text-muted-foreground">
                 Source:{' '}
@@ -133,7 +136,10 @@ export function BeanDetailPage() {
 }
 
 function RatingsList({ beanId }: { beanId: string }) {
-  const ratings = useLiveQuery(() => db.ratings.where('beanId').equals(beanId).reverse().toArray(), [beanId]);
+  const ratings = useLiveQuery(
+    () => db.ratings.where('beanId').equals(beanId).reverse().toArray(),
+    [beanId],
+  );
   const [editingId, setEditingId] = useState<string | null>(null);
 
   if (ratings === undefined) return <Skeleton className="h-24" />;
@@ -184,7 +190,7 @@ function RatingRow({ rating, onEdit }: { rating: Rating; onEdit: () => void }) {
     <>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <div className="font-medium">{rating.score} / 5</div>
+          <div className="font-medium">{formatOutOf(rating.score)}</div>
           <div className="text-sm text-muted-foreground">
             {brewLabel(rating.brewType)} — {rated}
           </div>
@@ -220,7 +226,7 @@ function RatingRow({ rating, onEdit }: { rating: Rating; onEdit: () => void }) {
       <ConfirmDialog
         open={confirming}
         title="Remove this rating?"
-        description={`This permanently removes the ${rating.score}/5 ${brewLabel(
+        description={`This permanently removes the ${formatOutOf(rating.score)} ${brewLabel(
           rating.brewType,
         ).toLowerCase()} rating from ${rated}. It cannot be undone.`}
         busy={busy}
@@ -281,7 +287,7 @@ function EditRatingForm({
         >
           {SCORE_OPTIONS.map((n) => (
             <option key={n} value={n}>
-              {n}
+              {formatScore(n)}
             </option>
           ))}
         </select>
@@ -323,7 +329,7 @@ function EditRatingForm({
 }
 
 function AddRatingForm({ beanId }: { beanId: string }) {
-  const [score, setScore] = useState(4);
+  const [score, setScore] = useState(DEFAULT_SCORE);
   const [brewType, setBrewType] = useState<BrewType>(DEFAULT_BREW_TYPE);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
@@ -334,7 +340,7 @@ function AddRatingForm({ beanId }: { beanId: string }) {
       const now = new Date().toISOString();
       const rating: Rating = {
         id: ulid(),
-        schemaVersion: 1,
+        schemaVersion: 2,
         beanId,
         score,
         brewType,
@@ -346,14 +352,14 @@ function AddRatingForm({ beanId }: { beanId: string }) {
       };
       await db.ratings.add(rating);
       setNotes('');
-      setScore(4);
+      setScore(DEFAULT_SCORE);
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="space-y-2 mt-2">
+    <div className="mt-2 space-y-2">
       <div className="flex gap-2">
         <select
           value={score}
@@ -363,7 +369,7 @@ function AddRatingForm({ beanId }: { beanId: string }) {
         >
           {SCORE_OPTIONS.map((n) => (
             <option key={n} value={n}>
-              {n}
+              {formatScore(n)}
             </option>
           ))}
         </select>
@@ -380,9 +386,21 @@ function AddRatingForm({ beanId }: { beanId: string }) {
           ))}
         </select>
       </div>
-      <textarea value={notes} onChange={(e)=>setNotes(e.target.value)} className="w-full rounded border p-2" aria-label="Tasting notes" placeholder="Tasting notes (optional)" />
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        className="w-full rounded border p-2"
+        aria-label="Tasting notes"
+        placeholder="Tasting notes (optional)"
+      />
       <div className="flex justify-end">
-        <button onClick={onAdd} disabled={saving} className="rounded bg-primary px-3 py-2 text-white">{saving ? 'Adding…' : 'Add rating'}</button>
+        <button
+          onClick={onAdd}
+          disabled={saving}
+          className="rounded bg-primary px-3 py-2 text-white"
+        >
+          {saving ? 'Adding…' : 'Add rating'}
+        </button>
       </div>
     </div>
   );

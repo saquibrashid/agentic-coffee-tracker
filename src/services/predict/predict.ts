@@ -4,19 +4,17 @@
  * Deliberately local and deterministic rather than a model call. A prediction
  * about someone's own palate should be arithmetic on their own history: it works
  * offline, costs nothing, cannot hallucinate a preference they never expressed,
- * and — most importantly — can show its working. "Likely a 4.4, because you have
- * rated 7 natural Ethiopians at 4.6" is checkable in a way that a paragraph of
+ * and — most importantly — can show its working. "Likely an 8.8, because you have
+ * rated 7 natural Ethiopians at 9.2" is checkable in a way that a paragraph of
  * generated prose is not.
  *
  * Statistically this is a weighted mean shrunk toward the user's own baseline.
  * Evidence pulls the estimate away from that baseline in proportion to how much
- * of it there is, so one 5-star cup of a Kenyan cannot declare every Kenyan a
+ * of it there is, so one top-marks cup of a Kenyan cannot declare every Kenyan a
  * certainty, while twenty of them can.
  */
+import { MAX_SCORE, NEUTRAL_SCORE, clampScore } from '@/services/ratings/scale';
 import type { CoffeeBean, Origin, Process, Rating, RoastLevel } from '@/types';
-
-/** Assumed rating for a user with no history at all — the middle of the scale. */
-const NEUTRAL_SCORE = 3;
 
 /**
  * Strength of the pull toward the baseline, in units of evidence weight. At
@@ -75,7 +73,7 @@ export interface Evidence {
 export type Verdict = 'love' | 'like' | 'unsure' | 'avoid';
 
 export interface Prediction {
-  /** Predicted score on the 1–5 scale, to one decimal. */
+  /** Predicted score on the 1–10 scale, to one decimal. */
   score: number;
   /** 0–1. How much history stands behind the number. */
   confidence: number;
@@ -192,11 +190,12 @@ function match(
 
 function verdictFor(score: number, delta: number, confidence: number): Verdict {
   // Ratings cluster around each person's own centre of gravity, so a raw score
-  // is not enough: for someone who averages 4.4, a predicted 4.0 is a warning.
+  // is not enough: for someone who averages 8.8, a predicted 8.0 is a warning.
+  // Thresholds are expressed on the 1–10 scale (specs/data-model.md).
   if (confidence < MIN_CONFIDENCE) return 'unsure';
-  if (score >= 4.2 && delta >= 0.1) return 'love';
-  if (score >= 3.6 && delta >= -0.15) return 'like';
-  if (score >= 3) return 'unsure';
+  if (score >= 8.4 && delta >= 0.2) return 'love';
+  if (score >= 7.2 && delta >= -0.3) return 'like';
+  if (score >= 6) return 'unsure';
   return 'avoid';
 }
 
@@ -257,7 +256,7 @@ export function predict(candidate: Candidate, index: PredictionIndex): Predictio
   const weighted = matches.reduce((sum, m) => sum + m.weight * m.evidence.averageScore, 0);
 
   const raw = (weighted + PRIOR_STRENGTH * index.baseline) / (totalWeight + PRIOR_STRENGTH);
-  const score = Math.round(Math.min(5, Math.max(1, raw)) * 10) / 10;
+  const score = Math.round(clampScore(raw) * 10) / 10;
 
   // Confidence saturates: it approaches 1 as evidence accumulates but never
   // claims certainty, and it is held back while the overall history is thin.
@@ -294,14 +293,14 @@ export function explain(evidence: Evidence): string {
   const average = evidence.averageScore.toFixed(1);
   switch (evidence.kind) {
     case 'roaster':
-      return `You have rated ${cups} from ${evidence.label} at ${average}/5.`;
+      return `You have rated ${cups} from ${evidence.label} at ${average}/${MAX_SCORE}.`;
     case 'origin':
-      return `Coffees from ${evidence.label} average ${average}/5 across ${cups}.`;
+      return `Coffees from ${evidence.label} average ${average}/${MAX_SCORE} across ${cups}.`;
     case 'process':
-      return `${evidence.label} process averages ${average}/5 across ${cups}.`;
+      return `${evidence.label} process averages ${average}/${MAX_SCORE} across ${cups}.`;
     case 'roastLevel':
-      return `${evidence.label} roasts average ${average}/5 across ${cups}.`;
+      return `${evidence.label} roasts average ${average}/${MAX_SCORE} across ${cups}.`;
     case 'flavour':
-      return `Coffees noting "${evidence.label}" average ${average}/5 across ${cups}.`;
+      return `Coffees noting "${evidence.label}" average ${average}/${MAX_SCORE} across ${cups}.`;
   }
 }

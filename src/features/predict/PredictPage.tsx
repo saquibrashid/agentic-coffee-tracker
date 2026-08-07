@@ -26,7 +26,14 @@ import {
   loadPredictionIndex,
   MIN_RATINGS_FOR_PREDICTION,
 } from '@/services/predict';
-import { explain, predict, type Evidence, type Prediction, type Verdict } from '@/services/predict/predict';
+import {
+  explain,
+  predict,
+  type Evidence,
+  type Prediction,
+  type Verdict,
+} from '@/services/predict/predict';
+import { MAX_SCORE } from '@/services/ratings/scale';
 import type { ParsedBean } from '@/services/ai';
 import type { Process, RoastLevel } from '@/types';
 
@@ -127,8 +134,8 @@ function VerdictCard({ prediction }: { prediction: Prediction }) {
         <div>
           <p className="font-medium">{prediction.headline}</p>
           <p className="text-sm text-muted-foreground">
-            Predicted <strong data-testid="prediction-score">{prediction.score.toFixed(1)}</strong>
-            /5 · {confidence}% confidence
+            Predicted <strong data-testid="prediction-score">{prediction.score.toFixed(1)}</strong>/
+            {MAX_SCORE} · {confidence}% confidence
           </p>
         </div>
       </div>

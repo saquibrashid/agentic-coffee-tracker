@@ -22,7 +22,7 @@ const CSV = [
   ...Array.from(
     { length: 5 },
     (_, i) =>
-      `Onyx Coffee Lab,Ethiopia Lot ${i + 1},5,latte,2025-03-0${i + 1},,light,natural,Ethiopia,"blueberry; jasmine"`,
+      `Onyx Coffee Lab,Ethiopia Lot ${i + 1},10,latte,2025-03-0${i + 1},,light,natural,Ethiopia,"blueberry; jasmine"`,
   ),
   ...Array.from(
     { length: 5 },
@@ -72,10 +72,10 @@ test.describe('will I like it?', () => {
 
     const prediction = page.getByTestId('prediction');
     await expect(prediction).toContainText('This looks like your kind of coffee.');
-    await expect(prediction).toContainText('Coffees from Ethiopia average 5.0/5 across 5 cups.');
+    await expect(prediction).toContainText('Coffees from Ethiopia average 10.0/10 across 5 cups.');
 
     const score = Number(await page.getByTestId('prediction-score').innerText());
-    expect(score).toBeGreaterThan(4.2);
+    expect(score).toBeGreaterThan(8.4);
   });
 
   test('warns off a coffee matching what the user dislikes', async ({ page }) => {
@@ -90,7 +90,7 @@ test.describe('will I like it?', () => {
     await expect(prediction).toContainText('What gives us pause');
 
     const score = Number(await page.getByTestId('prediction-score').innerText());
-    expect(score).toBeLessThan(3);
+    expect(score).toBeLessThan(6);
   });
 
   test('says so when it has nothing to go on, instead of guessing', async ({ page }) => {

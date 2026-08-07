@@ -24,7 +24,7 @@ function rating(beanId: string, score: number): Rating {
   seq += 1;
   return {
     id: `r${seq}`,
-    schemaVersion: 1,
+    schemaVersion: 2,
     beanId,
     score,
     brewType: 'latte',
@@ -86,15 +86,15 @@ describe('buildIndex', () => {
 
 describe('predict', () => {
   it('is enthusiastic about a coffee matching a well-liked profile', () => {
-    const { beans, ratings } = history(8, 5, {
+    const { beans, ratings } = history(8, 10, {
       origins: [{ country: 'Ethiopia' }],
       process: 'natural',
       roastLevel: 'light',
       tastingNotes: ['blueberry'],
       roaster: 'Onyx Coffee Lab',
     });
-    // A few mediocre cups elsewhere so the baseline is not already 5.
-    const { beans: others, ratings: otherRatings } = history(8, 2, {
+    // A few mediocre cups elsewhere so the baseline is not already 10.
+    const { beans: others, ratings: otherRatings } = history(8, 4, {
       origins: [{ country: 'Brazil' }],
       process: 'washed',
       roastLevel: 'dark',
@@ -114,14 +114,14 @@ describe('predict', () => {
     );
 
     expect(result.verdict).toBe('love');
-    expect(result.score).toBeGreaterThan(4.2);
+    expect(result.score).toBeGreaterThan(8.4);
     expect(result.confidence).toBeGreaterThan(0.6);
     expect(result.supporting.map((e) => e.kind)).toContain('origin');
     expect(result.detracting).toHaveLength(0);
   });
 
   it('warns off a coffee matching a disliked profile', () => {
-    const { beans, ratings } = history(8, 5, {
+    const { beans, ratings } = history(8, 10, {
       origins: [{ country: 'Ethiopia' }],
       process: 'natural',
       roastLevel: 'light',
@@ -145,12 +145,12 @@ describe('predict', () => {
     );
 
     expect(result.verdict).toBe('avoid');
-    expect(result.score).toBeLessThan(2.5);
+    expect(result.score).toBeLessThan(4);
     expect(result.detracting.length).toBeGreaterThan(0);
   });
 
   it('stays unsure when there is no evidence, rather than guessing', () => {
-    const { beans, ratings } = history(10, 5, { origins: [{ country: 'Ethiopia' }] });
+    const { beans, ratings } = history(10, 10, { origins: [{ country: 'Ethiopia' }] });
     const index = buildIndex(beans, ratings);
 
     const result = predict({ roaster: 'Nobody', origins: [{ country: 'Peru' }] }, index);
@@ -159,19 +159,19 @@ describe('predict', () => {
     expect(result.confidence).toBe(0);
     expect(result.unknowns).toEqual(expect.arrayContaining(['Nobody', 'Peru']));
     // With nothing to go on the estimate is exactly the user's own average.
-    expect(result.score).toBe(5);
+    expect(result.score).toBe(10);
   });
 
   it('shrinks a single glowing data point toward the baseline', () => {
     const one = bean({ origins: [{ country: 'Panama' }] });
-    const { beans, ratings } = history(9, 3, { origins: [{ country: 'Brazil' }] });
+    const { beans, ratings } = history(9, 6, { origins: [{ country: 'Brazil' }] });
 
-    const index = buildIndex([...beans, one], [...ratings, rating(one.id, 5)]);
+    const index = buildIndex([...beans, one], [...ratings, rating(one.id, 10)]);
     const result = predict({ origins: [{ country: 'Panama' }] }, index);
 
-    // Baseline is 3.2; one 5-star cup must not produce a 5-star prediction.
+    // Baseline is 6.4; one top-marks cup must not produce a top-marks prediction.
     expect(result.score).toBeGreaterThan(index.baseline);
-    expect(result.score).toBeLessThan(4);
+    expect(result.score).toBeLessThan(8);
     expect(result.confidence).toBeLessThan(0.35);
   });
 
@@ -190,7 +190,7 @@ describe('predict', () => {
   it('caps how far tasting notes can swing the answer', () => {
     // Twelve strongly-liked notes must not outweigh a strongly-disliked origin.
     const notes = Array.from({ length: 12 }, (_, i) => `note-${i}`);
-    const liked = history(6, 5, { tastingNotes: notes, origins: [{ country: 'Kenya' }] });
+    const liked = history(6, 10, { tastingNotes: notes, origins: [{ country: 'Kenya' }] });
     const disliked = history(6, 1, { origins: [{ country: 'Brazil' }] });
 
     const index = buildIndex(
@@ -201,17 +201,17 @@ describe('predict', () => {
     const withoutNotes = predict({ origins: [{ country: 'Brazil' }] }, index);
 
     expect(withNotes.score).toBeGreaterThan(withoutNotes.score);
-    expect(withNotes.score).toBeLessThan(3.5);
+    expect(withNotes.score).toBeLessThan(7);
   });
 
-  it('never returns a score outside the 1-5 scale', () => {
-    const { beans, ratings } = history(20, 5, { origins: [{ country: 'Ethiopia' }] });
+  it('never returns a score outside the 1-10 scale', () => {
+    const { beans, ratings } = history(20, 10, { origins: [{ country: 'Ethiopia' }] });
     const index = buildIndex(beans, ratings);
     const candidate: Candidate = { origins: [{ country: 'Ethiopia' }] };
 
     const result = predict(candidate, index);
 
-    expect(result.score).toBeLessThanOrEqual(5);
+    expect(result.score).toBeLessThanOrEqual(10);
     expect(result.score).toBeGreaterThanOrEqual(1);
   });
 
@@ -219,7 +219,7 @@ describe('predict', () => {
     const result = predict({ roaster: 'Onyx' }, buildIndex([], []));
 
     expect(result.verdict).toBe('unsure');
-    expect(result.score).toBe(3);
+    expect(result.score).toBe(5.5);
     expect(result.confidence).toBe(0);
   });
 });
@@ -228,9 +228,9 @@ describe('explain', () => {
   it('cites the real numbers behind a match', () => {
     expect(
       explain({ kind: 'origin', label: 'Ethiopia', count: 7, averageScore: 4.57, delta: 0.4 }),
-    ).toBe('Coffees from Ethiopia average 4.6/5 across 7 cups.');
-    expect(
-      explain({ kind: 'roaster', label: 'Onyx', count: 1, averageScore: 5, delta: 1 }),
-    ).toBe('You have rated 1 cup from Onyx at 5.0/5.');
+    ).toBe('Coffees from Ethiopia average 4.6/10 across 7 cups.');
+    expect(explain({ kind: 'roaster', label: 'Onyx', count: 1, averageScore: 10, delta: 1 })).toBe(
+      'You have rated 1 cup from Onyx at 10.0/10.',
+    );
   });
 });
