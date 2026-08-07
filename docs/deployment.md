@@ -230,6 +230,14 @@ Knobs, in order of impact:
 
 The job skips itself unless these repository **variables** are set:
 
+> **A skipped deploy still shows as a green ✅ run.** The job exits successfully so
+> that forks and freshly-cloned repos stay green, which means a green _Deploy_ run
+> does **not** by itself prove anything was published. When the variables are
+> missing the run posts a "⚠️ Deploy skipped — nothing was published" job summary;
+> a real deploy posts "✅ Deployed" with the commit SHA. Check the summary, or
+> compare the hashed asset filenames in the served `index.html` against a local
+> `pnpm build`, before assuming the live site is current.
+
 | Variable                                                                    | Purpose                                     |
 | --------------------------------------------------------------------------- | ------------------------------------------- |
 | `AZURE_CLIENT_ID`                                                           | App registration used for OIDC              |
