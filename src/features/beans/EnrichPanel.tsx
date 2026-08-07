@@ -108,14 +108,14 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
       <h3 className="text-sm font-medium">Web enrichment</h3>
 
       {error && (
-        <p role="alert" className="mt-2 text-sm text-destructive">
+        <p role="alert" className="text-destructive mt-2 text-sm">
           {error}
         </p>
       )}
 
       {phase === 'idle' && (
         <div className="mt-2 space-y-2">
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Search the web for this coffee and fill in any missing details. You choose what gets
             applied.
           </p>
@@ -126,7 +126,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
       )}
 
       {(phase === 'searching' || phase === 'fetching') && (
-        <p role="status" className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+        <p role="status" className="text-muted-foreground mt-2 flex items-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
           {phase === 'searching' ? 'Searching…' : 'Reading that page…'}
         </p>
@@ -135,14 +135,14 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
       {phase === 'candidates' && (
         <div className="mt-2 space-y-2">
           {candidates.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No results for this coffee.</p>
+            <p className="text-muted-foreground text-sm">No results for this coffee.</p>
           ) : (
             <ul aria-label="Search results" className="space-y-2">
               {candidates.map((candidate) => (
                 <li key={candidate.url} className="rounded border p-2">
                   <p className="text-sm font-medium">{candidate.title}</p>
-                  <p className="text-xs text-muted-foreground">{candidate.snippet}</p>
-                  <p className="mt-1 break-all text-xs text-muted-foreground">{candidate.url}</p>
+                  <p className="text-muted-foreground text-xs">{candidate.snippet}</p>
+                  <p className="text-muted-foreground mt-1 text-xs break-all">{candidate.url}</p>
                   <Button
                     className="mt-2"
                     variant="outline"
@@ -165,7 +165,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
         <div className="mt-2 space-y-3">
           {proposals.length === 0 ? (
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 That page had nothing new to add — your details already match.
               </p>
               <Button variant="ghost" size="sm" onClick={restart}>
@@ -174,7 +174,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
             </div>
           ) : (
             <>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 Choose what to apply. Changes that would replace an existing value start unchecked.
               </p>
               <ul aria-label="Proposed changes" className="space-y-2">
@@ -190,13 +190,13 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
                       <span className="min-w-0">
                         <span className="font-medium">{proposal.label}</span>
                         {proposal.current !== null && (
-                          <span className="block text-xs text-muted-foreground line-through">
+                          <span className="text-muted-foreground block text-xs line-through">
                             {proposal.current}
                           </span>
                         )}
-                        <span className="block break-words text-xs">{proposal.proposed}</span>
+                        <span className="block text-xs wrap-break-word">{proposal.proposed}</span>
                         {proposal.isConflict && (
-                          <span className="block text-xs text-destructive">
+                          <span className="text-destructive block text-xs">
                             Replaces your current value
                           </span>
                         )}
@@ -217,7 +217,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
                   Cancel
                 </Button>
               </div>
-              <p className="break-all text-xs text-muted-foreground">Source: {page.sourceUrl}</p>
+              <p className="text-muted-foreground text-xs break-all">Source: {page.sourceUrl}</p>
             </>
           )}
         </div>

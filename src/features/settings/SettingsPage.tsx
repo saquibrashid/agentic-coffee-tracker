@@ -80,7 +80,7 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent>
           {pending.length === 0 && (
-            <p className="text-sm text-muted-foreground">No pending operations.</p>
+            <p className="text-muted-foreground text-sm">No pending operations.</p>
           )}
           <ul className="space-y-2">
             {pending.map((t) => (
@@ -88,7 +88,7 @@ export function SettingsPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="font-medium">{describeTask(t)}</div>
-                    <div className="text-xs text-muted-foreground">
+                    <div className="text-muted-foreground text-xs">
                       attempts: {t.attempts}{' '}
                       {t.nextAttemptAt
                         ? `· next: ${new Date(t.nextAttemptAt).toLocaleString()}`
@@ -158,7 +158,7 @@ function DangerZone() {
       <CardContent className="space-y-4">
         <div>
           <h3 className="text-sm font-medium">Storage used</h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             {estimate === null
               ? 'Checking…'
               : estimate.supported
@@ -169,7 +169,7 @@ function DangerZone() {
 
         <div className="space-y-2">
           <h3 className="text-sm font-medium">Delete all data</h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             This permanently removes every coffee, rating and photo from this device, along with
             cached files and the offline service worker. Nothing is stored on a server, so anything
             you have not exported above is unrecoverable.
@@ -184,7 +184,7 @@ function DangerZone() {
             value={confirmation}
             onChange={(e) => setConfirmation(e.target.value)}
             disabled={busy}
-            className="h-10 w-full max-w-xs rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="border-input bg-background focus-visible:ring-ring h-10 w-full max-w-xs rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
           />
           <div>
             <Button
@@ -196,7 +196,7 @@ function DangerZone() {
             </Button>
           </div>
           {status && (
-            <p role="status" className="text-sm text-destructive">
+            <p role="status" className="text-destructive text-sm">
               {status}
             </p>
           )}

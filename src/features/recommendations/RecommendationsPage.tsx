@@ -29,7 +29,7 @@ function TasteRow({ label, items }: { label: string; items: RankedItem<string>[]
   return (
     <div className="flex flex-wrap items-baseline gap-2">
       <dt className="text-sm font-medium">{label}</dt>
-      <dd className="text-sm text-muted-foreground">
+      <dd className="text-muted-foreground text-sm">
         {items.map((i) => `${i.value} (${i.count})`).join(' · ')}
       </dd>
     </div>
@@ -91,7 +91,7 @@ export function RecommendationsPage() {
         </CardHeader>
         <CardContent>
           {!ready ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Rate at least {MIN_RATINGS_FOR_RECOMMENDATIONS} coffees and your profile will appear
               here.
             </p>
@@ -122,20 +122,20 @@ export function RecommendationsPage() {
               {loading ? 'Thinking…' : cached ? 'Refresh suggestions' : 'Suggest coffees'}
             </Button>
             {stale && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 You&apos;ve rated more coffees since these were generated.
               </p>
             )}
           </div>
 
           {error && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="text-destructive text-sm">
               {error}
             </p>
           )}
 
           {cached && cached.recommendations.length === 0 && (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               Not enough history yet to suggest anything with confidence.
             </p>
           )}
@@ -145,12 +145,12 @@ export function RecommendationsPage() {
               {cached.recommendations.map((rec) => (
                 <li key={rec.title} className="rounded-md border p-3">
                   <h3 className="font-medium">{rec.title}</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">{rec.rationale}</p>
-                  <p className="mt-2 text-xs text-muted-foreground">
+                  <p className="text-muted-foreground mt-1 text-sm">{rec.rationale}</p>
+                  <p className="text-muted-foreground mt-2 text-xs">
                     Based on: {rec.basedOn.join(', ')}
                   </p>
                   {rec.flavorNotes.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-muted-foreground text-xs">
                       Look for: {rec.flavorNotes.join(', ')}
                     </p>
                   )}
@@ -160,7 +160,7 @@ export function RecommendationsPage() {
           )}
 
           {cached && (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-muted-foreground text-xs">
               Generated {new Date(cached.generatedAt).toLocaleString()} · {cached.model}
             </p>
           )}

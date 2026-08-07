@@ -39,7 +39,7 @@ function Shell() {
 
   return (
     <div className="flex min-h-full flex-col">
-      <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur">
+      <header className="bg-background/95 sticky top-0 z-30 border-b backdrop-blur-sm">
         <div className="container flex h-14 items-center gap-3">
           <Coffee className="text-primary" aria-hidden="true" />
           <h1 className="text-base font-semibold">Agentic Coffee Tracker</h1>
@@ -47,7 +47,7 @@ function Shell() {
         {!online && (
           <div
             role="status"
-            className="bg-accent px-4 py-1 text-center text-xs text-accent-foreground"
+            className="bg-accent text-accent-foreground px-4 py-1 text-center text-xs"
           >
             Offline. New entries will sync details when you reconnect.
           </div>
@@ -60,7 +60,7 @@ function Shell() {
 
       <nav
         aria-label="Primary"
-        className="sticky bottom-0 z-30 border-t bg-background/95 backdrop-blur"
+        className="bg-background/95 sticky bottom-0 z-30 border-t backdrop-blur-sm"
       >
         <ul className="container grid grid-cols-7">
           <NavItem to="/" icon={<Home />} label="Home" />
