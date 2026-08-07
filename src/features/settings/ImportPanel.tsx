@@ -41,7 +41,7 @@ function IssueList({
       <h4 className={`text-sm font-medium ${tone}`}>
         {title} ({issues.length})
       </h4>
-      <ul className="space-y-0.5 text-xs text-muted-foreground">
+      <ul className="text-muted-foreground space-y-0.5 text-xs">
         {shown.map((issue) => (
           <li key={`${issue.line}-${issue.message}`}>
             Line {issue.line}: {issue.message}
@@ -159,7 +159,7 @@ export function ImportPanel() {
         <CardTitle>Import</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Bring in a rating history from a spreadsheet, or restore a backup exported above. One CSV
           row per cup you drank; coffees are grouped by roaster and name. Nothing is saved until you
           confirm the summary.
@@ -176,7 +176,7 @@ export function ImportPanel() {
             accept=".csv,.json,.txt,text/csv,application/json"
             disabled={busy}
             onChange={(e) => void handleFile(e)}
-            className="text-sm file:mr-3 file:rounded-md file:border file:border-input file:bg-background file:px-3 file:py-1.5 file:text-sm"
+            className="file:border-input file:bg-background text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-1.5 file:text-sm"
           />
           <Button variant="outline" onClick={downloadTemplate}>
             Download CSV template
@@ -184,7 +184,7 @@ export function ImportPanel() {
         </div>
 
         {error && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-destructive text-sm">
             {error}
           </p>
         )}
@@ -229,7 +229,7 @@ export function ImportPanel() {
                   tone="text-destructive"
                 />
                 {countEnrichable(preview.plan) > 0 && (
-                  <label className="flex items-start gap-2 rounded-md bg-muted/50 p-2 text-sm">
+                  <label className="bg-muted/50 flex items-start gap-2 rounded-md p-2 text-sm">
                     <input
                       id="import-enrich"
                       type="checkbox"
@@ -240,7 +240,7 @@ export function ImportPanel() {
                     <span>
                       Look up missing details for {countEnrichable(preview.plan)} coffee
                       {countEnrichable(preview.plan) === 1 ? '' : 's'}
-                      <span className="block text-xs text-muted-foreground">
+                      <span className="text-muted-foreground block text-xs">
                         Searches the web for origin, process, roast level and tasting notes after
                         the import finishes. Only empty fields are filled — anything in your file is
                         kept as you wrote it.
@@ -275,7 +275,7 @@ export function ImportPanel() {
             )}
 
             {nothingToDo && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-muted-foreground text-sm">
                 There is nothing new to import from this file.
               </p>
             )}

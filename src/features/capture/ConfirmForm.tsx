@@ -54,7 +54,7 @@ function splitList(value: string): string[] {
 }
 
 const inputClass =
-  'w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+  'w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring';
 
 export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFormProps) {
   const navigate = useNavigate();
@@ -122,7 +122,7 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
       {schemaErrors && schemaErrors.length > 0 && (
         <div
           role="alert"
-          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm"
+          className="border-destructive/40 bg-destructive/10 rounded-md border p-3 text-sm"
         >
           <p className="font-medium">We couldn&apos;t read this bag reliably.</p>
           <p className="text-muted-foreground">Fill in the details below — nothing was lost.</p>
@@ -204,7 +204,7 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
             value={form.origin}
             onChange={(e) => set('origin', e.target.value)}
           />
-          <p id="origin-hint" className="mt-1 text-xs text-muted-foreground">
+          <p id="origin-hint" className="text-muted-foreground mt-1 text-xs">
             Comma-separated.
           </p>
         </div>
@@ -235,7 +235,7 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
           value={form.tastingNotes}
           onChange={(e) => set('tastingNotes', e.target.value)}
         />
-        <p id="notes-hint" className="mt-1 text-xs text-muted-foreground">
+        <p id="notes-hint" className="text-muted-foreground mt-1 text-xs">
           Comma-separated.
         </p>
       </div>
@@ -243,12 +243,12 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
       {rawText && (
         <details className="rounded-md border p-3 text-sm">
           <summary className="cursor-pointer font-medium">Show text read from the bag</summary>
-          <pre className="mt-2 whitespace-pre-wrap text-xs text-muted-foreground">{rawText}</pre>
+          <pre className="text-muted-foreground mt-2 text-xs whitespace-pre-wrap">{rawText}</pre>
         </details>
       )}
 
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-destructive text-sm">
           {error}
         </p>
       )}

@@ -74,7 +74,7 @@ export function BeanDetailPage() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <CardTitle>{bean.name}</CardTitle>
-            <p className="text-sm text-muted-foreground">{bean.roaster}</p>
+            <p className="text-muted-foreground text-sm">{bean.roaster}</p>
           </div>
           <Button
             type="button"
@@ -90,12 +90,12 @@ export function BeanDetailPage() {
         <div className="space-y-4">
           <div>
             <h3 className="text-sm font-medium">Attributes</h3>
-            <p className="text-sm text-muted-foreground">Roast: {bean.roastLevel || '—'}</p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">Roast: {bean.roastLevel || '—'}</p>
+            <p className="text-muted-foreground text-sm">
               Origins: {(bean.origins ?? []).map((o) => o.country).join(', ') || '—'}
             </p>
             {bean.sourceUrl && (
-              <p className="break-all text-xs text-muted-foreground">
+              <p className="text-muted-foreground text-xs break-all">
                 Source:{' '}
                 <a href={bean.sourceUrl} target="_blank" rel="noreferrer" className="underline">
                   {bean.sourceUrl}
@@ -113,7 +113,7 @@ export function BeanDetailPage() {
           </div>
 
           {deleteError && !pendingSummary && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="text-destructive text-sm">
               {deleteError}
             </p>
           )}
@@ -143,7 +143,7 @@ function RatingsList({ beanId }: { beanId: string }) {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   if (ratings === undefined) return <Skeleton className="h-24" />;
-  if (ratings.length === 0) return <p className="text-sm text-muted-foreground">No ratings yet.</p>;
+  if (ratings.length === 0) return <p className="text-muted-foreground text-sm">No ratings yet.</p>;
 
   return (
     <ul className="space-y-2">
@@ -191,7 +191,7 @@ function RatingRow({ rating, onEdit }: { rating: Rating; onEdit: () => void }) {
       <div className="flex items-start justify-between gap-2">
         <div>
           <div className="font-medium">{formatOutOf(rating.score)}</div>
-          <div className="text-sm text-muted-foreground">
+          <div className="text-muted-foreground text-sm">
             {brewLabel(rating.brewType)} — {rated}
           </div>
         </div>
@@ -218,7 +218,7 @@ function RatingRow({ rating, onEdit }: { rating: Rating; onEdit: () => void }) {
       </div>
       {rating.notes && <p className="mt-2 text-sm">{rating.notes}</p>}
       {error && !confirming && (
-        <p role="alert" className="mt-2 text-sm text-destructive">
+        <p role="alert" className="text-destructive mt-2 text-sm">
           {error}
         </p>
       )}
@@ -312,7 +312,7 @@ function EditRatingForm({
         placeholder="Tasting notes (optional)"
       />
       {error && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-destructive text-sm">
           {error}
         </p>
       )}
@@ -397,7 +397,7 @@ function AddRatingForm({ beanId }: { beanId: string }) {
         <button
           onClick={onAdd}
           disabled={saving}
-          className="rounded bg-primary px-3 py-2 text-white"
+          className="bg-primary rounded px-3 py-2 text-white"
         >
           {saving ? 'Adding…' : 'Add rating'}
         </button>

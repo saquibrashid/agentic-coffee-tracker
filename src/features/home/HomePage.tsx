@@ -27,7 +27,7 @@ export function HomePage() {
     return (
       <Card className="mx-auto max-w-xl text-center">
         <CardHeader>
-          <Coffee className="mx-auto size-12 text-primary" aria-hidden="true" />
+          <Coffee className="text-primary mx-auto size-12" aria-hidden="true" />
           <CardTitle>Welcome to your coffee log</CardTitle>
           <CardDescription>
             Snap a photo of your first bag and we&apos;ll fill in the details.

@@ -50,7 +50,7 @@ export function ConfirmDialog({
     <dialog
       ref={ref}
       aria-labelledby="confirm-dialog-title"
-      className="max-w-md rounded-lg border border-border bg-background p-0 text-foreground backdrop:bg-black/50"
+      className="border-border bg-background text-foreground max-w-md rounded-lg border p-0 backdrop:bg-black/50"
       onCancel={(e) => {
         e.preventDefault();
         if (!busy) onCancel();
@@ -58,17 +58,17 @@ export function ConfirmDialog({
     >
       <div className="space-y-4 p-6">
         <div className="flex items-start gap-3">
-          <AlertTriangle className="mt-0.5 size-5 shrink-0 text-destructive" aria-hidden="true" />
+          <AlertTriangle className="text-destructive mt-0.5 size-5 shrink-0" aria-hidden="true" />
           <div>
             <h2 id="confirm-dialog-title" className="text-base font-semibold">
               {title}
             </h2>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+            <p className="text-muted-foreground mt-1 text-sm">{description}</p>
           </div>
         </div>
 
         {error && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className="text-destructive text-sm">
             {error}
           </p>
         )}

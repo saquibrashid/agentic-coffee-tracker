@@ -30,7 +30,7 @@ import {
 import type { Process, RoastLevel } from '@/types';
 
 const selectClass =
-  'h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
+  'h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring';
 
 export function BeansLibraryPage() {
   const [filters, setFilters] = useState<LibraryFilters>(DEFAULT_FILTERS);
@@ -109,7 +109,7 @@ export function BeansLibraryPage() {
     return (
       <Card className="mx-auto max-w-xl text-center">
         <CardHeader>
-          <Coffee className="mx-auto size-12 text-primary" aria-hidden="true" />
+          <Coffee className="text-primary mx-auto size-12" aria-hidden="true" />
           <CardTitle>No coffees yet</CardTitle>
           <CardDescription>Your library fills up as you log coffees.</CardDescription>
         </CardHeader>
@@ -129,7 +129,7 @@ export function BeansLibraryPage() {
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold">Bean library</h2>
         <div className="flex items-center gap-3">
-          <p className="text-sm text-muted-foreground" role="status">
+          <p className="text-muted-foreground text-sm" role="status">
             {visible.length} of {beans.length} {beans.length === 1 ? 'bean' : 'beans'}
           </p>
           {selecting ? (
@@ -145,13 +145,13 @@ export function BeansLibraryPage() {
       </div>
 
       {status && (
-        <p role="status" className="text-sm text-muted-foreground">
+        <p role="status" className="text-muted-foreground text-sm">
           {status}
         </p>
       )}
 
       {selecting && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-muted/40 p-3">
+        <div className="border-border bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
           <p className="text-sm" role="status">
             {selected.size} selected
           </p>
@@ -185,7 +185,7 @@ export function BeansLibraryPage() {
       )}
 
       {deleteError && !pendingSummary && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className="text-destructive text-sm">
           {deleteError}
         </p>
       )}
@@ -202,7 +202,7 @@ export function BeansLibraryPage() {
           </label>
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
               aria-hidden="true"
             />
             <input
@@ -211,7 +211,7 @@ export function BeansLibraryPage() {
               value={filters.search}
               onChange={(e) => set('search', e.target.value)}
               placeholder="Name, roaster, origin or tasting note"
-              className="h-10 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border pr-3 pl-9 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
             />
           </div>
         </div>
@@ -365,7 +365,7 @@ function BeanRow({
 
   const body = (
     <Card
-      className={`h-full transition ${selected ? 'ring-2 ring-destructive' : 'hover:shadow-md'}`}
+      className={`h-full transition ${selected ? 'ring-destructive ring-2' : 'hover:shadow-md'}`}
     >
       <CardHeader className="flex-row items-start gap-3 space-y-0">
         {selecting && (
@@ -387,16 +387,16 @@ function BeanRow({
           />
         ) : (
           <div
-            className="flex size-14 shrink-0 items-center justify-center rounded bg-muted"
+            className="bg-muted flex size-14 shrink-0 items-center justify-center rounded"
             aria-hidden="true"
           >
-            <Coffee className="size-6 text-muted-foreground" />
+            <Coffee className="text-muted-foreground size-6" />
           </div>
         )}
         <div className="min-w-0 flex-1">
           <CardTitle className="truncate text-base">{bean.name}</CardTitle>
           <CardDescription className="truncate">{bean.roaster}</CardDescription>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="text-muted-foreground mt-1 text-xs">
             {averageScore === null
               ? 'Not rated yet'
               : `${averageScore.toFixed(1)} ★ · ${ratingCount} ${ratingCount === 1 ? 'rating' : 'ratings'}`}

@@ -110,7 +110,7 @@ function EvidenceList({ title, items }: { title: string; items: Evidence[] }) {
   return (
     <div>
       <h4 className="text-sm font-medium">{title}</h4>
-      <ul className="mt-1 space-y-1 text-sm text-muted-foreground">
+      <ul className="text-muted-foreground mt-1 space-y-1 text-sm">
         {items.map((item) => (
           <li key={`${item.kind}-${item.label}`}>{explain(item)}</li>
         ))}
@@ -129,7 +129,7 @@ function VerdictCard({ prediction }: { prediction: Prediction }) {
         <Icon className="mt-0.5 shrink-0" aria-hidden="true" />
         <div>
           <p className="font-medium">{prediction.headline}</p>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             Predicted <strong data-testid="prediction-score">{prediction.score.toFixed(1)}</strong>/
             {MAX_SCORE} · {confidence}% confidence
           </p>
@@ -140,20 +140,20 @@ function VerdictCard({ prediction }: { prediction: Prediction }) {
       <EvidenceList title="What gives us pause" items={prediction.detracting} />
 
       {prediction.confidence < 0.25 && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           There is little in your history to go on here, so treat this as a shrug rather than an
           answer.
         </p>
       )}
 
       {prediction.unknowns.length > 0 && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Nothing rated yet for: {prediction.unknowns.join(', ')}.
         </p>
       )}
 
       {prediction.missing.length > 0 && (
-        <p className="text-sm text-muted-foreground">
+        <p className="text-muted-foreground text-sm">
           Add the {prediction.missing.join(', ')} for a sharper answer.
         </p>
       )}
@@ -278,7 +278,7 @@ export function PredictPage() {
           <CardDescription>Check a coffee against your taste before you buy it.</CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-muted-foreground text-sm">
             This works by comparing a coffee against what you have already rated, so it needs a
             little history first. Rate at least {MIN_RATINGS_FOR_PREDICTION} cups — you have{' '}
             {index.totalRatings} — or bulk-import your existing notes from Settings.
@@ -311,7 +311,7 @@ export function PredictPage() {
               capture="environment"
               disabled={busy !== null}
               onChange={(e) => void handlePhoto(e)}
-              className="block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground"
+              className="file:bg-primary file:text-primary-foreground block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2 file:text-sm file:font-medium"
             />
           </div>
 
@@ -327,7 +327,7 @@ export function PredictPage() {
                 placeholder="https://roaster.example/coffee"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="border-input bg-background focus-visible:ring-ring h-10 min-w-0 flex-1 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
               />
               <Button type="submit" variant="outline" disabled={busy !== null || !url.trim()}>
                 {busy === 'link' ? 'Reading…' : 'Read'}
@@ -336,17 +336,17 @@ export function PredictPage() {
           </form>
 
           {busy === 'photo' && (
-            <p role="status" className="text-sm text-muted-foreground">
+            <p role="status" className="text-muted-foreground text-sm">
               Reading the label…
             </p>
           )}
           {error && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className="text-destructive text-sm">
               {error}
             </p>
           )}
           {notice && (
-            <p role="status" className="text-sm text-muted-foreground">
+            <p role="status" className="text-muted-foreground text-sm">
               {notice}
             </p>
           )}
@@ -372,7 +372,7 @@ export function PredictPage() {
                   id="predict-roaster"
                   value={form.roaster}
                   onChange={(e) => update({ roaster: e.target.value })}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                 />
               </div>
               <div>
@@ -384,7 +384,7 @@ export function PredictPage() {
                   placeholder="Ethiopia, Colombia"
                   value={form.origin}
                   onChange={(e) => update({ origin: e.target.value })}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                 />
               </div>
               <div>
@@ -395,7 +395,7 @@ export function PredictPage() {
                   id="predict-process"
                   value={form.process}
                   onChange={(e) => update({ process: e.target.value as Process | '' })}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                 >
                   {PROCESS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -412,7 +412,7 @@ export function PredictPage() {
                   id="predict-roast"
                   value={form.roastLevel}
                   onChange={(e) => update({ roastLevel: e.target.value as RoastLevel | '' })}
-                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                 >
                   {ROAST_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -432,7 +432,7 @@ export function PredictPage() {
                 placeholder="blueberry, cocoa, jasmine"
                 value={form.tastingNotes}
                 onChange={(e) => update({ tastingNotes: e.target.value })}
-                className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
               />
             </div>
 

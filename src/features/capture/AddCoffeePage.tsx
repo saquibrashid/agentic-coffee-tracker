@@ -204,10 +204,10 @@ export function AddCoffeePage() {
               accept="image/*"
               capture="environment"
               onChange={(e) => void handleFile(e)}
-              className="block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-4 file:py-2 file:text-sm file:font-medium file:text-primary-foreground"
+              className="file:bg-primary file:text-primary-foreground block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2 file:text-sm file:font-medium"
             />
             {error && (
-              <p role="alert" className="mt-3 text-sm text-destructive">
+              <p role="alert" className="text-destructive mt-3 text-sm">
                 {error}
               </p>
             )}
@@ -217,7 +217,7 @@ export function AddCoffeePage() {
                 <label htmlFor="bean-url" className="mb-2 block text-sm font-medium">
                   Or import from a link
                 </label>
-                <p className="mb-2 text-sm text-muted-foreground">
+                <p className="text-muted-foreground mb-2 text-sm">
                   Paste the roaster&apos;s product page and we&apos;ll read the details from there
                   instead.
                 </p>
@@ -229,7 +229,7 @@ export function AddCoffeePage() {
                     placeholder="https://roaster.example/coffee"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    className="h-10 min-w-0 flex-1 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="border-input bg-background focus-visible:ring-ring h-10 min-w-0 flex-1 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
                   />
                   <Button type="submit" variant="outline" disabled={url.trim() === ''}>
                     Import
@@ -249,7 +249,7 @@ export function AddCoffeePage() {
         )}
 
         {(stage === 'processing' || stage === 'extracting' || stage === 'importing') && (
-          <p role="status" className="text-sm text-muted-foreground">
+          <p role="status" className="text-muted-foreground text-sm">
             {stage === 'processing'
               ? 'Preparing your photo…'
               : stage === 'importing'

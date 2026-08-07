@@ -33,7 +33,7 @@ export function SummaryPage() {
       <CardContent>
         {summary ? (
           <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">For {summary.month}</p>
+            <p className="text-muted-foreground text-sm">For {summary.month}</p>
             <p>{summary.narrative}</p>
             <p className="text-sm">
               Highlights: {summary.highlights.topRoaster || '—'} ·{' '}
@@ -41,7 +41,7 @@ export function SummaryPage() {
             </p>
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">No summary yet for this month.</p>
+          <p className="text-muted-foreground text-sm">No summary yet for this month.</p>
         )}
         <div className="mt-3">
           <Button onClick={() => void regenerate()} disabled={loading}>

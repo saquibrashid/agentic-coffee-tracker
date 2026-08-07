@@ -63,7 +63,7 @@ export function AnalyticsPage() {
         <CardContent>
           <ul className="flex flex-wrap gap-2">
             {data.topFlavors.map((f) => (
-              <li key={f.value} className="rounded bg-muted px-2 py-1 text-xs">
+              <li key={f.value} className="bg-muted rounded px-2 py-1 text-xs">
                 {f.value} ({f.count})
               </li>
             ))}
