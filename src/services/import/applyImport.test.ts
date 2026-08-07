@@ -6,8 +6,7 @@ import { applyImportPlan, countEnrichable, planCsvImport } from './ratingsImport
 
 const HEADER = 'roaster,coffee,score,brew,date,notes,roast,process,origin,tasting notes';
 const SPARSE = 'Onyx,Geometry,5,espresso,2025-03-14,';
-const FULL =
-  'Anchorhead,Bali,4,latte,2025-03-15,,medium,natural,Indonesia,"strawberry; cocoa"';
+const FULL = 'Anchorhead,Bali,4,latte,2025-03-15,,medium,natural,Indonesia,"strawberry; cocoa"';
 
 beforeEach(async () => {
   await Promise.all([db.beans.clear(), db.ratings.clear(), db.pendingAiTasks.clear()]);

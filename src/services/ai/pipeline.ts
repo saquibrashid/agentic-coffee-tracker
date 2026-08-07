@@ -9,13 +9,7 @@
  *  - 422 schema violation     -> resolve with `needsReview: true` and the raw
  *    OCR text. Retrying will not help, so it must not be treated as an error.
  */
-import {
-  ApiError,
-  isSchemaError,
-  ocr,
-  parse,
-  type ParsedBean,
-} from '@/services/ai';
+import { ApiError, isSchemaError, ocr, parse, type ParsedBean } from '@/services/ai';
 import { mockOcrFromPhotoBlob } from '@/services/mocks/ocrMock';
 
 /** Raised when the BFF could not be reached at all (offline, dev API not running). */

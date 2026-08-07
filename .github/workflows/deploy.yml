@@ -32,7 +32,7 @@ jobs:
       AZURE_VISION_KEY: ${{ secrets.AZURE_VISION_KEY }}
       AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Everything below is skipped on forks and on repos that have never been
       # wired to a subscription, so the workflow is green out of the box.
@@ -52,7 +52,7 @@ jobs:
 
       - name: Setup Node
         if: steps.config.outputs.ready == 'true'
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: pnpm

@@ -1,10 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import {
-  formatBytes,
-  getStorageEstimate,
-  resetAllData,
-  type ResetEnvironment,
-} from './reset';
+import { formatBytes, getStorageEstimate, resetAllData, type ResetEnvironment } from './reset';
 
 function fakeCaches(keys: string[], onDelete?: (key: string) => Promise<boolean>): CacheStorage {
   return {

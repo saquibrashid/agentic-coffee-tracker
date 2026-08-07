@@ -60,9 +60,15 @@ export function SettingsPage() {
           <CardTitle>Export</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void exportCsv()}>Export CSV</Button>
-          <Button variant="outline" onClick={() => void exportJson()}>Export JSON</Button>
-          <Button variant="outline" onClick={() => void exportJsonWithPhotos()}>Export JSON + photos</Button>
+          <Button variant="outline" onClick={() => void exportCsv()}>
+            Export CSV
+          </Button>
+          <Button variant="outline" onClick={() => void exportJson()}>
+            Export JSON
+          </Button>
+          <Button variant="outline" onClick={() => void exportJsonWithPhotos()}>
+            Export JSON + photos
+          </Button>
         </CardContent>
       </Card>
 
@@ -73,7 +79,9 @@ export function SettingsPage() {
           <CardTitle>Pending AI operations ({pending.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {pending.length === 0 && <p className="text-sm text-muted-foreground">No pending operations.</p>}
+          {pending.length === 0 && (
+            <p className="text-sm text-muted-foreground">No pending operations.</p>
+          )}
           <ul className="space-y-2">
             {pending.map((t) => (
               <li key={t.id} className="rounded border p-2 text-sm">
@@ -81,13 +89,20 @@ export function SettingsPage() {
                   <div>
                     <div className="font-medium">{describeTask(t)}</div>
                     <div className="text-xs text-muted-foreground">
-                      attempts: {t.attempts} {t.nextAttemptAt ? `· next: ${new Date(t.nextAttemptAt).toLocaleString()}` : ''}
+                      attempts: {t.attempts}{' '}
+                      {t.nextAttemptAt
+                        ? `· next: ${new Date(t.nextAttemptAt).toLocaleString()}`
+                        : ''}
                     </div>
                     {t.lastError && <div className="text-xs text-red-600">{t.lastError}</div>}
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => void retryTask(t.id)}>Retry</Button>
-                    <Button variant="outline" onClick={() => void cancelTask(t.id)}>Cancel</Button>
+                    <Button variant="outline" onClick={() => void retryTask(t.id)}>
+                      Retry
+                    </Button>
+                    <Button variant="outline" onClick={() => void cancelTask(t.id)}>
+                      Cancel
+                    </Button>
                   </div>
                 </div>
               </li>

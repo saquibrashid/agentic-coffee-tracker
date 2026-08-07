@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - **Project scaffold**: Vite + React 18 + TypeScript, Tailwind CSS theme tokens,
   shadcn-style `Button`/`Card`/`Skeleton` primitives, `lucide-react` icons,
   React Router shell with bottom nav, offline banner, PWA manifest via

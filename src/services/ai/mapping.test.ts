@@ -68,9 +68,9 @@ describe('parsedBeanToUpdate', () => {
   });
 
   it('keeps a half-known elevation range but drops an empty one', () => {
-    expect(parsedBeanToUpdate({ ...empty, elevationMeters: { min: 1800, max: null } })).toMatchObject(
-      { elevationMeters: { min: 1800 } },
-    );
+    expect(
+      parsedBeanToUpdate({ ...empty, elevationMeters: { min: 1800, max: null } }),
+    ).toMatchObject({ elevationMeters: { min: 1800 } });
     expect(
       parsedBeanToUpdate({ ...empty, elevationMeters: { min: null, max: null } }).elevationMeters,
     ).toBeUndefined();

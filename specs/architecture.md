@@ -23,6 +23,7 @@ This document covers the system topology, secrets handling, network boundaries, 
 ```
 
 **Why a BFF is required (non-negotiable):**
+
 - Azure Vision and Azure OpenAI keys must NEVER be shipped in the browser.
 - Web scraping from a browser is blocked by CORS for most roaster sites.
 - The BFF lets us add rate limiting, caching, and content moderation centrally.
@@ -33,14 +34,14 @@ The BFF is intentionally thin — it forwards requests, attaches keys, and norma
 
 ## Hosting
 
-| Concern        | Choice                                    | Notes                                |
-|----------------|-------------------------------------------|--------------------------------------|
-| Static hosting | **Azure Static Web Apps (Standard)**      | Built-in Functions integration       |
-| API runtime    | Azure Functions (Node 20, consumption)    | Co-located with SWA                  |
-| Auth (v1)      | None                                      | App is single-user, local-only       |
-| Auth (v2)      | SWA built-in auth (Microsoft, Apple)      | Placeholder module from day 1        |
-| IaC            | Bicep in `/infra`                         | `azd up` deployable                  |
-| CI/CD          | GitHub Actions (provided by SWA template) | PR previews enabled                  |
+| Concern        | Choice                                    | Notes                          |
+| -------------- | ----------------------------------------- | ------------------------------ |
+| Static hosting | **Azure Static Web Apps (Standard)**      | Built-in Functions integration |
+| API runtime    | Azure Functions (Node 20, consumption)    | Co-located with SWA            |
+| Auth (v1)      | None                                      | App is single-user, local-only |
+| Auth (v2)      | SWA built-in auth (Microsoft, Apple)      | Placeholder module from day 1  |
+| IaC            | Bicep in `/infra`                         | `azd up` deployable            |
+| CI/CD          | GitHub Actions (provided by SWA template) | PR previews enabled            |
 
 ---
 
@@ -49,19 +50,23 @@ The BFF is intentionally thin — it forwards requests, attaches keys, and norma
 All endpoints accept/return JSON. All are POST. All require an `x-app-version` header (used for telemetry & deprecation).
 
 ### `POST /api/ocr`
+
 ```
 Request:  { imageBase64: string, mimeType: string }
 Response: { rawText: string, provider: 'azure-vision', providerVersion: string }
 Errors:   413 too large, 429 rate-limited, 502 upstream
 ```
+
 Max payload: 8 MB. Server downscales further if needed before calling Azure Vision.
 
 ### `POST /api/parse`
+
 ```
 Request:  { ocrText: string, model?: string }
 Response: { parsed: <LLM Output schema>, model: string, rawText: string }
 Errors:   400 missing ocrText, 422 model output failed schema validation, 500 upstream
 ```
+
 Uses Azure OpenAI **structured outputs** with the schema in `data-model.md`, sent over the
 v1 Responses API (`POST {endpoint}/openai/v1/responses`, `text.format` = `json_schema`
 with `strict: true`) via the shared client in `api/src/lib/openai.ts`. The response is
@@ -69,32 +74,39 @@ then re-validated server-side by
 `api/src/lib/beanSchema.ts` before it is returned — structured outputs are a strong
 hint, not a guarantee, and an unvalidated object would silently corrupt local data.
 
-Validation is forgiving about *omissions* (missing keys are backfilled with `null`/`[]`
-and `confidence` defaults to `0`) but strict about *wrong* values (bad types, unknown
+Validation is forgiving about _omissions_ (missing keys are backfilled with `null`/`[]`
+and `confidence` defaults to `0`) but strict about _wrong_ values (bad types, unknown
 properties, out-of-enum `process`/`roastLevel`, `confidence` outside `0..1`).
 
 On failure the endpoint answers **422** with:
+
 ```
 { error: string, details: string[], model: string, rawText: string, rawContent: string }
 ```
+
 This is an expected outcome, not a transient fault: the client must not retry it. It
 should save the bean with `needsReview = true` and surface `rawText` for manual entry.
 
 ### `POST /api/search`
+
 ```
 Request:  { roaster: string, name: string, max?: number }
 Response: { results: { url, title, snippet }[] }
 ```
+
 Calls Bing Web Search v7. Cached server-side for 24h keyed by `(roaster|name)`.
 
 ### `POST /api/scrape`
+
 ```
 Request:  { url: string }
 Response: { extracted: <partial LLM Output schema>, sourceUrl: string }
 ```
+
 Fetches, sanitizes HTML, runs LLM extraction with the same JSON schema. Allowlist of domains (roaster sites + known coffee retailers); deny-by-default for unknown domains in v1.
 
 ### `POST /api/recommend`
+
 ```
 Request:  { preferences: <PreferenceSummary>, max?: number }
 Response: { recommendations: Recommendation[], model: string, reason?: 'insufficient-history' }
@@ -109,12 +121,13 @@ Each `Recommendation` must populate `basedOn` with the preference values it is
 grounded in. The server rejects (422) any suggestion with an empty `basedOn` —
 an ungrounded suggestion is exactly the hallucination this endpoint guards
 against. The prompt also forbids inventing roaster names, products, prices, or
-availability; the model describes the *kind* of coffee to look for.
+availability; the model describes the _kind_ of coffee to look for.
 
 Below `totalRatings < 3` the endpoint short-circuits to an empty list with
 `reason: 'insufficient-history'` rather than calling the model at all.
 
 ### `GET /api/health`
+
 ```
 Response: { status: 'ok', version, timestamp, services: { ocr, parse, search, recommend } }
 ```
@@ -128,15 +141,15 @@ smoke test and by the Application Insights availability test.
 
 ## Secrets & Configuration
 
-| Name                          | Where         | Notes                          |
-|-------------------------------|---------------|--------------------------------|
-| `AZURE_VISION_ENDPOINT`/`KEY` | Functions app | Stored in Key Vault reference  |
-| `AZURE_OPENAI_ENDPOINT`/`KEY` | Functions app | Key Vault reference            |
-| `AZURE_OPENAI_DEPLOYMENT`     | Functions app | Model deployment name          |
-| `SCRAPE_ALLOWLIST`            | Functions app | Comma-separated hosts; empty allows any public host |
-| `ALLOWED_ORIGINS`             | Functions app | Comma-separated; SWA hostname  |
-| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Functions app | Set by Bicep; enables host telemetry |
-| `VITE_API_BASE_URL`           | Client build  | Empty on SWA Standard (linked backend); Function App URL on Free |
+| Name                                    | Where         | Notes                                                            |
+| --------------------------------------- | ------------- | ---------------------------------------------------------------- |
+| `AZURE_VISION_ENDPOINT`/`KEY`           | Functions app | Stored in Key Vault reference                                    |
+| `AZURE_OPENAI_ENDPOINT`/`KEY`           | Functions app | Key Vault reference                                              |
+| `AZURE_OPENAI_DEPLOYMENT`               | Functions app | Model deployment name                                            |
+| `SCRAPE_ALLOWLIST`                      | Functions app | Comma-separated hosts; empty allows any public host              |
+| `ALLOWED_ORIGINS`                       | Functions app | Comma-separated; SWA hostname                                    |
+| `APPLICATIONINSIGHTS_CONNECTION_STRING` | Functions app | Set by Bicep; enables host telemetry                             |
+| `VITE_API_BASE_URL`                     | Client build  | Empty on SWA Standard (linked backend); Function App URL on Free |
 
 Every AI secret is **optional**. Bicep only creates a Key Vault secret and its
 app setting when a value was supplied, and each endpoint falls back to a
@@ -152,6 +165,7 @@ deployment is a supported configuration.
 **Stack:** Tailwind CSS + shadcn/ui (Radix UI primitives) + lucide-react icons.
 
 ### Choices and rationale
+
 - **Tailwind CSS 3.x** — utility-first, JIT-compiled. Production stylesheet typically 5–15 KB gzipped (tree-shaken by class usage). Fits the 180 KB initial JS budget without competing for it (CSS is separate).
 - **shadcn/ui** — accessible component primitives (Button, Dialog, DropdownMenu, Tabs, Toast, Form, Input, Select, Sheet, Tooltip, Popover, Command, Skeleton, Sonner). **Not a dependency** — components are generated into `src/components/ui/` and owned by this repo. Upgrade by re-running the CLI per component.
 - **Radix UI** — the headless primitives shadcn/ui wraps. Provides keyboard nav, focus management, and ARIA semantics needed to satisfy `ux-states.md` accessibility rules.
@@ -160,6 +174,7 @@ deployment is a supported configuration.
 - **`tailwindcss-animate`** — animation utilities required by shadcn/ui components.
 
 ### Folder & file conventions
+
 ```
 src/
   components/
@@ -178,6 +193,7 @@ components.json          # shadcn CLI config
 ```
 
 ### Theme tokens
+
 Colors and radii are defined as CSS variables in `globals.css` (HSL channels, shadcn convention) and referenced from `tailwind.config.ts`. This makes dark mode and brand re-skinning a one-file change.
 
 ```css
@@ -190,7 +206,7 @@ Colors and radii are defined as CSS variables in `globals.css` (HSL channels, sh
   :root {
     --background: 30 40% 98%;
     --foreground: 25 30% 15%;
-    --primary: 25 60% 35%;       /* coffee brown */
+    --primary: 25 60% 35%; /* coffee brown */
     --primary-foreground: 30 40% 98%;
     --radius: 0.75rem;
     /* ...full shadcn token set... */
@@ -205,11 +221,13 @@ Colors and radii are defined as CSS variables in `globals.css` (HSL channels, sh
 ```
 
 ### Dark mode
+
 - Class strategy (`darkMode: 'class'`).
 - User pref stored in `meta` IndexedDB store; default = follow `prefers-color-scheme`.
 - All shadcn components handle dark variants natively via the token set above.
 
 ### Rules
+
 1. **No runtime CSS-in-JS** (no styled-components / Emotion). Build-time only.
 2. **No second component library.** Don't mix MUI/Chakra/Ant alongside shadcn.
 3. **No second icon library.** lucide-react only.
@@ -219,20 +237,23 @@ Colors and radii are defined as CSS variables in `globals.css` (HSL channels, sh
 7. **All interactive components must hit the WCAG 2.1 AA contrast and keyboard requirements** in `ux-states.md` — Radix gives this for free, but custom compositions need manual checks.
 
 ### Required shadcn components (initial generation list)
+
 `button`, `card`, `dialog`, `sheet`, `dropdown-menu`, `tabs`, `tooltip`, `popover`, `select`, `input`, `textarea`, `label`, `form`, `toast` (or `sonner`), `skeleton`, `badge`, `separator`, `command` (for the bean search palette), `progress`, `slider` (for rating), `switch`, `alert-dialog` (for destructive confirms).
 
 ### Charts
+
 Use **Recharts** for analytics screens. It styles via CSS variables, so theme tokens flow through. Lazy-loaded per `architecture.md` performance budgets.
 
 ### Bundle impact (estimates, gzipped)
-| Item | Size |
-|---|---|
-| Tailwind production CSS (typical) | 8–12 KB |
-| Radix primitives (sum of used) | 15–25 KB |
-| shadcn/ui generated TS | counted in your code, not deps |
-| lucide-react (per icon used) | ~0.5–1.5 KB |
-| `tailwind-merge` + `clsx` | ~3 KB |
-| **Total style+UI overhead** | **~30–45 KB** |
+
+| Item                              | Size                           |
+| --------------------------------- | ------------------------------ |
+| Tailwind production CSS (typical) | 8–12 KB                        |
+| Radix primitives (sum of used)    | 15–25 KB                       |
+| shadcn/ui generated TS            | counted in your code, not deps |
+| lucide-react (per icon used)      | ~0.5–1.5 KB                    |
+| `tailwind-merge` + `clsx`         | ~3 KB                          |
+| **Total style+UI overhead**       | **~30–45 KB**                  |
 
 Comfortably within the 180 KB initial-JS budget.
 
@@ -268,6 +289,7 @@ src/
 ```
 
 **Rules:**
+
 - Components never call `fetch` directly — always via `services/ai/*`.
 - Components never touch Dexie directly — always via hooks or `services/db/*`.
 - All AI service calls go through the queue, even when online (queue auto-flushes).
@@ -289,6 +311,7 @@ Hard limits: max 5 photos per bean (1 bag + up to 4 cup photos); reject > 8 MB a
 ## Offline-First Strategy
 
 ### Service Worker (Workbox)
+
 - **Precache** app shell (JS/CSS/HTML, icons).
 - **Runtime caching**:
   - `*.svg`, `*.png`, fonts → `CacheFirst`, 30 days.
@@ -296,6 +319,7 @@ Hard limits: max 5 photos per bean (1 bag + up to 4 cup photos); reject > 8 MB a
 - App detects offline via `navigator.onLine` + heartbeat ping every 30s when relevant.
 
 ### AI Task Queue
+
 The `pendingAiTasks` store IS the offline queue. Flow:
 
 1. UI action enqueues a task and returns immediately.
@@ -305,9 +329,11 @@ The `pendingAiTasks` store IS the offline queue. Flow:
 5. Bean records show a "draft" badge while their seed task is unresolved.
 
 ### UX states per screen
+
 Every screen renders explicit states: `loading`, `empty`, `error`, `offline`, `success`. See `ux-states.md`.
 
 ### Capture-while-offline UX
+
 - Photo + manual fields can always be saved.
 - OCR/LLM/scrape steps queue with friendly messages: "We'll fill in details when you're back online."
 - User can edit or save the draft anyway.
@@ -319,6 +345,7 @@ Every screen renders explicit states: `loading`, `empty`, `error`, `offline`, `s
 Library: **Dexie 4.x**. Database name: `coffee-app`. Current version: `1`.
 
 Migration rules:
+
 - Bump Dexie version on any store/index change.
 - Each version supplies an `upgrade(tx)` function that mutates existing records to the new schema, including bumping `schemaVersion` on each row.
 - A `meta.dbSchemaVersion` record gates app boot; if the on-disk schema is newer than the running app, show "Please refresh."
@@ -349,14 +376,14 @@ Storage quotas: request `navigator.storage.persist()` after the first save; surf
 
 ## Performance Budgets
 
-| Metric                                   | Target            |
-|------------------------------------------|-------------------|
-| First contentful paint (mid-tier mobile) | < 1.8s            |
-| Time to interactive                      | < 3.0s            |
-| JS bundle (initial, gzipped)             | < 180 KB          |
-| Photo capture → preview render           | < 500 ms          |
-| OCR + parse end-to-end (online)          | < 6 s p50         |
-| Bean list scroll                         | 60 fps to 1k items|
+| Metric                                   | Target             |
+| ---------------------------------------- | ------------------ |
+| First contentful paint (mid-tier mobile) | < 1.8s             |
+| Time to interactive                      | < 3.0s             |
+| JS bundle (initial, gzipped)             | < 180 KB           |
+| Photo capture → preview render           | < 500 ms           |
+| OCR + parse end-to-end (online)          | < 6 s p50          |
+| Bean list scroll                         | 60 fps to 1k items |
 
 Lazy-load: analytics charts (Recharts), camera fallback module, scraper UI.
 

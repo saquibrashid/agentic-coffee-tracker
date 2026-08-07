@@ -294,7 +294,12 @@ export function BeansLibraryPage() {
             Include archived
           </label>
           {hasActiveFilters(filters) && (
-            <Button type="button" variant="ghost" size="sm" onClick={() => setFilters(DEFAULT_FILTERS)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => setFilters(DEFAULT_FILTERS)}
+            >
               Clear filters
             </Button>
           )}

@@ -108,37 +108,52 @@ const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       {
         path: 'add',
-        lazy: async () => ({ Component: (await import('@/features/capture/AddCoffeePage')).AddCoffeePage }),
+        lazy: async () => ({
+          Component: (await import('@/features/capture/AddCoffeePage')).AddCoffeePage,
+        }),
       },
       {
         path: 'beans',
-        lazy: async () => ({ Component: (await import('@/features/beans/BeansLibraryPage')).BeansLibraryPage }),
+        lazy: async () => ({
+          Component: (await import('@/features/beans/BeansLibraryPage')).BeansLibraryPage,
+        }),
       },
       {
         path: 'beans/:beanId',
-        lazy: async () => ({ Component: (await import('@/features/beans/BeanDetailPage')).BeanDetailPage }),
+        lazy: async () => ({
+          Component: (await import('@/features/beans/BeanDetailPage')).BeanDetailPage,
+        }),
       },
       {
         path: 'analytics',
-        lazy: async () => ({ Component: (await import('@/features/analytics/AnalyticsPage')).AnalyticsPage }),
+        lazy: async () => ({
+          Component: (await import('@/features/analytics/AnalyticsPage')).AnalyticsPage,
+        }),
       },
       {
         path: 'for-you',
         lazy: async () => ({
-          Component: (await import('@/features/recommendations/RecommendationsPage')).RecommendationsPage,
+          Component: (await import('@/features/recommendations/RecommendationsPage'))
+            .RecommendationsPage,
         }),
       },
       {
         path: 'predict',
-        lazy: async () => ({ Component: (await import('@/features/predict/PredictPage')).PredictPage }),
+        lazy: async () => ({
+          Component: (await import('@/features/predict/PredictPage')).PredictPage,
+        }),
       },
       {
         path: 'summary',
-        lazy: async () => ({ Component: (await import('@/features/summary/SummaryPage')).SummaryPage }),
+        lazy: async () => ({
+          Component: (await import('@/features/summary/SummaryPage')).SummaryPage,
+        }),
       },
       {
         path: 'settings',
-        lazy: async () => ({ Component: (await import('@/features/settings/SettingsPage')).SettingsPage }),
+        lazy: async () => ({
+          Component: (await import('@/features/settings/SettingsPage')).SettingsPage,
+        }),
       },
     ],
   },

@@ -7,7 +7,11 @@ const parse = vi.fn();
 
 vi.mock('./index', async () => {
   const actual = await vi.importActual<typeof AiModule>('./index');
-  return { ...actual, ocr: (...a: unknown[]) => ocr(...a), parse: (...a: unknown[]) => parse(...a) };
+  return {
+    ...actual,
+    ocr: (...a: unknown[]) => ocr(...a),
+    parse: (...a: unknown[]) => parse(...a),
+  };
 });
 
 const { extractBeanFromPhoto, PipelineUnavailableError } = await import('./pipeline');
@@ -60,8 +64,13 @@ describe('extractBeanFromPhoto', () => {
     await expect(extractBeanFromPhoto(blob)).resolves.toMatchObject({ usedMock: true });
   });
 
-  it('flags low-confidence results for review', async () => {    ocr.mockResolvedValue({ rawText: 'blurry', provider: 'azure-vision' });
-    parse.mockResolvedValue({ parsed: { ...parsed, confidence: 0.2 }, model: 'gpt-4o', rawText: 'blurry' });
+  it('flags low-confidence results for review', async () => {
+    ocr.mockResolvedValue({ rawText: 'blurry', provider: 'azure-vision' });
+    parse.mockResolvedValue({
+      parsed: { ...parsed, confidence: 0.2 },
+      model: 'gpt-4o',
+      rawText: 'blurry',
+    });
 
     await expect(extractBeanFromPhoto(blob)).resolves.toMatchObject({ needsReview: true });
   });

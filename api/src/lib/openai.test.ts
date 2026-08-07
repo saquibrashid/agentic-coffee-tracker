@@ -15,9 +15,7 @@ const config = {
 
 function responsePayload(text: string): unknown {
   return {
-    output: [
-      { type: 'message', content: [{ type: 'output_text', text }] },
-    ],
+    output: [{ type: 'message', content: [{ type: 'output_text', text }] }],
   };
 }
 

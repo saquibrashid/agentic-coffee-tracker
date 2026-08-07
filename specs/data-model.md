@@ -5,6 +5,7 @@ This document defines all persistent data structures, the LLM output contract, a
 ---
 
 ## Conventions
+
 - **IDs**: ULIDs (string, sortable, 26 chars). Generated client-side.
 - **Timestamps**: ISO 8601 strings in UTC (`new Date().toISOString()`).
 - **Dates without time** (e.g. roast date): `YYYY-MM-DD` string.
@@ -16,13 +17,7 @@ This document defines all persistent data structures, the LLM output contract, a
 ## Enums
 
 ```ts
-export type RoastLevel =
-  | 'light'
-  | 'medium-light'
-  | 'medium'
-  | 'medium-dark'
-  | 'dark'
-  | 'unknown';
+export type RoastLevel = 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark' | 'unknown';
 
 export type Process =
   | 'washed'
@@ -48,12 +43,7 @@ export type BrewType =
   | 'cold-brew'
   | 'other';
 
-export type EntrySource =
-  | 'photo-ocr'
-  | 'manual'
-  | 'barcode'
-  | 'url-scrape'
-  | 'voice';
+export type EntrySource = 'photo-ocr' | 'manual' | 'barcode' | 'url-scrape' | 'voice';
 ```
 
 ---
@@ -62,44 +52,44 @@ export type EntrySource =
 
 ```ts
 export interface CoffeeBean {
-  id: string;                     // ULID
+  id: string; // ULID
   schemaVersion: 1;
 
   // Identity
-  roaster: string;                // required after confirmation
-  name: string;                   // required after confirmation
+  roaster: string; // required after confirmation
+  name: string; // required after confirmation
 
   // Provenance
-  origins?: Origin[];             // multi-origin blends supported
+  origins?: Origin[]; // multi-origin blends supported
   process?: Process;
   roastLevel?: RoastLevel;
-  varietals?: string[];           // e.g. ["Bourbon", "Typica"]
+  varietals?: string[]; // e.g. ["Bourbon", "Typica"]
   elevationMeters?: { min?: number; max?: number };
 
   // Sensory
-  tastingNotes?: string[];        // e.g. ["blueberry", "chocolate"]
-  roasterDescription?: string;    // free text from bag/web
+  tastingNotes?: string[]; // e.g. ["blueberry", "chocolate"]
+  roasterDescription?: string; // free text from bag/web
 
   // Lifecycle
-  roastDate?: string;             // YYYY-MM-DD
-  purchaseDate?: string;          // YYYY-MM-DD
+  roastDate?: string; // YYYY-MM-DD
+  purchaseDate?: string; // YYYY-MM-DD
   bagSizeGrams?: number;
   pricePaid?: { amount: number; currency: string };
 
   // Media
-  photoId?: string;               // FK to Photo (blob store)
-  thumbnailDataUrl?: string;      // tiny base64 for fast list rendering
+  photoId?: string; // FK to Photo (blob store)
+  thumbnailDataUrl?: string; // tiny base64 for fast list rendering
 
   // Provenance of data
   source: EntrySource;
-  sourceUrl?: string;             // if scraped
-  confidence?: number;            // 0–1, from LLM
-  rawOcrText?: string;            // kept for debugging / re-parsing
-  llmModel?: string;              // e.g. "gpt-4o-2024-08-06"
+  sourceUrl?: string; // if scraped
+  confidence?: number; // 0–1, from LLM
+  rawOcrText?: string; // kept for debugging / re-parsing
+  llmModel?: string; // e.g. "gpt-4o-2024-08-06"
 
   // Status
-  isArchived: boolean;            // user marked as finished
-  needsReview: boolean;           // missing required fields
+  isArchived: boolean; // user marked as finished
+  needsReview: boolean; // missing required fields
 
   // Audit
   createdAt: string;
@@ -107,11 +97,11 @@ export interface CoffeeBean {
 }
 
 export interface Origin {
-  country: string;                // ISO 3166-1 name, e.g. "Ethiopia"
-  region?: string;                // e.g. "Yirgacheffe"
+  country: string; // ISO 3166-1 name, e.g. "Ethiopia"
+  region?: string; // e.g. "Yirgacheffe"
   farm?: string;
   producer?: string;
-  percentage?: number;            // for blends, 0–100
+  percentage?: number; // for blends, 0–100
 }
 ```
 
@@ -123,14 +113,14 @@ export interface Origin {
 
 ```ts
 export interface Rating {
-  id: string;                     // ULID
+  id: string; // ULID
   schemaVersion: 1;
-  beanId: string;                 // FK → CoffeeBean.id
+  beanId: string; // FK → CoffeeBean.id
 
-  score: number;                  // 1–10, allow halves (1, 1.5, ... 10)
+  score: number; // 1–10, allow halves (1, 1.5, ... 10)
   brewType: BrewType;
   notes?: string;
-  ratedAt: string;                // ISO 8601
+  ratedAt: string; // ISO 8601
 
   // Optional brew parameters
   brewParams?: {
@@ -140,11 +130,11 @@ export interface Rating {
     grindSetting?: string;
     waterTempC?: number;
     brewTimeSeconds?: number;
-    ratio?: string;               // e.g. "1:2"
+    ratio?: string; // e.g. "1:2"
   };
 
   // Optional media
-  cupPhotoId?: string;            // FK to Photo
+  cupPhotoId?: string; // FK to Photo
 
   // Location/context
   location?: 'home' | 'cafe' | 'work' | 'other';
@@ -169,12 +159,12 @@ export interface UserPreferences {
   schemaVersion: 1;
   computedAt: string;
 
-  favoriteOrigins:    RankedItem<string>[];   // country name
-  favoriteRoasters:   RankedItem<string>[];
-  favoriteProcesses:  RankedItem<Process>[];
+  favoriteOrigins: RankedItem<string>[]; // country name
+  favoriteRoasters: RankedItem<string>[];
+  favoriteProcesses: RankedItem<Process>[];
   favoriteRoastLevels: RankedItem<RoastLevel>[];
-  favoriteFlavors:    RankedItem<string>[];   // from tastingNotes
-  favoriteBrewTypes:  RankedItem<BrewType>[];
+  favoriteFlavors: RankedItem<string>[]; // from tastingNotes
+  favoriteBrewTypes: RankedItem<BrewType>[];
 
   averageScore: number;
   totalRatings: number;
@@ -183,13 +173,14 @@ export interface UserPreferences {
 
 export interface RankedItem<T> {
   value: T;
-  weightedScore: number;          // see algorithm below
+  weightedScore: number; // see algorithm below
   count: number;
   averageScore: number;
 }
 ```
 
 ### Ranking algorithm
+
 For each candidate value `v` (e.g. an origin country):
 
 ```
@@ -198,6 +189,7 @@ weightedScore(v) = Σ over ratings r where bean(r) has v of:
                    * recencyWeight(r.ratedAt)
                    * (1 / numAttributes)    // dilute multi-origin blends
 ```
+
 - `recencyWeight(t) = 0.5 ^ (ageDays / 180)` — 6-month half-life.
 - Rank descending; keep top 10 per category.
 
@@ -209,11 +201,11 @@ Stored in a separate IndexedDB object store to keep main records small.
 
 ```ts
 export interface PhotoBlob {
-  id: string;                     // ULID
+  id: string; // ULID
   schemaVersion: 1;
   kind: 'bag' | 'cup';
-  mimeType: string;               // 'image/jpeg' | 'image/webp'
-  blob: Blob;                     // original (downscaled, see Architecture)
+  mimeType: string; // 'image/jpeg' | 'image/webp'
+  blob: Blob; // original (downscaled, see Architecture)
   widthPx: number;
   heightPx: number;
   byteSize: number;
@@ -245,11 +237,11 @@ export interface PendingAiTask {
   id: string;
   schemaVersion: 1;
   type: 'ocr' | 'llm-parse' | 'web-enrich' | 'recommendation';
-  payload: unknown;               // typed per task type at runtime
-  beanId?: string;                // draft bean this task contributes to
+  payload: unknown; // typed per task type at runtime
+  beanId?: string; // draft bean this task contributes to
   attempts: number;
   lastError?: string;
-  nextAttemptAt?: string;         // ISO; backoff schedule
+  nextAttemptAt?: string; // ISO; backoff schedule
   createdAt: string;
 }
 ```
@@ -265,13 +257,21 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "roaster", "name", "origins", "process", "roastLevel",
-    "tastingNotes", "roastDate", "varietals", "elevationMeters",
-    "roasterDescription", "confidence"
+    "roaster",
+    "name",
+    "origins",
+    "process",
+    "roastLevel",
+    "tastingNotes",
+    "roastDate",
+    "varietals",
+    "elevationMeters",
+    "roasterDescription",
+    "confidence"
   ],
   "properties": {
-    "roaster":     { "type": ["string", "null"] },
-    "name":        { "type": ["string", "null"] },
+    "roaster": { "type": ["string", "null"] },
+    "name": { "type": ["string", "null"] },
     "origins": {
       "type": "array",
       "items": {
@@ -279,25 +279,25 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
         "additionalProperties": false,
         "required": ["country", "region", "farm", "producer", "percentage"],
         "properties": {
-          "country":    { "type": ["string", "null"] },
-          "region":     { "type": ["string", "null"] },
-          "farm":       { "type": ["string", "null"] },
-          "producer":   { "type": ["string", "null"] },
+          "country": { "type": ["string", "null"] },
+          "region": { "type": ["string", "null"] },
+          "farm": { "type": ["string", "null"] },
+          "producer": { "type": ["string", "null"] },
           "percentage": { "type": ["number", "null"] }
         }
       }
     },
     "process": {
       "type": ["string", "null"],
-      "enum": ["washed","natural","honey","anaerobic","wet-hulled","other",null]
+      "enum": ["washed", "natural", "honey", "anaerobic", "wet-hulled", "other", null]
     },
     "roastLevel": {
       "type": ["string", "null"],
-      "enum": ["light","medium-light","medium","medium-dark","dark",null]
+      "enum": ["light", "medium-light", "medium", "medium-dark", "dark", null]
     },
-    "tastingNotes":        { "type": "array", "items": { "type": "string" } },
-    "roastDate":           { "type": ["string", "null"], "description": "YYYY-MM-DD" },
-    "varietals":           { "type": "array", "items": { "type": "string" } },
+    "tastingNotes": { "type": "array", "items": { "type": "string" } },
+    "roastDate": { "type": ["string", "null"], "description": "YYYY-MM-DD" },
+    "varietals": { "type": "array", "items": { "type": "string" } },
     "elevationMeters": {
       "type": ["object", "null"],
       "additionalProperties": false,
@@ -308,15 +308,17 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
       }
     },
     "roasterDescription": { "type": ["string", "null"] },
-    "confidence":         { "type": "number", "minimum": 0, "maximum": 1 }
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
   }
 }
 ```
 
 **System prompt (canonical):**
+
 > You extract structured coffee bean metadata from OCR text of a coffee bag. Return ONLY fields present in or strongly implied by the text. Use null for anything unknown — do not guess. Normalize roast level and process to the provided enums. Output must match the supplied JSON schema exactly.
 
 **Failure handling:**
+
 - JSON parse failure → retry once at temperature 0.
 - Schema validation failure → mark task `needsReview = true`, surface raw text to user.
 - All fields null → suggest manual entry.
@@ -326,48 +328,61 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
 ## Export Schemas
 
 ### `beans.csv`
+
 Columns (in order):
+
 ```
 id, roaster, name, origins, process, roastLevel, varietals,
 tastingNotes, roastDate, purchaseDate, bagSizeGrams, priceAmount,
 priceCurrency, source, sourceUrl, isArchived, createdAt, updatedAt
 ```
+
 - `origins` serialized as `"Country/Region/Farm[ pct%]; Country2/..."`
 - `tastingNotes` and `varietals` serialized as `;`-separated.
 - Dates as ISO 8601.
 
 ### `ratings.csv`
+
 ```
 id, beanId, roaster, name, score, brewType, notes, ratedAt,
 doseGrams, yieldGrams, ratio, location, cafeName, createdAt
 ```
+
 `roaster` and `name` duplicated for spreadsheet convenience.
 
 ### `export.json`
+
 ```json
 {
   "exportedAt": "2026-06-09T13:48:00.000Z",
   "schemaVersion": 1,
   "appVersion": "0.1.0",
-  "beans": [ /* CoffeeBean[] */ ],
-  "ratings": [ /* Rating[] */ ],
-  "preferences": { /* UserPreferences */ }
+  "beans": [
+    /* CoffeeBean[] */
+  ],
+  "ratings": [
+    /* Rating[] */
+  ],
+  "preferences": {
+    /* UserPreferences */
+  }
 }
 ```
+
 Photo blobs are **not** included in JSON export by default. A separate "Export with images" option zips a folder of `<photoId>.jpg` alongside `export.json`.
 
 ---
 
 ## IndexedDB Object Stores
 
-| Store              | Key path | Indexes                                              |
-|--------------------|----------|------------------------------------------------------|
-| `beans`            | `id`     | `roaster`, `createdAt`, `isArchived`, `needsReview`  |
-| `ratings`          | `id`     | `beanId`, `ratedAt`, `brewType`                      |
-| `photos`           | `id`     | `kind`                                               |
-| `ocrResults`       | `id`     | `photoId`                                            |
-| `preferences`      | `id`     | —                                                    |
-| `pendingAiTasks`   | `id`     | `type`, `nextAttemptAt`                              |
-| `meta`             | `key`    | — (key-value: schemaVersion, lastSummaryAt, etc.)    |
+| Store            | Key path | Indexes                                             |
+| ---------------- | -------- | --------------------------------------------------- |
+| `beans`          | `id`     | `roaster`, `createdAt`, `isArchived`, `needsReview` |
+| `ratings`        | `id`     | `beanId`, `ratedAt`, `brewType`                     |
+| `photos`         | `id`     | `kind`                                              |
+| `ocrResults`     | `id`     | `photoId`                                           |
+| `preferences`    | `id`     | —                                                   |
+| `pendingAiTasks` | `id`     | `type`, `nextAttemptAt`                             |
+| `meta`           | `key`    | — (key-value: schemaVersion, lastSummaryAt, etc.)   |
 
 See `architecture.md` for the migration strategy.

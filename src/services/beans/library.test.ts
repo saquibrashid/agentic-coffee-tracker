@@ -97,8 +97,12 @@ describe('filterAndSortBeans', () => {
 
   it('searches across name, roaster, origin and tasting notes', () => {
     expect(ids(filterAndSortBeans(summaries, filters({ search: 'onyx' })))).toEqual(['colombia']);
-    expect(ids(filterAndSortBeans(summaries, filters({ search: 'jasmine' })))).toEqual(['ethiopia']);
-    expect(ids(filterAndSortBeans(summaries, filters({ search: 'Ethiopia' })))).toEqual(['ethiopia']);
+    expect(ids(filterAndSortBeans(summaries, filters({ search: 'jasmine' })))).toEqual([
+      'ethiopia',
+    ]);
+    expect(ids(filterAndSortBeans(summaries, filters({ search: 'Ethiopia' })))).toEqual([
+      'ethiopia',
+    ]);
   });
 
   it('narrows rather than widens as more search terms are added', () => {

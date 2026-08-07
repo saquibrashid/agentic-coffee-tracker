@@ -3,13 +3,7 @@
  * Keep these in sync with the spec — the spec is the source of truth.
  */
 
-export type RoastLevel =
-  | 'light'
-  | 'medium-light'
-  | 'medium'
-  | 'medium-dark'
-  | 'dark'
-  | 'unknown';
+export type RoastLevel = 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark' | 'unknown';
 
 export type Process =
   | 'washed'

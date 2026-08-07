@@ -18,11 +18,12 @@ export async function generateMonthlySummary(): Promise<MonthlySummary> {
   const topRoaster = a.topRoasters[0]?.value;
   const topFlavor = a.topFlavors[0]?.value;
 
-  const narrative = a.totalRatings === 0
-    ? 'No ratings recorded this month yet. Add some coffees to get a summary.'
-    : `You logged ${a.totalRatings} ratings across ${a.totalBeans} beans this period with an average score of ${a.averageScore.toFixed(2)}.` +
-      (topRoaster ? ` Your most-logged roaster was ${topRoaster}.` : '') +
-      (topFlavor ? ` Notable flavor: ${topFlavor}.` : '');
+  const narrative =
+    a.totalRatings === 0
+      ? 'No ratings recorded this month yet. Add some coffees to get a summary.'
+      : `You logged ${a.totalRatings} ratings across ${a.totalBeans} beans this period with an average score of ${a.averageScore.toFixed(2)}.` +
+        (topRoaster ? ` Your most-logged roaster was ${topRoaster}.` : '') +
+        (topFlavor ? ` Notable flavor: ${topFlavor}.` : '');
 
   const summary: MonthlySummary = {
     generatedAt: new Date().toISOString(),

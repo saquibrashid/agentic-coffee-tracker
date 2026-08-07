@@ -104,7 +104,13 @@ function searchableText(bean: CoffeeBean): string {
       (part): part is string => typeof part === 'string',
     ),
   );
-  return [bean.name, bean.roaster, ...origins, ...(bean.tastingNotes ?? []), ...(bean.varietals ?? [])]
+  return [
+    bean.name,
+    bean.roaster,
+    ...origins,
+    ...(bean.tastingNotes ?? []),
+    ...(bean.varietals ?? []),
+  ]
     .join(' ')
     .toLowerCase();
 }

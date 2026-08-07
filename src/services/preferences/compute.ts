@@ -49,10 +49,7 @@ function rank<T extends string>(map: Map<string, Accumulator>): RankedItem<T>[] 
     .slice(0, TOP_N);
 }
 
-export function computePreferencesFrom(
-  beans: CoffeeBean[],
-  ratings: Rating[],
-): UserPreferences {
+export function computePreferencesFrom(beans: CoffeeBean[], ratings: Rating[]): UserPreferences {
   const beanById = new Map(beans.map((bean) => [bean.id, bean]));
 
   const origins = new Map<string, Accumulator>();

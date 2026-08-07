@@ -120,7 +120,10 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
       )}
 
       {schemaErrors && schemaErrors.length > 0 && (
-        <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm">
+        <div
+          role="alert"
+          className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm"
+        >
           <p className="font-medium">We couldn&apos;t read this bag reliably.</p>
           <p className="text-muted-foreground">Fill in the details below — nothing was lost.</p>
         </div>

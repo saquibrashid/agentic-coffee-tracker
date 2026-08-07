@@ -25,7 +25,15 @@ type Preview =
 /** How many example lines to show before collapsing to a count. */
 const ISSUE_PREVIEW_LIMIT = 5;
 
-function IssueList({ title, issues, tone }: { title: string; issues: ImportIssue[]; tone: string }) {
+function IssueList({
+  title,
+  issues,
+  tone,
+}: {
+  title: string;
+  issues: ImportIssue[];
+  tone: string;
+}) {
   if (issues.length === 0) return null;
   const shown = issues.slice(0, ISSUE_PREVIEW_LIMIT);
   return (
@@ -233,9 +241,9 @@ export function ImportPanel() {
                       Look up missing details for {countEnrichable(preview.plan)} coffee
                       {countEnrichable(preview.plan) === 1 ? '' : 's'}
                       <span className="block text-xs text-muted-foreground">
-                        Searches the web for origin, process, roast level and tasting notes after the
-                        import finishes. Only empty fields are filled — anything in your file is kept
-                        as you wrote it.
+                        Searches the web for origin, process, roast level and tasting notes after
+                        the import finishes. Only empty fields are filled — anything in your file is
+                        kept as you wrote it.
                       </span>
                     </span>
                   </label>

@@ -22,12 +22,15 @@ This project is **spec-driven**. Before writing code:
 ## How to contribute
 
 ### Reporting bugs
+
 Open an [issue](./.github/ISSUE_TEMPLATE/bug_report.md). Include reproduction steps, expected vs actual behavior, and environment.
 
 ### Suggesting features
+
 Open a [feature request](./.github/ISSUE_TEMPLATE/feature_request.md). Reference the spec section it relates to.
 
 ### Submitting a pull request
+
 1. Fork the repository and create a branch from `main`:
    `git checkout -b <kind>/<short-description>` where `<kind>` ∈ {`feat`, `fix`, `docs`, `chore`, `refactor`, `test`}.
 2. Make your changes. Keep them focused — one logical change per PR.
@@ -40,16 +43,17 @@ Open a [feature request](./.github/ISSUE_TEMPLATE/feature_request.md). Reference
 
 ## Coding standards
 
-| Rule | Tool |
-|---|---|
+| Rule                   | Tool                                                                                                         |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------ |
 | TypeScript strict mode | `tsconfig.json` (`"strict": true`, `"noUncheckedIndexedAccess": true`, `"exactOptionalPropertyTypes": true`) |
-| Linting | ESLint + `eslint-plugin-jsx-a11y` + `eslint-plugin-react-hooks` |
-| Formatting | Prettier (Tailwind plugin enabled) |
-| Commit style | [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, …) |
-| Branch naming | `<kind>/<short-description>` |
-| Accessibility | WCAG 2.1 AA — verified by `axe-core` and a keyboard-only walkthrough |
+| Linting                | ESLint + `eslint-plugin-jsx-a11y` + `eslint-plugin-react-hooks`                                              |
+| Formatting             | Prettier (Tailwind plugin enabled)                                                                           |
+| Commit style           | [Conventional Commits](https://www.conventionalcommits.org/) (`feat:`, `fix:`, `docs:`, …)                   |
+| Branch naming          | `<kind>/<short-description>`                                                                                 |
+| Accessibility          | WCAG 2.1 AA — verified by `axe-core` and a keyboard-only walkthrough                                         |
 
 ### Architectural rules
+
 - Components never call `fetch` directly — always via `services/ai/*`.
 - Components never touch Dexie directly — always via hooks or `services/db/*`.
 - All AI service calls go through the offline queue.
@@ -59,13 +63,13 @@ Open a [feature request](./.github/ISSUE_TEMPLATE/feature_request.md). Reference
 
 ## Testing
 
-| Layer | Tool |
-|---|---|
-| Unit | Vitest |
-| Component | Testing Library |
-| E2E | Playwright |
+| Layer         | Tool                                                  |
+| ------------- | ----------------------------------------------------- |
+| Unit          | Vitest                                                |
+| Component     | Testing Library                                       |
+| E2E           | Playwright                                            |
 | Accessibility | `@axe-core/react` (dev) + `@axe-core/playwright` (CI) |
-| Contract | JSON-schema validation against `specs/data-model.md` |
+| Contract      | JSON-schema validation against `specs/data-model.md`  |
 
 New code without tests will be sent back for revision unless the change is purely documentation.
 

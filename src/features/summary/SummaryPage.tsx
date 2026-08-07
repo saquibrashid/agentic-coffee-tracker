@@ -1,7 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useEffect, useState } from 'react';
-import { generateMonthlySummary, getLatestSummary, type MonthlySummary } from '@/services/summary/monthly';
+import {
+  generateMonthlySummary,
+  getLatestSummary,
+  type MonthlySummary,
+} from '@/services/summary/monthly';
 
 export function SummaryPage() {
   const [summary, setSummary] = useState<MonthlySummary | null>(null);
@@ -32,7 +36,8 @@ export function SummaryPage() {
             <p className="text-sm text-muted-foreground">For {summary.month}</p>
             <p>{summary.narrative}</p>
             <p className="text-sm">
-              Highlights: {summary.highlights.topRoaster || '—'} · {summary.highlights.topFlavor || '—'}
+              Highlights: {summary.highlights.topRoaster || '—'} ·{' '}
+              {summary.highlights.topFlavor || '—'}
             </p>
           </div>
         ) : (

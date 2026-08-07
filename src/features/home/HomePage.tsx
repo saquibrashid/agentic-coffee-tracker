@@ -65,9 +65,7 @@ export function HomePage() {
         </ul>
         <div className="mt-3">
           <Button asChild variant="outline">
-            <Link to="/beans">
-              View all {totalBeans ?? beans.length} beans
-            </Link>
+            <Link to="/beans">View all {totalBeans ?? beans.length} beans</Link>
           </Button>
         </div>
       </section>

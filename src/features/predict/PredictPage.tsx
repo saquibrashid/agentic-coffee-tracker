@@ -21,11 +21,7 @@ import { isSchemaError } from '@/services/ai';
 import { extractBeanFromPhoto, PipelineUnavailableError } from '@/services/ai/pipeline';
 import { EmptyPageError, enrichFromUrl } from '@/services/enrich';
 import { dataUrlToBlob, resizeDataUrl } from '@/services/image/imagePipeline';
-import {
-  canPredict,
-  loadPredictionIndex,
-  MIN_RATINGS_FOR_PREDICTION,
-} from '@/services/predict';
+import { canPredict, loadPredictionIndex, MIN_RATINGS_FOR_PREDICTION } from '@/services/predict';
 import {
   explain,
   predict,
@@ -279,9 +275,7 @@ export function PredictPage() {
       <Card>
         <CardHeader>
           <CardTitle>Will I like it?</CardTitle>
-          <CardDescription>
-            Check a coffee against your taste before you buy it.
-          </CardDescription>
+          <CardDescription>Check a coffee against your taste before you buy it.</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-sm text-muted-foreground">

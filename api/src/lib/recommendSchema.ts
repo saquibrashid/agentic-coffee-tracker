@@ -49,7 +49,15 @@ export const RECOMMENDATION_SCHEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['title', 'rationale', 'basedOn', 'origin', 'roastLevel', 'process', 'flavorNotes'],
+        required: [
+          'title',
+          'rationale',
+          'basedOn',
+          'origin',
+          'roastLevel',
+          'process',
+          'flavorNotes',
+        ],
         properties: {
           title: { type: 'string' },
           rationale: { type: 'string' },
@@ -102,7 +110,7 @@ export function validateRecommendations(input: unknown): RecommendationValidatio
       errors.push(`${path}/rationale must be a non-empty string`);
     }
     // A suggestion with no grounding is exactly the hallucination we are guarding against.
-    if (!isStringArray(item['basedOn']) || (item['basedOn']).length === 0) {
+    if (!isStringArray(item['basedOn']) || item['basedOn'].length === 0) {
       errors.push(`${path}/basedOn must list at least one preference it is grounded in`);
     }
     if (!isNullableString(item['origin'])) errors.push(`${path}/origin must be a string or null`);
