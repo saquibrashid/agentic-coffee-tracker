@@ -22,9 +22,15 @@ vi.mock('./index', async () => {
   };
 });
 
+vi.mock('./photo', () => ({
+  attachPhotoFromUrl: vi.fn(),
+  beanNeedsPhoto: (b: CoffeeBean) => !b.photoId,
+}));
+
 const enrichModule = await import('./index');
 const findCandidates = vi.mocked(enrichModule.findCandidates);
 const enrichFromUrl = vi.mocked(enrichModule.enrichFromUrl);
+const { attachPhotoFromUrl } = vi.mocked(await import('./photo'));
 
 function bean(overrides: Partial<CoffeeBean> = {}): CoffeeBean {
   return {
@@ -61,6 +67,8 @@ function parsed(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   findCandidates.mockReset();
   enrichFromUrl.mockReset();
+  attachPhotoFromUrl.mockReset();
+  attachPhotoFromUrl.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -100,6 +108,7 @@ describe('missingFields / beanNeedsEnrichment', () => {
 
   it('reports a fully described coffee as complete', () => {
     const full = bean({
+      photoId: 'p1',
       origins: [{ country: 'Colombia' }],
       process: 'washed',
       roastLevel: 'medium',
@@ -112,10 +121,28 @@ describe('missingFields / beanNeedsEnrichment', () => {
     expect(beanNeedsEnrichment(full)).toBe(false);
   });
 
+  it('still wants a lookup when only the picture is missing', () => {
+    // An imported row never has a photo, and a library card with no image is
+    // the most visible gap there is — worth a lookup even with full metadata.
+    const noPhoto = bean({
+      origins: [{ country: 'Colombia' }],
+      process: 'washed',
+      roastLevel: 'medium',
+      varietals: ['Caturra'],
+      elevationMeters: { min: 1700 },
+      tastingNotes: ['cocoa'],
+      roasterDescription: 'Lovely.',
+    });
+
+    expect(missingFields(noPhoto)).toEqual([]);
+    expect(beanNeedsEnrichment(noPhoto)).toBe(true);
+  });
+
   it('does not queue a lookup for gaps no spreadsheet could fill', () => {
     // Varietals, elevation and the roaster blurb have no CSV column, so a row
     // that is otherwise complete must not trigger a lookup on every import.
     const coreComplete = bean({
+      photoId: 'p1',
       origins: [{ country: 'Colombia' }],
       process: 'washed',
       roastLevel: 'medium',
@@ -178,6 +205,7 @@ describe('isTerminalEnrichFailure', () => {
 describe('autoEnrichBean', () => {
   it('does nothing when the coffee is already complete', async () => {
     const full = bean({
+      photoId: 'p1',
       origins: [{ country: 'Colombia' }],
       process: 'washed',
       roastLevel: 'medium',
@@ -237,5 +265,76 @@ describe('autoEnrichBean', () => {
     });
 
     await expect(autoEnrichBean(bean())).resolves.toBeNull();
+  });
+
+  it('saves a photo even when the page had no new details', async () => {
+    // The whole point of looking a coffee up can be the picture: a row with
+    // complete metadata and no image must still come back with something.
+    findCandidates.mockResolvedValue([
+      { url: 'https://onyx.example/sw', title: 'Southern Weather', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed({
+        origins: [],
+        process: null,
+        roastLevel: null,
+        tastingNotes: [],
+        varietals: [],
+        elevationMeters: null,
+        roasterDescription: null,
+      }),
+      rawText: 'raw',
+      sourceUrl: 'https://onyx.example/sw',
+      model: 'gpt-4o',
+      imageUrl: 'https://onyx.example/bag.jpg',
+    });
+    attachPhotoFromUrl.mockResolvedValue({ photoId: 'p9', thumbnailDataUrl: 'data:image/jpeg,x' });
+
+    const result = await autoEnrichBean(bean());
+
+    expect(attachPhotoFromUrl).toHaveBeenCalledWith('https://onyx.example/bag.jpg');
+    expect(result?.photoAttached).toBe(true);
+    expect(result?.filled).toEqual([]);
+    expect(result?.update.photoId).toBe('p9');
+    expect(result?.update.thumbnailDataUrl).toBe('data:image/jpeg,x');
+  });
+
+  it('leaves a photo the user already took alone', async () => {
+    findCandidates.mockResolvedValue([
+      { url: 'https://onyx.example/sw', title: 'Southern Weather', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed(),
+      rawText: 'raw',
+      sourceUrl: 'https://onyx.example/sw',
+      model: 'gpt-4o',
+      imageUrl: 'https://onyx.example/bag.jpg',
+    });
+
+    const result = await autoEnrichBean(bean({ photoId: 'mine' }));
+
+    expect(attachPhotoFromUrl).not.toHaveBeenCalled();
+    expect(result?.photoAttached).toBe(false);
+    expect(result?.update.photoId).toBeUndefined();
+  });
+
+  it('still fills the details when the image could not be downloaded', async () => {
+    findCandidates.mockResolvedValue([
+      { url: 'https://onyx.example/sw', title: 'Southern Weather', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed(),
+      rawText: 'raw',
+      sourceUrl: 'https://onyx.example/sw',
+      model: 'gpt-4o',
+      imageUrl: 'https://onyx.example/dead.jpg',
+    });
+    attachPhotoFromUrl.mockResolvedValue(null);
+
+    const result = await autoEnrichBean(bean());
+
+    expect(result?.photoAttached).toBe(false);
+    expect(result?.update.roastLevel).toBe('medium-light');
+    expect(result?.update.photoId).toBeUndefined();
   });
 });

@@ -24,6 +24,8 @@ export interface EnrichedPage {
   rawText: string;
   sourceUrl: string;
   model: string;
+  /** The product image on the page, when the scrape found one. */
+  imageUrl?: string;
 }
 
 function extractRawText(extracted: Record<string, unknown>): string {
@@ -51,5 +53,6 @@ export async function enrichFromUrl(url: string): Promise<EnrichedPage> {
     rawText: result.rawText,
     sourceUrl: scraped.sourceUrl,
     model: result.model,
+    ...(scraped.imageUrl ? { imageUrl: scraped.imageUrl } : {}),
   };
 }

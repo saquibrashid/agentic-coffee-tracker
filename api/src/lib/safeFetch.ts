@@ -124,6 +124,13 @@ export interface SafeFetchResult {
   contentType: string;
 }
 
+export interface SafeFetchBinaryResult {
+  finalUrl: string;
+  status: number;
+  bytes: Buffer;
+  contentType: string;
+}
+
 /**
  * Fetches a URL with redirects followed manually so that every hop gets the
  * same address check as the original, and with the response body capped so a
@@ -133,6 +140,39 @@ export async function safeFetch(
   raw: string,
   init: { accept?: string } = {},
 ): Promise<SafeFetchResult> {
+  const res = await safeFetchBytes(raw, {
+    accept: init.accept ?? 'text/html,application/xhtml+xml',
+    maxBytes: MAX_BYTES,
+  });
+  return {
+    finalUrl: res.finalUrl,
+    status: res.status,
+    body: new TextDecoder().decode(res.bytes),
+    contentType: res.contentType,
+  };
+}
+
+/**
+ * The same guarantees as `safeFetch`, but the body is handed back as bytes.
+ *
+ * Decoding an image as UTF-8 text and re-encoding it would corrupt it, so
+ * anything binary has to take this path. The cap is separate because an image
+ * is legitimately larger than the page that referenced it.
+ */
+export async function safeFetchBinary(
+  raw: string,
+  init: { accept?: string; maxBytes?: number } = {},
+): Promise<SafeFetchBinaryResult> {
+  return safeFetchBytes(raw, {
+    accept: init.accept ?? '*/*',
+    maxBytes: init.maxBytes ?? MAX_BYTES,
+  });
+}
+
+async function safeFetchBytes(
+  raw: string,
+  init: { accept: string; maxBytes: number },
+): Promise<SafeFetchBinaryResult> {
   let current = raw;
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -142,7 +182,7 @@ export async function safeFetch(
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: {
         'user-agent': USER_AGENT,
-        accept: init.accept ?? 'text/html,application/xhtml+xml',
+        accept: init.accept,
       },
     });
 
@@ -156,7 +196,7 @@ export async function safeFetch(
     return {
       finalUrl: url.toString(),
       status: res.status,
-      body: await readCapped(res),
+      bytes: await readCapped(res, init.maxBytes),
       contentType: res.headers.get('content-type') ?? '',
     };
   }
@@ -164,8 +204,8 @@ export async function safeFetch(
   throw new UnsafeUrlError('Too many redirects.');
 }
 
-async function readCapped(res: Response): Promise<string> {
-  if (!res.body) return '';
+async function readCapped(res: Response, maxBytes: number): Promise<Buffer> {
+  if (!res.body) return Buffer.alloc(0);
   const reader = res.body.getReader();
   const chunks: Uint8Array[] = [];
   let total = 0;
@@ -175,8 +215,8 @@ async function readCapped(res: Response): Promise<string> {
       if (done) break;
       if (!value) continue;
       total += value.byteLength;
-      if (total > MAX_BYTES) {
-        chunks.push(value.subarray(0, value.byteLength - (total - MAX_BYTES)));
+      if (total > maxBytes) {
+        chunks.push(value.subarray(0, value.byteLength - (total - maxBytes)));
         break;
       }
       chunks.push(value);
@@ -184,5 +224,5 @@ async function readCapped(res: Response): Promise<string> {
   } finally {
     await reader.cancel().catch(() => undefined);
   }
-  return new TextDecoder().decode(Buffer.concat(chunks));
+  return Buffer.concat(chunks);
 }

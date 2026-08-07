@@ -13,20 +13,22 @@ beforeEach(async () => {
 });
 
 describe('applyImportPlan enrichment queue', () => {
-  it('queues a lookup only for coffees missing metadata', async () => {
+  it('queues a lookup for every imported coffee, since none arrives with a picture', async () => {
+    // A spreadsheet can carry metadata but never an image, so even the fully
+    // described row is worth looking up — for the photo if nothing else.
     const plan = planCsvImport([HEADER, SPARSE, FULL].join('\n'), { beans: [], ratings: [] });
     expect(plan.newBeans).toHaveLength(2);
-    expect(countEnrichable(plan)).toBe(1);
+    expect(countEnrichable(plan)).toBe(2);
 
     await applyImportPlan(plan, { enrich: true });
 
     const tasks = await db.pendingAiTasks.toArray();
-    expect(tasks).toHaveLength(1);
-    expect(tasks[0]?.type).toBe('web-enrich');
-    expect(tasks[0]?.attempts).toBe(0);
+    expect(tasks).toHaveLength(2);
+    expect(tasks.every((t) => t.type === 'web-enrich')).toBe(true);
+    expect(tasks.every((t) => t.attempts === 0)).toBe(true);
 
-    const queuedBean = await db.beans.get(tasks[0]?.beanId ?? '');
-    expect(queuedBean?.name).toBe('Geometry');
+    const queued = await Promise.all(tasks.map((t) => db.beans.get(t.beanId ?? '')));
+    expect(queued.map((b) => b?.name).sort()).toEqual(['Bali', 'Geometry']);
   });
 
   it('queues nothing when enrichment is declined', async () => {
@@ -39,12 +41,12 @@ describe('applyImportPlan enrichment queue', () => {
     await expect(db.ratings.count()).resolves.toBe(1);
   });
 
-  it('still writes the history when there is nothing to enrich', async () => {
+  it('writes the history whether or not a lookup was queued', async () => {
     const plan = planCsvImport([HEADER, FULL].join('\n'), { beans: [], ratings: [] });
 
     await applyImportPlan(plan, { enrich: true });
 
-    await expect(db.pendingAiTasks.count()).resolves.toBe(0);
     await expect(db.ratings.count()).resolves.toBe(1);
+    await expect(db.beans.count()).resolves.toBe(1);
   });
 });

@@ -5,7 +5,12 @@ import { test, expect, type Page } from '@playwright/test';
  * network boundary with the same shapes the mock BFF returns. That keeps this
  * test honest about the contract without needing credentials or a live server.
  */
-async function stubEnrichmentApi(page: Page) {
+
+/** A real, decodable 1×1 PNG — the canvas resize pipeline needs actual pixels. */
+const PIXEL_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+async function stubEnrichmentApi(page: Page, options: { imageUrl?: string } = {}) {
   await page.route('**/api/search', async (route) => {
     await route.fulfill({
       status: 200,
@@ -29,6 +34,20 @@ async function stubEnrichmentApi(page: Page) {
       body: JSON.stringify({
         extracted: { rawText: 'Mock Roaster Ethiopia Yirgacheffe washed light jasmine bergamot' },
         sourceUrl: 'https://mockroaster.example/geometry',
+        ...(options.imageUrl ? { imageUrl: options.imageUrl } : {}),
+      }),
+    });
+  });
+
+  await page.route('**/api/image', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        dataUrl: PIXEL_PNG,
+        contentType: 'image/png',
+        byteSize: 68,
+        sourceUrl: options.imageUrl ?? 'https://mockroaster.example/bag.png',
       }),
     });
   });
@@ -148,5 +167,66 @@ test.describe('Web enrichment', () => {
     await page.getByRole('button', { name: /^Apply 1 change$/ }).click();
     await expect(page.getByText(/updated\. check the details above/i)).toBeVisible();
     await expect(page.getByText('Mock Roaster')).toBeVisible();
+  });
+
+  test('an imported coffee arrives with the product photo already attached', async ({
+    page,
+    browserName,
+  }) => {
+    // Headless WebKit cannot store a Blob in IndexedDB ("Error preparing
+    // Blob/File data to be stored in object store"), which is the same reason
+    // the bag-capture suite skips it. The photo path is identical for both.
+    test.skip(browserName === 'webkit', 'Blob storage in IndexedDB is flaky in headless WebKit.');
+    await stubEnrichmentApi(page, { imageUrl: 'https://mockroaster.example/bag.png' });
+    await page.goto('/add');
+
+    await page.getByLabel(/import from a link/i).fill('https://mockroaster.example/geometry');
+    await page.getByRole('button', { name: 'Import' }).click();
+
+    const roaster = page.getByLabel(/roaster/i);
+    await expect(roaster).toBeVisible({ timeout: 20000 });
+    await page.getByRole('button', { name: /save coffee/i }).click();
+    await expect(page).toHaveURL(/\/beans\//, { timeout: 15000 });
+
+    // The library card is where a missing picture is most visible, so that is
+    // where the fetched photo has to show up.
+    await page.goto('/beans');
+    const thumbnail = page.locator('img[src^="data:image/"]').first();
+    await expect(thumbnail).toBeVisible({ timeout: 15000 });
+  });
+
+  test('offers the product photo as an opt-in change, and applies it', async ({
+    page,
+    browserName,
+  }) => {
+    test.skip(browserName === 'webkit', 'Blob storage in IndexedDB is flaky in headless WebKit.');
+    // No image on the import, so the saved coffee has no picture and the panel
+    // has a real gap to offer.
+    await stubEnrichmentApi(page);
+    await page.goto('/add');
+    await page.getByLabel(/import from a link/i).fill('https://mockroaster.example/geometry');
+    await page.getByRole('button', { name: 'Import' }).click();
+    await expect(page.getByLabel(/roaster/i)).toBeVisible({ timeout: 20000 });
+    await page.getByRole('button', { name: /save coffee/i }).click();
+    await expect(page).toHaveURL(/\/beans\//, { timeout: 15000 });
+
+    // Now the lookup does find one.
+    await stubEnrichmentApi(page, { imageUrl: 'https://mockroaster.example/bag.png' });
+    await page.getByRole('button', { name: /find details on the web/i }).click();
+    await page.getByRole('button', { name: /use this page/i }).click();
+
+    const changes = page.getByRole('list', { name: 'Proposed changes' });
+    await expect(changes).toBeVisible({ timeout: 20000 });
+
+    const photoRow = changes.getByRole('listitem').filter({ hasText: 'Photo' });
+    await expect(photoRow.getByRole('checkbox')).toBeChecked();
+
+    await page.getByRole('button', { name: /^Apply \d+ changes?$/ }).click();
+    await expect(page.getByText(/updated\. check the details above/i)).toBeVisible({
+      timeout: 20000,
+    });
+
+    await page.goto('/beans');
+    await expect(page.locator('img[src^="data:image/"]').first()).toBeVisible({ timeout: 15000 });
   });
 });

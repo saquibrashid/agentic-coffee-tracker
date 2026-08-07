@@ -5,6 +5,7 @@ import {
   type InvocationContext,
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
+import { extractImageUrl } from '../lib/extractImage.js';
 import { safeFetch, UnsafeUrlError } from '../lib/safeFetch.js';
 
 interface ScrapeRequest {
@@ -86,6 +87,9 @@ app.http('scrape', {
               'Tasting notes: jasmine, bergamot, stone fruit. Grown at 1900-2100m.',
           },
           sourceUrl: body.url,
+          // Kept on the mock host so `/api/image` recognises it and returns a
+          // placeholder, rather than reaching for the public internet.
+          imageUrl: new URL('/mock-bag.png', body.url).toString(),
         });
       }
 
@@ -94,11 +98,14 @@ app.http('scrape', {
         return errorResponse(ctx, 502, `Fetch returned ${res.status}`);
       }
 
+      const imageUrl = extractImageUrl(res.body, res.finalUrl);
+
       return json(200, {
         extracted: { rawText: extractTextFromHtml(res.body) },
         // The URL after redirects, so the recorded source is where the text
         // actually came from rather than where we started looking.
         sourceUrl: res.finalUrl,
+        ...(imageUrl ? { imageUrl } : {}),
       });
     } catch (err) {
       if (err instanceof UnsafeUrlError) return errorResponse(ctx, 400, err.message, err);

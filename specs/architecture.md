@@ -100,10 +100,36 @@ Calls Bing Web Search v7. Cached server-side for 24h keyed by `(roaster|name)`.
 
 ```
 Request:  { url: string }
-Response: { extracted: <partial LLM Output schema>, sourceUrl: string }
+Response: { extracted: <partial LLM Output schema>, sourceUrl: string, imageUrl?: string }
 ```
 
 Fetches, sanitizes HTML, runs LLM extraction with the same JSON schema. Allowlist of domains (roaster sites + known coffee retailers); deny-by-default for unknown domains in v1.
+
+`imageUrl` is the product shot found on the page (`og:image`, then `twitter:image`,
+then `link rel="image_src"`, then the first plausible `<img>`), absolutised against
+the final URL. It is a _pointer_, not the image — the client passes it to
+`/api/image` to actually download it.
+
+### `POST /api/image`
+
+```
+Request:  { url: string }
+Response: { dataUrl: string, contentType: string, byteSize: number, sourceUrl: string }
+Errors:   400 invalid/blocked URL, 415 not a supported image, 502 upstream failure
+```
+
+A binary proxy so the client can obtain a roaster's product photo. Two reasons it
+cannot be a direct browser fetch: roaster CDNs send no CORS headers, and the SSRF
+guard (private-range and redirect checks, shared with `/api/scrape`) must stay
+server-side.
+
+The response is only ever a real bitmap: the payload is sniffed by magic number
+and must be PNG, JPEG, WebP, GIF, or AVIF. **SVG is deliberately rejected** — it
+is active content, and this data URL is rendered in the app. Capped at 6 MB.
+
+The client resizes the result through the same canvas pipeline as a camera
+capture, so an enriched photo is indistinguishable downstream from one the user
+took.
 
 ### `POST /api/recommend`
 

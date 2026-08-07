@@ -169,8 +169,28 @@ export interface ScrapeRequest {
 export interface ScrapeResponse {
   extracted: Record<string, unknown>;
   sourceUrl: string;
+  /** The product image found on the page, when there was one. */
+  imageUrl?: string;
 }
 export const scrape = (req: ScrapeRequest): Promise<ScrapeResponse> => apiPost('/api/scrape', req);
+
+// ---- Image ----
+export interface ImageRequest {
+  url: string;
+}
+export interface ImageResponse {
+  /** The image as a data URL, ready for the canvas resize pipeline. */
+  dataUrl: string;
+  contentType: string;
+  byteSize: number;
+  sourceUrl: string;
+}
+/**
+ * Fetched through the BFF rather than the browser: roaster CDNs do not send
+ * permissive CORS headers, so a direct `fetch` from the page is blocked however
+ * public the image is.
+ */
+export const fetchImage = (req: ImageRequest): Promise<ImageResponse> => apiPost('/api/image', req);
 
 // ---- Recommend ----
 export interface RankedSummaryItem {
