@@ -17,6 +17,7 @@ import { parsedBeanToUpdate } from '@/services/ai/mapping';
 import { ApiError } from '@/services/ai';
 import type { CoffeeBean } from '@/types';
 import { EmptyPageError, enrichFromUrl, findCandidates } from './index';
+import { attachPhotoFromUrl, beanNeedsPhoto } from './photo';
 
 /**
  * The fields auto-enrichment may fill.
@@ -86,7 +87,10 @@ export function missingFields(bean: CoffeeBean): EnrichableField[] {
 
 /** True when a coffee is missing something worth looking up. */
 export function beanNeedsEnrichment(bean: CoffeeBean): boolean {
-  return CORE_FIELDS.some((field) => isFieldMissing(bean, field));
+  // A missing picture is reason enough on its own. An imported row has no
+  // photo by definition, and the library is a wall of cards — a coffee with
+  // no image is the most visible gap there is, even when its metadata is complete.
+  return CORE_FIELDS.some((field) => isFieldMissing(bean, field)) || beanNeedsPhoto(bean);
 }
 
 /** Narrows an update to the fields the bean is actually missing. */
@@ -119,6 +123,8 @@ export interface AutoEnrichResult {
   update: Partial<CoffeeBean>;
   sourceUrl: string;
   filled: EnrichableField[];
+  /** True when the lookup also supplied a photo the coffee did not have. */
+  photoAttached: boolean;
 }
 
 /**
@@ -135,16 +141,26 @@ export async function autoEnrichBean(bean: CoffeeBean): Promise<AutoEnrichResult
   const page = await enrichFromUrl(best.url);
   const filled = fillMissingFields(bean, parsedBeanToUpdate(page.parsed));
   const fields = Object.keys(filled) as EnrichableField[];
-  if (fields.length === 0) return null;
+
+  // Attempted only when the coffee has no picture of its own, so a user photo
+  // is never displaced by a stock shot from a storefront.
+  const photo =
+    page.imageUrl && beanNeedsPhoto(bean) ? await attachPhotoFromUrl(page.imageUrl) : null;
+
+  // A photo alone is worth persisting: a coffee whose metadata was already
+  // complete can still be missing the image that makes its library card useful.
+  if (fields.length === 0 && !photo) return null;
 
   return {
     update: {
       ...filled,
+      ...(photo ?? {}),
       sourceUrl: page.sourceUrl,
       llmModel: page.model,
       updatedAt: new Date().toISOString(),
     },
     sourceUrl: page.sourceUrl,
     filled: fields,
+    photoAttached: photo !== null,
   };
 }

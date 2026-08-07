@@ -25,9 +25,10 @@ import {
   type EnrichableField,
   type FieldProposal,
 } from '@/services/enrich/diff';
+import { attachPhotoFromUrl, beanNeedsPhoto } from '@/services/enrich/photo';
 import type { CoffeeBean } from '@/types';
 
-type Phase = 'idle' | 'searching' | 'candidates' | 'fetching' | 'review' | 'done';
+type Phase = 'idle' | 'searching' | 'candidates' | 'fetching' | 'review' | 'saving' | 'done';
 
 export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
   const [phase, setPhase] = useState<Phase>('idle');
@@ -35,7 +36,14 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
   const [page, setPage] = useState<EnrichedPage | null>(null);
   const [proposals, setProposals] = useState<FieldProposal[]>([]);
   const [selected, setSelected] = useState<ReadonlySet<EnrichableField>>(new Set());
+  const [usePhoto, setUsePhoto] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Only offered when the coffee has no picture of its own: enrichment fills
+  // gaps, and silently swapping a photo the user took for a storefront render
+  // would be a different and much less welcome thing to do.
+  const photoOffered = page?.imageUrl !== undefined && beanNeedsPhoto(bean);
+  const applyCount = selected.size + (usePhoto && photoOffered ? 1 : 0);
 
   function fail(err: unknown, fallback: string) {
     // Enrichment is additive: a failure returns the user to where they were
@@ -67,6 +75,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
       setPage(enriched);
       setProposals(next);
       setSelected(defaultSelection(next));
+      setUsePhoto(enriched.imageUrl !== undefined && beanNeedsPhoto(bean));
       setPhase('review');
     } catch (err) {
       fail(err, 'Could not read that page.');
@@ -86,11 +95,23 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
   async function applySelected() {
     if (!page) return;
     const update = applyProposals(page.parsed, selected, { sourceUrl: page.sourceUrl });
+
+    // Fetched last, and never allowed to fail the whole apply: the fields the
+    // user picked are the point, and a dead image URL should not cost them.
+    let photoFailed = false;
+    if (usePhoto && page.imageUrl && photoOffered) {
+      setPhase('saving');
+      const photo = await attachPhotoFromUrl(page.imageUrl);
+      if (photo) Object.assign(update, photo);
+      else photoFailed = true;
+    }
+
     if (Object.keys(update).length === 0) {
       setPhase('done');
       return;
     }
     await db.beans.update(bean.id, update);
+    setError(photoFailed ? 'We saved the details, but that photo could not be downloaded.' : null);
     setPhase('done');
   }
 
@@ -100,6 +121,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
     setPage(null);
     setProposals([]);
     setSelected(new Set());
+    setUsePhoto(false);
     setError(null);
   }
 
@@ -125,10 +147,12 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
         </div>
       )}
 
-      {(phase === 'searching' || phase === 'fetching') && (
+      {(phase === 'searching' || phase === 'fetching' || phase === 'saving') && (
         <p role="status" className="text-muted-foreground mt-2 flex items-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-          {phase === 'searching' ? 'Searching…' : 'Reading that page…'}
+          {phase === 'searching' && 'Searching…'}
+          {phase === 'fetching' && 'Reading that page…'}
+          {phase === 'saving' && 'Saving the photo…'}
         </p>
       )}
 
@@ -163,7 +187,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
 
       {phase === 'review' && page && (
         <div className="mt-2 space-y-3">
-          {proposals.length === 0 ? (
+          {proposals.length === 0 && !photoOffered ? (
             <div className="space-y-2">
               <p className="text-muted-foreground text-sm">
                 That page had nothing new to add — your details already match.
@@ -204,14 +228,37 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
                     </label>
                   </li>
                 ))}
+                {photoOffered && page.imageUrl && (
+                  <li className="rounded border p-2">
+                    <label className="flex items-start gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        className="mt-1 size-4"
+                        checked={usePhoto}
+                        onChange={() => setUsePhoto((prev) => !prev)}
+                      />
+                      <span className="font-medium">Photo</span>
+                      <img
+                        src={page.imageUrl}
+                        alt=""
+                        className="size-20 rounded object-cover"
+                        // A hotlinked preview can 404 or be blocked; hide the
+                        // broken-image glyph rather than show a torn page.
+                        onError={(event) => {
+                          event.currentTarget.style.display = 'none';
+                        }}
+                      />
+                    </label>
+                  </li>
+                )}
               </ul>
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  disabled={selected.size === 0}
+                  disabled={selected.size === 0 && !usePhoto}
                   onClick={() => void applySelected()}
                 >
-                  Apply {selected.size} {selected.size === 1 ? 'change' : 'changes'}
+                  Apply {applyCount} {applyCount === 1 ? 'change' : 'changes'}
                 </Button>
                 <Button variant="ghost" size="sm" onClick={restart}>
                   Cancel

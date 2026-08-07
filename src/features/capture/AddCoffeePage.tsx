@@ -12,6 +12,7 @@ import { createThumbnail, dataUrlToBlob, resizeDataUrl } from '@/services/image/
 import { extractBeanFromPhoto, PipelineUnavailableError } from '@/services/ai/pipeline';
 import { parsedBeanToUpdate } from '@/services/ai/mapping';
 import { EmptyPageError, enrichFromUrl } from '@/services/enrich';
+import { attachPhotoFromUrl } from '@/services/enrich/photo';
 import { isSchemaError } from '@/services/ai';
 import { ConfirmForm } from './ConfirmForm';
 import type { CoffeeBean } from '@/types';
@@ -79,7 +80,15 @@ export function AddCoffeePage() {
 
     try {
       const enriched = await enrichFromUrl(trimmed);
-      await db.beans.add({ ...draft, ...parsedBeanToUpdate(enriched.parsed), sourceUrl: trimmed });
+      // Best-effort: a draft with details and no picture is still a good draft,
+      // so a failed image download must not lose the import.
+      const photo = enriched.imageUrl ? await attachPhotoFromUrl(enriched.imageUrl) : null;
+      await db.beans.add({
+        ...draft,
+        ...parsedBeanToUpdate(enriched.parsed),
+        ...(photo ?? {}),
+        sourceUrl: trimmed,
+      });
       const bean = await db.beans.get(beanId);
       setConfirmState({
         bean: bean ?? draft,
