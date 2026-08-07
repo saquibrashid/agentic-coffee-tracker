@@ -78,19 +78,19 @@ function Shell() {
 
 function NavItem({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) {
   return (
-    <li>
+    <li className="min-w-0">
       <NavLink
         to={to}
         end={to === '/'}
         className={({ isActive }) =>
           cn(
-            'flex flex-col items-center gap-1 py-3 text-xs font-medium',
+            'flex flex-col items-center gap-1 py-3 text-[10px] leading-tight font-medium tracking-tight sm:text-xs sm:tracking-normal',
             isActive ? 'text-primary' : 'text-muted-foreground hover:text-foreground',
           )
         }
       >
         <span aria-hidden="true">{icon}</span>
-        {label}
+        <span className="block w-full truncate text-center">{label}</span>
       </NavLink>
     </li>
   );
