@@ -84,6 +84,10 @@ jobs:
         if: steps.scaffold.outputs.ready == 'true'
         run: pnpm lint
 
+      - name: Format check
+        if: steps.scaffold.outputs.ready == 'true'
+        run: pnpm format:check
+
       - name: Typecheck
         if: steps.scaffold.outputs.ready == 'true'
         run: pnpm typecheck
