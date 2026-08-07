@@ -37,7 +37,7 @@ export default tseslint.config(
       'react-refresh': reactRefresh,
       'jsx-a11y': jsxA11y,
     },
-    settings: { react: { version: 'detect' } },
+    settings: { react: { version: '18.3' } },
     rules: {
       ...react.configs.recommended.rules,
       ...react.configs['jsx-runtime'].rules,
