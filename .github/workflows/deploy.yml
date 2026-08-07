@@ -43,7 +43,19 @@ jobs:
             echo "ready=true" >> $GITHUB_OUTPUT
           else
             echo "ready=false" >> $GITHUB_OUTPUT
-            echo "::notice::Azure repository variables are not set — skipping deploy. See docs/deployment.md."
+            echo "::warning title=Deploy skipped — nothing was published::Azure repository variables are not set, so this run did NOT deploy anything. The live site still serves the previous build. Run 'azd pipeline config --provider github', or deploy by hand with 'azd deploy'. See docs/deployment.md."
+            {
+              echo "## ⚠️ Deploy skipped — nothing was published"
+              echo ""
+              echo "\`AZURE_CLIENT_ID\` / \`AZURE_TENANT_ID\` / \`AZURE_SUBSCRIPTION_ID\` are not set as repository variables,"
+              echo "so \`azd provision\` and \`azd deploy\` never ran. **The live site is still serving the previous build.**"
+              echo ""
+              echo "To wire this up once: \`azd pipeline config --provider github\`"
+              echo ""
+              echo "To publish right now from your machine: \`azd deploy\`"
+              echo ""
+              echo "See [docs/deployment.md](../blob/main/docs/deployment.md)."
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Setup pnpm
@@ -100,3 +112,13 @@ jobs:
           done
           echo "::error::Health probe never returned 200."
           exit 1
+
+      - name: Report published build
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          WEB_URI=$(azd env get-value SERVICE_WEB_URI)
+          {
+            echo "## ✅ Deployed"
+            echo ""
+            echo "Commit \`${GITHUB_SHA::7}\` is live at $WEB_URI"
+          } >> "$GITHUB_STEP_SUMMARY"
