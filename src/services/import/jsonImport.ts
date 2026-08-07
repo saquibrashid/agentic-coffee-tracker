@@ -1,5 +1,6 @@
 import { db } from '@/services/db';
 import { dataUrlToBlob } from '@/services/image/imagePipeline';
+import { rescaleLegacyScore } from '@/services/ratings/scale';
 import type { CoffeeBean, PhotoBlob, Rating } from '@/types';
 import { ImportFormatError } from './ratingsImport';
 
@@ -78,7 +79,15 @@ export async function planJsonImport(text: string): Promise<JsonImportPlan> {
   );
   // A rating whose bean is missing would be invisible in the UI but would still
   // skew the preference profile, so it is dropped rather than half-restored.
-  const newRatings = candidateRatings.filter((r) => beanIds.has(r.beanId));
+  // A backup taken before the 1–10 change carries 1–5 scores, so it is migrated
+  // on the way in exactly as the Dexie v2 upgrade migrates live data.
+  const newRatings = candidateRatings
+    .filter((r) => beanIds.has(r.beanId))
+    .map((r) =>
+      r.schemaVersion >= 2
+        ? r
+        : ({ ...r, score: rescaleLegacyScore(r.score), schemaVersion: 2 } satisfies Rating),
+    );
 
   const newPhotos: PhotoBlob[] = [];
   let skippedPhotos = 0;

@@ -140,11 +140,11 @@ Add rating form validation: score required (1–10 step 0.5), brew type required
   because the estimate is computed locally.
 - The verdict is arithmetic on the user's own ratings, not a model call. It works offline, costs
   nothing, cannot invent a preference they never expressed, and shows its working: every claim cites
-  a real count and average ("Coffees from Ethiopia average 4.6/5 across 7 cups").
-- Shows a predicted score out of 5, a confidence percentage, the evidence for and against, which
+  a real count and average ("Coffees from Ethiopia average 9.2/10 across 7 cups").
+- Shows a predicted score out of 10, a confidence percentage, the evidence for and against, which
   values the history says nothing about, and which attributes were left blank.
 - The estimate is shrunk toward the user's own average in proportion to how much evidence there is,
-  so a single 5-star cup cannot produce a confident rave.
+  so a single top-marks cup cannot produce a confident rave.
 - Below a confidence floor the verdict is always "could go either way", explicitly described as a
   shrug rather than an answer.
 - **Empty state:** under three ratings the screen explains that it needs some history first and

@@ -1,4 +1,5 @@
 import { db } from '@/services/db';
+import { MAX_SCORE, MIN_SCORE } from '@/services/ratings/scale';
 
 export interface AnalyticsSummary {
   totalBeans: number;
@@ -43,10 +44,15 @@ export async function computeAnalytics(): Promise<AnalyticsSummary> {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10);
 
-  const scoreHistogram = [1, 2, 3, 4, 5].map((score) => ({
-    score,
-    count: ratings.filter((r) => Math.round(r.score) === score).length,
-  }));
+  // One bucket per whole point; half-steps fold into the nearer bucket so the
+  // chart stays readable rather than doubling to 19 columns.
+  const scoreHistogram = Array.from({ length: MAX_SCORE - MIN_SCORE + 1 }, (_, i) => {
+    const score = MIN_SCORE + i;
+    return {
+      score,
+      count: ratings.filter((r) => Math.round(r.score) === score).length,
+    };
+  });
 
   return { totalBeans, totalRatings, averageScore, topRoasters, topFlavors, scoreHistogram };
 }

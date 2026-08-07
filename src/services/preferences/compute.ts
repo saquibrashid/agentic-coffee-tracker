@@ -2,7 +2,7 @@
  * Derives `UserPreferences` from the local ratings history (specs/data-model.md).
  *
  * Ranking uses `averageScore * log2(1 + count)` rather than a raw average, so a
- * single 5-star cup cannot outrank an origin the user has enjoyed a dozen times.
+ * single top-marks cup cannot outrank an origin the user has enjoyed a dozen times.
  * Everything is computed locally — preferences never leave the device except as
  * the small, anonymous summary sent to `/api/recommend`.
  */

@@ -23,7 +23,7 @@ interface RecommendRequest {
   max?: unknown;
 }
 
-const RECOMMEND_SYSTEM_PROMPT = `You suggest coffees a person is likely to enjoy, based ONLY on the taste-preference summary provided. Every suggestion must cite, in "basedOn", the specific preference values it is grounded in. Never invent a roaster name, product name, price, or availability — describe the *kind* of coffee to look for instead. If the summary is too thin to justify a suggestion, return fewer suggestions rather than guessing. Output must match the supplied JSON schema exactly.`;
+const RECOMMEND_SYSTEM_PROMPT = `You suggest coffees a person is likely to enjoy, based ONLY on the taste-preference summary provided. Any numeric scores in the summary are on a 1-10 scale, where 10 is best. Every suggestion must cite, in "basedOn", the specific preference values it is grounded in. Never invent a roaster name, product name, price, or availability — describe the *kind* of coffee to look for instead. If the summary is too thin to justify a suggestion, return fewer suggestions rather than guessing. Output must match the supplied JSON schema exactly.`;
 
 function isPreferenceSummary(value: unknown): value is PreferenceSummary {
   if (typeof value !== 'object' || value === null) return false;

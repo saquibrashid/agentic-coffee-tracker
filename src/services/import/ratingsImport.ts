@@ -2,6 +2,14 @@ import { ulid } from 'ulid';
 import { db } from '@/services/db';
 import { beanNeedsEnrichment } from '@/services/enrich/autoEnrich';
 import { DEFAULT_BREW_TYPE } from '@/services/ratings/brewTypes';
+import {
+  LEGACY_MAX_SCORE,
+  MAX_SCORE,
+  MIN_SCORE,
+  formatOutOf,
+  rescaleLegacyScore,
+  roundToStep,
+} from '@/services/ratings/scale';
 import type {
   BrewType,
   CoffeeBean,
@@ -190,22 +198,28 @@ export function parseScore(raw: string): number | null {
   const text = raw.trim();
   if (!text) return null;
 
-  // "★★★★" / "★★★★☆" — count the filled stars.
+  // "★★★★" / "★★★★☆" — star ratings are conventionally out of 5, so a filled
+  // star is worth two points on the 1–10 scale.
   const filledStars = (text.match(/★/g) ?? []).length;
-  if (filledStars > 0) return filledStars;
+  if (filledStars > 0) return rescaleLegacyScore(filledStars);
 
-  // "4/5" or "8/10" — rescale whatever denominator they used onto 1–5.
+  // "4/5" or "8/10" — an explicit denominator removes all ambiguity, so honour
+  // it and rescale onto 1–10.
   const fraction = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/.exec(text);
   if (fraction) {
     const value = Number(fraction[1]);
     const outOf = Number(fraction[2]);
     if (outOf <= 0) return null;
-    return Math.round((value / outOf) * 5);
+    return roundToStep((value / outOf) * MAX_SCORE);
   }
 
+  // A bare number is taken at face value on the 1–10 scale. It genuinely is
+  // ambiguous — "4" could be 4/5 — but guessing per-cell would be worse than a
+  // consistent rule, and planRatingsImport warns when a whole file looks like
+  // it was written on the old 5-point scale.
   const number = /-?\d+(?:\.\d+)?/.exec(text);
   if (!number) return null;
-  return Math.round(Number(number[0]));
+  return roundToStep(Number(number[0]));
 }
 
 export function parseBrewType(raw: string): BrewType | null {
@@ -317,6 +331,11 @@ export function planCsvImport(text: string, existing: ExistingData): ImportPlan 
     seenRatings.add(ratingKey(rating.beanId, rating.ratedAt, rating.brewType, rating.score));
   }
 
+  // Tracks bare (denominator-less) scores so a file that was clearly written on
+  // the old 5-point scale can be flagged rather than silently halved in meaning.
+  const bareScoreLines: number[] = [];
+  let sawBareAboveLegacyMax = false;
+
   const cell = (row: CsvRow, field: string): string => {
     const index = columns.get(field);
     if (index === undefined) return '';
@@ -349,11 +368,20 @@ export function planCsvImport(text: string, existing: ExistingData): ImportPlan 
       plan.errors.push({ line, message: `Could not read a score from "${rawScore}".` });
       continue;
     }
-    if (score < 1 || score > 5) {
-      plan.errors.push({ line, message: `Score ${score} is outside 1–5 (from "${rawScore}").` });
+    if (score < MIN_SCORE || score > MAX_SCORE) {
+      plan.errors.push({
+        line,
+        message: `Score ${score} is outside ${MIN_SCORE}–${MAX_SCORE} (from "${rawScore}").`,
+      });
       continue;
     }
-    if (/\d+\.\d/.test(rawScore) && !rawScore.includes('/')) {
+    // A bare number on the new scale may have been written on the old one; the
+    // rows are collected so a whole-file warning can be raised after the loop.
+    if (!rawScore.includes('/') && !rawScore.includes('★')) {
+      bareScoreLines.push(line);
+      if (score > LEGACY_MAX_SCORE) sawBareAboveLegacyMax = true;
+    }
+    if (roundToStep(Number(rawScore)) !== Number(rawScore) && !rawScore.includes('/')) {
       plan.warnings.push({ line, message: `Rounded ${rawScore} to ${score}.` });
     }
 
@@ -415,7 +443,7 @@ export function planCsvImport(text: string, existing: ExistingData): ImportPlan 
     if (seenRatings.has(dedupeKey)) {
       plan.duplicates.push({
         line,
-        message: `${roaster} — ${name} (${score}/5) already recorded.`,
+        message: `${roaster} — ${name} (${formatOutOf(score)}) already recorded.`,
       });
       continue;
     }
@@ -424,7 +452,7 @@ export function planCsvImport(text: string, existing: ExistingData): ImportPlan 
     const notes = cell(row, 'notes');
     plan.newRatings.push({
       id: ulid(),
-      schemaVersion: 1,
+      schemaVersion: 2,
       beanId: bean.id,
       score,
       brewType,
@@ -439,6 +467,19 @@ export function planCsvImport(text: string, existing: ExistingData): ImportPlan 
   // with no ratings, which looks like a phantom coffee in the library.
   const beansWithRatings = new Set(plan.newRatings.map((r) => r.beanId));
   plan.newBeans = plan.newBeans.filter((b) => beansWithRatings.has(b.id));
+
+  // If every bare score in the file would have been legal on the old 5-point
+  // scale, the file was probably written on it. That cannot be proven, so the
+  // import is not blocked — but importing "5" as mediocre when the user meant
+  // top marks is the kind of error they would never spot afterwards.
+  if (bareScoreLines.length > 0 && !sawBareAboveLegacyMax) {
+    plan.warnings.push({
+      line: bareScoreLines[0]!,
+      message:
+        `Every score is ${LEGACY_MAX_SCORE} or lower, so this file may use a 1–${LEGACY_MAX_SCORE} scale. ` +
+        `Scores are read as out of ${MAX_SCORE}. Write them as "4/${LEGACY_MAX_SCORE}" to convert instead.`,
+    });
+  }
 
   return plan;
 }
@@ -490,9 +531,9 @@ export function countEnrichable(plan: ImportPlan): number {
 export const CSV_TEMPLATE = [
   '# Agentic Coffee Tracker — rating import template',
   '# One row per cup you drank. Only roaster, coffee and score are required.',
-  '# score accepts 4, 4/5, 8/10 or stars. date accepts 2025-03-14 or 3/14/2025.',
+  '# score is out of 10 — accepts 8.5, 4/5, 8/10 or stars. date accepts 2025-03-14 or 3/14/2025.',
   '# A blank brew is recorded as a latte.',
   'roaster,coffee,score,brew,date,notes,roast,process,origin,tasting notes',
-  '"Anchorhead Coffee","Bali Kintamani",5,espresso,2025-03-14,"Syrupy, great as a cortado",medium,natural,Indonesia,"strawberry; cocoa; orange"',
-  '"Onyx Coffee Lab","Southern Weather",4,pour-over,2025-03-16,,medium-light,washed,"Colombia; Ethiopia","chocolate; citrus"',
+  '"Anchorhead Coffee","Bali Kintamani",9.5,espresso,2025-03-14,"Syrupy, great as a cortado",medium,natural,Indonesia,"strawberry; cocoa; orange"',
+  '"Onyx Coffee Lab","Southern Weather",8,pour-over,2025-03-16,,medium-light,washed,"Colombia; Ethiopia","chocolate; citrus"',
 ].join('\n');

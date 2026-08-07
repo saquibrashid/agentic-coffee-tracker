@@ -23,11 +23,14 @@ function bean(id: string, overrides: Partial<CoffeeBean> = {}): CoffeeBean {
 function rating(id: string, beanId: string): Rating {
   return {
     id,
-    schemaVersion: 1,
+    schemaVersion: 2,
     beanId,
-    score: 4,
+    score: 8,
+    brewType: 'espresso',
     ratedAt: '2026-01-02T00:00:00.000Z',
-  } as Rating;
+    createdAt: '2026-01-02T00:00:00.000Z',
+    updatedAt: '2026-01-02T00:00:00.000Z',
+  };
 }
 
 function photo(id: string): PhotoBlob {

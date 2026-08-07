@@ -1,4 +1,5 @@
 import { db } from '@/services/db';
+import { MAX_SCORE, MIN_SCORE, SCORE_STEP, isValidScore } from '@/services/ratings/scale';
 import type { BrewType, Rating } from '@/types';
 
 /**
@@ -23,8 +24,10 @@ export class RatingNotFoundError extends Error {
 }
 
 function assertValidScore(score: number): void {
-  if (!Number.isInteger(score) || score < 1 || score > 5) {
-    throw new RangeError(`Score must be a whole number from 1 to 5, got ${score}`);
+  if (!isValidScore(score)) {
+    throw new RangeError(
+      `Score must be between ${MIN_SCORE} and ${MAX_SCORE} in steps of ${SCORE_STEP}, got ${score}`,
+    );
   }
 }
 

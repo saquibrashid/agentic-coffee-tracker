@@ -9,9 +9,9 @@ import { RatingNotFoundError, deleteRating, updateRating } from './mutations';
 function rating(id: string, overrides: Partial<Rating> = {}): Rating {
   return {
     id,
-    schemaVersion: 1,
+    schemaVersion: 2,
     beanId: 'b1',
-    score: 4,
+    score: 8,
     brewType: 'drip',
     ratedAt: '2026-01-02T00:00:00.000Z',
     createdAt: '2026-01-02T00:00:00.000Z',
@@ -70,14 +70,14 @@ describe('updateRating', () => {
     expect(updated.updatedAt).not.toBe('2026-01-02T00:00:00.000Z');
   });
 
-  it('rejects a score outside 1..5 without touching the stored record', async () => {
+  it('rejects a score off the 1..10 half-step scale without touching the stored record', async () => {
     await db.ratings.add(rating('r1'));
 
-    await expect(updateRating('r1', { score: 6, brewType: 'drip' })).rejects.toThrow(RangeError);
+    await expect(updateRating('r1', { score: 11, brewType: 'drip' })).rejects.toThrow(RangeError);
     await expect(updateRating('r1', { score: 0, brewType: 'drip' })).rejects.toThrow(RangeError);
-    await expect(updateRating('r1', { score: 3.5, brewType: 'drip' })).rejects.toThrow(RangeError);
+    await expect(updateRating('r1', { score: 3.7, brewType: 'drip' })).rejects.toThrow(RangeError);
 
-    expect((await db.ratings.get('r1'))?.score).toBe(4);
+    expect((await db.ratings.get('r1'))?.score).toBe(8);
   });
 
   it('reports a rating that no longer exists rather than silently creating one', async () => {
