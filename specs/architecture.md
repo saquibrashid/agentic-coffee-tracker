@@ -439,6 +439,9 @@ Lazy-load: analytics charts (Recharts), camera fallback module, scraper UI.
 The following modules ship as no-op stubs in v1, but with stable interfaces:
 
 - `services/auth/` — `AuthProvider` interface; v1 implementation is `LocalOnlyAuthProvider`.
-- `services/sync/` — `SyncEngine` interface with `push()`/`pull()`/`status()`; v1 = `NoopSyncEngine`.
+- `services/sync/` — `SyncEngine` interface with `sync()`/`status()`/`reset()`; v1 = `NoopSyncEngine`.
+
+The v2 design for both is fully specified in `sync.md`, including the storage topology, replication protocol, and delivery phases.
+
 - `services/embeddings/` — `EmbeddingIndex` interface; v1 = `NoopEmbeddingIndex`.
 - Cafe-drink tracking — schema reserves `Rating.location = 'cafe'` and `cafeName` already.
