@@ -228,15 +228,17 @@ Knobs, in order of impact:
 
 `.github/workflows/deploy.yml` runs `azd provision` + `azd deploy` on every push to `main`, then smoke-tests `/api/health`. It authenticates with OIDC federated credentials — no long-lived secrets.
 
-The job skips itself unless these repository **variables** are set:
+The job needs these repository **variables**:
 
-> **A skipped deploy still shows as a green ✅ run.** The job exits successfully so
-> that forks and freshly-cloned repos stay green, which means a green _Deploy_ run
-> does **not** by itself prove anything was published. When the variables are
-> missing the run posts a "⚠️ Deploy skipped — nothing was published" job summary;
-> a real deploy posts "✅ Deployed" with the commit SHA. Check the summary, or
-> compare the hashed asset filenames in the served `index.html` against a local
-> `pnpm build`, before assuming the live site is current.
+> **A green _Deploy_ run means the commit shipped.** If `AZURE_CLIENT_ID`,
+> `AZURE_TENANT_ID` or `AZURE_SUBSCRIPTION_ID` is missing, the run **fails** with a
+> "❌ Deploy failed — nothing was published" summary listing which variable is absent,
+> rather than passing silently. Only **forks** skip the deploy and stay green, since
+> they have no subscription to deploy into.
+>
+> This used to be a silent skip on every repo, which meant weeks of green checkmarks
+> on `main` while the live site kept serving a stale build. If you ever need the old
+> lenient behaviour, the discriminator is `github.event.repository.fork`.
 
 | Variable                                                                    | Purpose                                     |
 | --------------------------------------------------------------------------- | ------------------------------------------- |

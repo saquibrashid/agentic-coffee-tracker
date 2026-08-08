@@ -34,29 +34,54 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # Everything below is skipped on forks and on repos that have never been
-      # wired to a subscription, so the workflow is green out of the box.
+      # Forks have no subscription, so they skip the deploy and stay green out of
+      # the box. This repo is expected to be configured, so a missing variable is
+      # a real breakage and fails the run — a green check here must mean the
+      # commit actually shipped, never that the deploy was quietly bypassed.
       - name: Check Azure configuration
         id: config
+        env:
+          IS_FORK: ${{ github.event.repository.fork }}
         run: |
           if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_SUBSCRIPTION_ID" ] && [ -n "$AZURE_TENANT_ID" ]; then
             echo "ready=true" >> $GITHUB_OUTPUT
-          else
-            echo "ready=false" >> $GITHUB_OUTPUT
-            echo "::warning title=Deploy skipped — nothing was published::Azure repository variables are not set, so this run did NOT deploy anything. The live site still serves the previous build. Run 'azd pipeline config --provider github', or deploy by hand with 'azd deploy'. See docs/deployment.md."
-            {
-              echo "## ⚠️ Deploy skipped — nothing was published"
-              echo ""
-              echo "\`AZURE_CLIENT_ID\` / \`AZURE_TENANT_ID\` / \`AZURE_SUBSCRIPTION_ID\` are not set as repository variables,"
-              echo "so \`azd provision\` and \`azd deploy\` never ran. **The live site is still serving the previous build.**"
-              echo ""
-              echo "To wire this up once: \`azd pipeline config --provider github\`"
-              echo ""
-              echo "To publish right now from your machine: \`azd deploy\`"
-              echo ""
-              echo "See [docs/deployment.md](../blob/main/docs/deployment.md)."
-            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
+
+          if [ "$IS_FORK" = "true" ]; then
+            echo "ready=false" >> $GITHUB_OUTPUT
+            echo "::notice title=Deploy skipped on fork::This fork has no Azure subscription wired up, so nothing was deployed. That is expected."
+            {
+              echo "## ⏭️ Deploy skipped — this is a fork"
+              echo ""
+              echo "Forks have no Azure subscription, so \`azd provision\` and \`azd deploy\` were not run."
+              echo "To deploy your own copy, see [docs/deployment.md](../blob/main/docs/deployment.md)."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          echo "ready=false" >> $GITHUB_OUTPUT
+          echo "::error title=Deploy failed — nothing was published::Azure repository variables are missing, so this commit did NOT deploy. The live site still serves the previous build. Restore the variables with 'azd pipeline config --provider github', or publish by hand with 'azd deploy'. See docs/deployment.md."
+          {
+            echo "## ❌ Deploy failed — nothing was published"
+            echo ""
+            echo "One or more of \`AZURE_CLIENT_ID\` / \`AZURE_TENANT_ID\` / \`AZURE_SUBSCRIPTION_ID\` is missing from the"
+            echo "repository variables, so \`azd provision\` and \`azd deploy\` never ran."
+            echo "**The live site is still serving the previous build.**"
+            echo ""
+            echo "| Variable | Set |"
+            echo "| --- | --- |"
+            echo "| \`AZURE_CLIENT_ID\` | $([ -n "$AZURE_CLIENT_ID" ] && echo 'yes' || echo '**no**') |"
+            echo "| \`AZURE_TENANT_ID\` | $([ -n "$AZURE_TENANT_ID" ] && echo 'yes' || echo '**no**') |"
+            echo "| \`AZURE_SUBSCRIPTION_ID\` | $([ -n "$AZURE_SUBSCRIPTION_ID" ] && echo 'yes' || echo '**no**') |"
+            echo ""
+            echo "To restore them: \`azd pipeline config --provider github\`"
+            echo ""
+            echo "To publish right now from your machine: \`azd deploy\`"
+            echo ""
+            echo "See [docs/deployment.md](../blob/main/docs/deployment.md)."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
 
       - name: Setup pnpm
         if: steps.config.outputs.ready == 'true'
