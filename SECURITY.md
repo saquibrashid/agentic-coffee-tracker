@@ -19,6 +19,7 @@ In scope:
 - The web client (PWA) source code in this repository
 - The Azure Functions BFF (`/api`) source code
 - The Bicep infrastructure templates (`/infra`)
+- Authentication and sync endpoints, once implemented — see the planned-change section below
 
 Out of scope:
 
@@ -32,6 +33,25 @@ Out of scope:
 - Image EXIF is stripped before forwarding to upstream AI services.
 - BFF logs no request bodies — only timing, status, and model name.
 - CSP locks `connect-src` to the same origin and the BFF host.
-- All user data lives client-side in IndexedDB; nothing is persisted server-side.
+- Images fetched during enrichment are identified by magic number, not `Content-Type`, and SVG is refused because it is active content.
+- All user data lives client-side in IndexedDB. The BFF is stateless — it has no database, and nothing a user records is persisted server-side.
 
 See `specs/architecture.md` § "Security & Privacy" for full details.
+
+## Planned change: optional cloud sync
+
+`specs/sync.md` specifies opt-in multi-device sync. It is **specified, not implemented** — no code in this repository sends user data anywhere, and the statement above is accurate for every build shipped to date.
+
+It will stop being the whole story once sync ships, so the intended end state is recorded here in advance:
+
+- **Signed out stays the default** and keeps today's behaviour exactly: no account, no network storage, no change.
+- **Signing in** replicates beans, ratings, and photo metadata to Cosmos DB, and photo bytes to Blob Storage, partitioned per user.
+- Data will be encrypted in transit and at rest by the platform, but **not end-to-end**. The operator would be technically capable of reading it. This is a deliberate trade-off, recorded as an open question in `specs/sync.md`.
+- Deleting every server-side byte will be possible from inside the app.
+
+Two guarantees are being built in from the start rather than retrofitted:
+
+- Sync is **hard-disabled** in any build configured to call the Function App directly (`VITE_API_BASE_URL`). In that topology the `x-ms-client-principal` header is attacker-supplied rather than injected by Static Web Apps, so trusting it would expose one user's data to another. The check lives in `src/services/sync/index.ts` and fails closed.
+- Derived data (preferences, summaries, recommendations) is never uploaded. It is recomputed on each device from the records it already holds.
+
+This section will be replaced with a description of shipped behaviour in the same pull request that enables sync, not in a follow-up.

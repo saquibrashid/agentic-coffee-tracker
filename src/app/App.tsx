@@ -12,6 +12,8 @@ import {
 import { useEffect, useState } from 'react';
 
 import { HomePage } from '@/features/home/HomePage';
+import { useSyncStatus } from '@/services/sync/useSyncStatus';
+import type { SyncStatus } from '@/services/sync/types';
 import { cn } from '@/lib/utils';
 
 function useOnlineStatus(): boolean {
@@ -29,8 +31,33 @@ function useOnlineStatus(): boolean {
   return online;
 }
 
+/**
+ * The one line the sync engine gets in the chrome, per `specs/sync.md` → UI.
+ *
+ * Only states that need the user's attention are shown. A sync that is working
+ * is invisible on purpose: a permanent "all good" badge trains people to ignore
+ * the spot where the genuine warnings appear.
+ */
+function syncMessage(status: SyncStatus): string | null {
+  switch (status.state) {
+    case 'syncing':
+      return 'Syncing…';
+    case 'error':
+      return status.lastError ?? 'Sync failed. It will retry automatically.';
+    case 'needs-upgrade':
+      return 'Refresh to continue syncing — this version is out of date.';
+    default:
+      // 'disabled' (the v1 default), 'idle' and 'offline' say nothing here.
+      // Offline already has its own banner directly above.
+      return null;
+  }
+}
+
 function Shell() {
   const online = useOnlineStatus();
+  const sync = useSyncStatus();
+  const syncNotice = syncMessage(sync);
+
   // Start the background queue runner for pending AI tasks
   useEffect(() => {
     // Start the runner lazily on mount
@@ -50,6 +77,19 @@ function Shell() {
             className="bg-accent text-accent-foreground px-4 py-1 text-center text-xs"
           >
             Offline. New entries will sync details when you reconnect.
+          </div>
+        )}
+        {syncNotice && (
+          <div
+            role="status"
+            className={cn(
+              'px-4 py-1 text-center text-xs',
+              sync.state === 'error' || sync.state === 'needs-upgrade'
+                ? 'bg-destructive text-white'
+                : 'bg-accent text-accent-foreground',
+            )}
+          >
+            {syncNotice}
           </div>
         )}
       </header>
