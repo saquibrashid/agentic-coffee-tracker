@@ -47,6 +47,7 @@ Build a **web‑based, offline‑first, AI‑powered coffee tracking application
 
 - `data-model.md` — types, enums, LLM JSON schema, IndexedDB stores, export schemas
 - `architecture.md` — BFF, hosting, secrets, offline queue, migrations, security
+- `sync.md` — v2 multi-device sync: identity, Cosmos/Blob storage, replication protocol, conflict policy
 - `ui.md` — screens and flows
 - `ux-states.md` — loading/empty/error/offline/success states per screen
 - `ai.md` — OCR, LLM, web search, preference modeling, agent behaviors
