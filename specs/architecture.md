@@ -131,6 +131,18 @@ The client resizes the result through the same canvas pipeline as a camera
 capture, so an enriched photo is indistinguishable downstream from one the user
 took.
 
+Because both images have been through that identical pipeline by the time they
+meet, they can be compared fairly. When a coffee already has a picture, the
+found one is offered as a replacement only if it carries at least **1.25x the
+pixel area** — roughly 1.12x in each dimension, past the point where the
+difference shows on a library card. Resolution is the only criterion, since
+"better" is otherwise a matter of taste: a studio render is not objectively an
+improvement on a photo of the bag on the user's own counter. The swap is always
+the user's explicit choice, shown side by side with both dimensions, and the
+replaced photo is deleted only once nothing else references it. Unattended
+enrichment during a bulk import never replaces an existing photo, because there
+is nobody there to choose.
+
 ### `POST /api/recommend`
 
 ```
