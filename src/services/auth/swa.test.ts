@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CONFIGURED_PROVIDERS, SwaAuthProvider } from './swa';
 import { getAuthProvider, isAuthSupported, resetAuthProviderForTests } from './index';
 import { LocalOnlyAuthProvider } from './localOnly';
+import type { AuthProviderId } from './types';
 
 function respondWith(body: unknown, ok = true): typeof fetch {
   return vi.fn().mockResolvedValue({
@@ -125,9 +126,11 @@ describe('SwaAuthProvider.login', () => {
   });
 
   it('refuses a provider that is not configured for this deployment', async () => {
-    // Apple is 404'd in staticwebapp.config.json pending open question 2, so
-    // offering it would send the user to an error page.
-    await expect(new SwaAuthProvider().login('apple')).rejects.toThrow(/not configured/);
+    // Not reachable through the type today. The scenario it guards is a future
+    // contributor widening AuthProviderId without adding the provider to
+    // staticwebapp.config.json, which would redirect people to a 404.
+    const unconfigured = 'google' as unknown as AuthProviderId;
+    await expect(new SwaAuthProvider().login(unconfigured)).rejects.toThrow(/not configured/);
     expect(assign).not.toHaveBeenCalled();
   });
 
@@ -138,7 +141,8 @@ describe('SwaAuthProvider.login', () => {
     );
   });
 
-  it('configures only Microsoft for now', () => {
+  it('configures Microsoft and nothing else', () => {
+    // specs/sync.md → Decisions § 2: Apple was dropped rather than deferred.
     expect(CONFIGURED_PROVIDERS).toEqual(['aad']);
   });
 });

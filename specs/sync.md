@@ -61,7 +61,7 @@ Syncing derived data would create a second source of truth that can disagree wit
 
 **Provider**: Azure Static Web Apps built-in authentication, as already anticipated in `architecture.md` → Hosting (Auth v2).
 
-- Identity providers: Microsoft (`/.auth/login/aad`) and Apple (custom OIDC provider).
+- Identity provider: Microsoft (`/.auth/login/aad`). It is the only one — see Decisions § 2 for why Apple was dropped.
 - The client reads `/.auth/me` to obtain the `clientPrincipal`.
 - SWA injects the `x-ms-client-principal` header (base64 JSON) into every linked-backend Function invocation.
 - `userId` = `clientPrincipal.userId`, a stable per-provider subject identifier. It is the Cosmos partition key.
@@ -83,22 +83,18 @@ Implement the second (a build-time feature flag) for v2, and record the first as
 {
   "routes": [
     { "route": "/api/sync/*", "allowedRoles": ["authenticated"] },
-    { "route": "/.auth/login/twitter", "statusCode": 404 }
-  ],
-  "auth": {
-    "identityProviders": {
-      "apple": {
-        "registration": {
-          "clientIdSettingName": "APPLE_CLIENT_ID",
-          "clientSecretSettingName": "APPLE_CLIENT_SECRET"
-        }
-      }
-    }
-  }
+    { "route": "/.auth/login/apple", "statusCode": 404 },
+    { "route": "/.auth/login/github", "statusCode": 404 },
+    { "route": "/.auth/login/twitter", "statusCode": 404 },
+    { "route": "/.auth/login/facebook", "statusCode": 404 },
+    { "route": "/.auth/login/google", "statusCode": 404 }
+  ]
 }
 ```
 
-Unused providers are explicitly 404'd so SWA's defaults do not silently expose them.
+No `auth.identityProviders` block: Microsoft is the only provider, and it is registered on the Static Web App itself rather than in this file.
+
+Every other provider is explicitly 404'd so SWA's defaults cannot silently expose an identity source nobody reviewed. The client enforces the same allowlist a second time, rejecting a principal that reports an unconfigured provider — reaching that branch means the config failed, and the `userId` in question would otherwise become a partition key.
 
 ---
 
@@ -109,6 +105,10 @@ Unused providers are explicitly 404'd so SWA's defaults do not silently expose t
 Serverless, SQL API. One database `coffee`, one container `sync`, partition key `/userId`.
 
 A single container holds every record type. This keeps a user's entire dataset in one logical partition, which is what makes the transactional sequence assignment below possible.
+
+**Why Cosmos rather than a relational database.** The choice follows from the `seq` cursor, not from preference. Partitioning by `/userId` places a user's whole dataset in one logical partition, and a Cosmos _transactional batch_ is scoped to exactly that — which is what allows sequence numbers to be assigned atomically alongside the records they number. Lose that atomicity and two devices pushing concurrently produce duplicate or gapped `seq` values, at which point pull silently drops records, the worst possible failure for a sync engine.
+
+Alternatives fail on that guarantee or on cost. Table Storage has no multi-document transactions. PostgreSQL Flexible Server and Azure SQL both do, but bill for an always-on instance at roughly $13–15/month, against Cosmos serverless at about $0.25 per million RUs plus $0.25/GB — pennies at personal scale, and nothing at all while idle. Serverless also has no throughput to provision, which suits a workload that is bursty by nature: a few pushes a day, nothing overnight.
 
 **Record document:**
 
@@ -268,7 +268,7 @@ src/services/
 ```ts
 export interface AuthProvider {
   getUser(): Promise<AuthUser | null>;
-  login(provider: 'aad' | 'apple'): Promise<void>;
+  login(provider: 'aad'): Promise<void>;
   logout(): Promise<void>;
 }
 
@@ -447,7 +447,7 @@ This works because `CoffeeBean.thumbnailDataUrl` is already stored inline on the
 Signed out:
 
 - Explanation of what leaves the device, linking to the privacy notice
-- **Sign in with Microsoft** / **Sign in with Apple**
+- **Sign in with Microsoft**
 
 Signed in:
 
@@ -480,7 +480,7 @@ Additions to `/infra`:
 
 Use managed identity throughout. Cosmos and Storage keys must not appear in app settings or Key Vault — user-delegation SAS requires the identity path anyway, and it removes an entire class of secret to rotate.
 
-New app settings: `COSMOS_ENDPOINT`, `COSMOS_DATABASE`, `STORAGE_ACCOUNT_NAME`, `APPLE_CLIENT_ID`, `APPLE_CLIENT_SECRET` (Key Vault reference).
+New app settings: `COSMOS_ENDPOINT`, `COSMOS_DATABASE`, `STORAGE_ACCOUNT_NAME`. No identity-provider secrets: Microsoft is registered on the Static Web App itself, and dropping Apple removed the one client secret that would have needed rotating every 6 months.
 
 Follow the existing optional-dependency pattern from `architecture.md` → Secrets & Configuration: when `COSMOS_ENDPOINT` is absent, `/api/sync/*` returns `501 Not Implemented` and `/api/health` reports `sync: 'disabled'`. A credential-free deployment must stay a supported configuration.
 
@@ -534,16 +534,80 @@ Phase 8 is not optional polish. `SECURITY.md` currently states that all user dat
 
 ---
 
-## Open questions
+## Decisions
 
-Resolve before Phase 2; each has a real bearing on the design.
+Resolved before Phase 2. Recorded here with the reasoning, because each one is
+load-bearing and the reasoning is what a future reader will need in order to
+revisit it safely.
 
-1. **End-to-end encryption.** Encrypting payloads under a key derived from a user passphrase would preserve the current privacy posture, at the cost of unrecoverable data on a forgotten passphrase and no possibility of future server-side features. Decide now — retrofitting E2EE after data exists requires a migration.
-2. **Apple Sign In.** Requires a paid Apple Developer account and a client secret that expires every 6 months, needing rotation. Confirm this is worth it, or ship Microsoft-only in v2.
-3. **Photo quota.** Is 500 MB per user right? It is roughly 2,000 photos at the current 1600px/WebP pipeline output.
-4. **Tombstone retention.** Tombstones currently live forever in Cosmos. If they are ever garbage-collected, a device whose cursor predates the GC horizon must be forced into a full re-sync. Either accept unbounded tombstones (small, and simplest) or specify the horizon and the forced-resync path.
-5. **Multi-provider identity.** Signing in with Microsoft and later with Apple produces two distinct `userId` values and therefore two disjoint datasets. Is an account-linking flow needed, or is a clear warning at sign-in sufficient?
-6. **Region and residency.** Single-region deployment implies a data residency choice. Confirm the target region.
+### 1. No end-to-end encryption
+
+**Decided: payloads are stored as plaintext, protected by TLS in transit and platform-managed encryption at rest.**
+
+The deciding fact is that in this deployment the data subject and the operator
+are the same person — it runs in the owner's own Azure subscription. E2EE defends
+notes against whoever runs the server, and here that is the user themselves, so
+the threat it addresses does not exist while its costs are permanent:
+
+- A forgotten passphrase means **unrecoverable data**. There is no reset path by construction.
+- Every additional device needs a key transfer, not just a sign-in.
+- Server-side features become impossible forever — no search across a library, no sharing, no server-side enrichment.
+- Schema migrations could only run on-device, so a device that never comes back would hold the only copy of an old-format record.
+
+It would also leak more than it appears to. `seq`, `updatedAt`, `type` and blob
+size must remain plaintext or the conflict policy above cannot run, so an
+observer still learns how many records exist, when they change, and how large
+the photos are.
+
+What is guaranteed instead: HTTPS everywhere, encryption at rest, per-user
+partitioning, and the ability to delete every server-side byte from inside the
+app (Phase 7). `SECURITY.md` states plainly that the deployment operator is
+technically capable of reading stored data.
+
+**Revisit if** the app is ever operated for users other than the operator. That
+changes the threat model, and this decision with it — but it requires a
+migration, because the data already exists in plaintext by then.
+
+### 2. Microsoft-only sign-in — Apple dropped
+
+**Decided: Microsoft Entra is the only identity provider. Apple Sign In is removed from this spec, not deferred.**
+
+It required a paid Apple Developer account and a client secret expiring every 6
+months, so the cost was a recurring manual rotation that outlives the feature
+work and fails closed — silently, on a schedule, long after anyone remembers
+why. For one identity provider serving one user that is a bad trade.
+
+`AuthProviderId` is therefore a single-member union rather than a list, and
+`public/staticwebapp.config.json` continues to return 404 for Apple along with
+every other provider this project has not configured.
+
+**Consequence:** open question 5 (multi-provider identity) disappears. One
+provider means one `userId` per user and no possibility of the two-disjoint-datasets
+problem, so no account-linking flow is needed.
+
+### 3. Photo quota: 500 MB per user
+
+**Decided as specified.** Roughly 2,000 photos through the current 1600px/WebP
+pipeline, and comfortably inside the 20 GB logical-partition ceiling. Tracked in
+`CursorDocument.photoBytes`.
+
+### 4. Tombstones are kept indefinitely
+
+**Decided: no garbage collection.** A tombstone is a few hundred bytes, and
+collecting them would require every device whose cursor predates the horizon to
+be forced into a full re-sync — real complexity, a rare and expensive failure
+mode, in exchange for negligible storage. Revisit only if tombstones become a
+measurable share of a partition.
+
+### 5. Multi-provider identity
+
+**Not applicable.** Resolved by decision 2.
+
+### 6. Region and residency
+
+Single-region, matching the region the existing resources are deployed to, so
+sync introduces no new residency question beyond the one already answered by the
+current deployment.
 
 ---
 

@@ -12,11 +12,14 @@
 /**
  * The providers the app is willing to talk to.
  *
- * Deliberately a closed union rather than a string: `staticwebapp.config.json`
- * explicitly 404s every provider it does not configure, and this type is the
- * client-side half of that same allowlist.
+ * A single-member union rather than a string, and deliberately still a union:
+ * Microsoft is the only identity provider (`specs/sync.md` → Decisions § 2 —
+ * Apple was dropped rather than deferred, because a client secret expiring
+ * every 6 months is a recurring manual rotation that fails closed silently,
+ * long after anyone remembers why). This type is the client-side half of the
+ * allowlist that `staticwebapp.config.json` enforces by 404ing everything else.
  */
-export type AuthProviderId = 'aad' | 'apple';
+export type AuthProviderId = 'aad';
 
 /** Who is signed in, as reported by the identity provider. */
 export interface AuthUser {

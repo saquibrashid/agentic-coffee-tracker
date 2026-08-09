@@ -188,7 +188,7 @@ To enable it:
 
 Two things the config already enforces:
 
-- **Unused providers are 404'd.** `public/staticwebapp.config.json` explicitly blocks GitHub, Google, Facebook, Twitter and Apple so SWA's defaults cannot silently expose an identity source nobody reviewed. Apple is blocked pending open question 2 in `specs/sync.md` — it needs a paid developer account and a secret that expires every 6 months.
+- **Unused providers are 404'd.** `public/staticwebapp.config.json` explicitly blocks GitHub, Google, Facebook, Twitter and Apple so SWA's defaults cannot silently expose an identity source nobody reviewed. Microsoft is the only provider this project supports — Apple was dropped rather than deferred, because its client secret expires every 6 months and a rotation that fails closed on a schedule, long after anyone remembers why, is a poor trade for one identity provider (`specs/sync.md` → Decisions § 2).
 - **Auth stays off when `VITE_API_BASE_URL` is set.** In that topology the browser calls the Function App directly, so the `x-ms-client-principal` header is attacker-supplied rather than injected by SWA. `VITE_AUTH_ENABLED` cannot override this; see `specs/sync.md` → Identity.
 
 ## Monitoring

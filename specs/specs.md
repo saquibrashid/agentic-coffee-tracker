@@ -36,7 +36,7 @@ Build a **web‑based, offline‑first, AI‑powered coffee tracking application
 ## Future Features (v2+)
 
 - Café drink tracking
-- Microsoft + Apple ID login
+- Microsoft account sign-in
 - Azure cloud sync
 - Embeddings + vector search
 - Native iOS app

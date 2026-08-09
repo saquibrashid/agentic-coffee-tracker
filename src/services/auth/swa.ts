@@ -14,12 +14,11 @@ import type { AuthProvider, AuthProviderId, AuthUser } from './types';
 /**
  * The providers that are actually configured in `public/staticwebapp.config.json`.
  *
- * Apple is in the `AuthProviderId` union because the spec plans for it, but it
- * needs a paid developer account and a client secret that expires every six
- * months — open question 2 in `specs/sync.md`, still unresolved. Until that is
- * answered, Apple is 404'd in the SWA config, so offering it here would send
- * people to an error page. Listing configured providers separately from
- * supported ones lets `login()` fail with a sentence instead.
+ * Identical to the `AuthProviderId` union today, and kept as a separate runtime
+ * value on purpose: this one validates the *response* from `/.auth/me`, which
+ * is data crossing a trust boundary rather than a value TypeScript can vouch
+ * for. If SWA ever reports a provider that should have been 404'd, this is what
+ * notices.
  */
 export const CONFIGURED_PROVIDERS: readonly AuthProviderId[] = ['aad'];
 
@@ -97,6 +96,10 @@ export class SwaAuthProvider implements AuthProvider {
    * answer arrives as a fresh page load, where `getUser()` reports it.
    */
   login(provider: AuthProviderId): Promise<void> {
+    // Unreachable through the type today, and kept anyway: the failure it
+    // guards against is a future contributor widening AuthProviderId without
+    // adding the provider to the SWA config, which would otherwise redirect
+    // people to a 404 with no clue why.
     if (!CONFIGURED_PROVIDERS.includes(provider)) {
       return Promise.reject(
         new Error(`Sign-in with ${provider} is not configured for this deployment.`),

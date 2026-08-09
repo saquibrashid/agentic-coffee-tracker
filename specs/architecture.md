@@ -39,7 +39,7 @@ The BFF is intentionally thin — it forwards requests, attaches keys, and norma
 | Static hosting | **Azure Static Web Apps (Standard)**      | Built-in Functions integration |
 | API runtime    | Azure Functions (Node 20, consumption)    | Co-located with SWA            |
 | Auth (v1)      | None                                      | App is single-user, local-only |
-| Auth (v2)      | SWA built-in auth (Microsoft, Apple)      | Placeholder module from day 1  |
+| Auth (v2)      | SWA built-in auth (Microsoft)             | Placeholder module from day 1  |
 | IaC            | Bicep in `/infra`                         | `azd up` deployable            |
 | CI/CD          | GitHub Actions (provided by SWA template) | PR previews enabled            |
 
