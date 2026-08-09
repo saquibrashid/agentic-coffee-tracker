@@ -40,18 +40,21 @@ See `specs/architecture.md` § "Security & Privacy" for full details.
 
 ## Planned change: optional cloud sync
 
-`specs/sync.md` specifies opt-in multi-device sync. It is **specified, not implemented** — no code in this repository sends user data anywhere, and the statement above is accurate for every build shipped to date.
+`specs/sync.md` specifies opt-in multi-device sync. Sync itself is **specified, not implemented** — no code in this repository sends user data anywhere, and the statement above is accurate for every build shipped to date.
 
-It will stop being the whole story once sync ships, so the intended end state is recorded here in advance:
+Sign-in is now implemented, and by itself changes nothing about where data lives: signing in establishes a Static Web Apps session and nothing more. Every coffee, rating and photo stays in IndexedDB on the device. It is also **off unless a deployment sets `VITE_AUTH_ENABLED=true`**, which no shipped build does yet.
+
+The statement above will stop being the whole story once sync ships, so the intended end state is recorded here in advance:
 
 - **Signed out stays the default** and keeps today's behaviour exactly: no account, no network storage, no change.
 - **Signing in** replicates beans, ratings, and photo metadata to Cosmos DB, and photo bytes to Blob Storage, partitioned per user.
 - Data will be encrypted in transit and at rest by the platform, but **not end-to-end**. The operator would be technically capable of reading it. This is a deliberate trade-off, recorded as an open question in `specs/sync.md`.
 - Deleting every server-side byte will be possible from inside the app.
 
-Two guarantees are being built in from the start rather than retrofitted:
+Three guarantees are being built in from the start rather than retrofitted:
 
-- Sync is **hard-disabled** in any build configured to call the Function App directly (`VITE_API_BASE_URL`). In that topology the `x-ms-client-principal` header is attacker-supplied rather than injected by Static Web Apps, so trusting it would expose one user's data to another. The check lives in `src/services/sync/index.ts` and fails closed.
+- Sync **and sign-in** are **hard-disabled** in any build configured to call the Function App directly (`VITE_API_BASE_URL`). In that topology the `x-ms-client-principal` header is attacker-supplied rather than injected by Static Web Apps, so trusting it would expose one user's data to another. The checks live in `src/services/sync/index.ts` and `src/services/auth/index.ts`, both fail closed, and both delegate to one predicate in `src/services/platform/topology.ts` so they cannot drift apart.
+- Only identity providers this project has explicitly configured are reachable. `public/staticwebapp.config.json` returns 404 for every other provider, and a principal from an unconfigured one is rejected client-side as well.
 - Derived data (preferences, summaries, recommendations) is never uploaded. It is recomputed on each device from the records it already holds.
 
 This section will be replaced with a description of shipped behaviour in the same pull request that enables sync, not in a follow-up.
