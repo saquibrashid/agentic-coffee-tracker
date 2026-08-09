@@ -21,7 +21,7 @@ It supersedes the `services/sync/` and `services/auth/` placeholders described i
 - Real-time collaboration or live presence. Sync is periodic pull/push, not a socket.
 - Field-level or three-way merge. Conflict resolution is whole-record last-write-wins (see [Conflict policy](#conflict-policy)).
 - Sharing data between users.
-- End-to-end encryption. See [Open questions](#open-questions) — this is the main privacy trade-off being accepted.
+- End-to-end encryption. See [Decisions](#decisions) § 1 — this is the main privacy trade-off being accepted, and it is settled rather than open.
 - Server-side AI or server-side derived data. The BFF stays thin; preferences, summaries, and recommendations remain client-computed.
 
 ---
