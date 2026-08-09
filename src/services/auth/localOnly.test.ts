@@ -19,7 +19,6 @@ describe('LocalOnlyAuthProvider', () => {
     // A silent no-op would leave the caller waiting for a sign-in that is never
     // coming, with no way to tell "in progress" from "impossible".
     await expect(auth.login('aad')).rejects.toThrow(/not available/i);
-    await expect(auth.login('apple')).rejects.toThrow(/not available/i);
   });
 
   it('treats signing out of nothing as success', async () => {

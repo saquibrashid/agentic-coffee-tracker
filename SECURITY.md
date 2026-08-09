@@ -48,7 +48,7 @@ The statement above will stop being the whole story once sync ships, so the inte
 
 - **Signed out stays the default** and keeps today's behaviour exactly: no account, no network storage, no change.
 - **Signing in** replicates beans, ratings, and photo metadata to Cosmos DB, and photo bytes to Blob Storage, partitioned per user.
-- Data will be encrypted in transit and at rest by the platform, but **not end-to-end**. The operator would be technically capable of reading it. This is a deliberate trade-off, recorded as an open question in `specs/sync.md`.
+- Data will be encrypted in transit and at rest by the platform, but **not end-to-end**. The operator would be technically capable of reading it. This is a settled decision, recorded with its reasoning in `specs/sync.md` → Decisions § 1: the app runs in its owner's own subscription, so the data subject and the operator are the same person, and end-to-end encryption would trade a threat that does not exist here for data that is permanently unrecoverable if a passphrase is forgotten. It would also leak the timing, count and size of records regardless, because the conflict-resolution metadata has to stay readable.
 - Deleting every server-side byte will be possible from inside the app.
 
 Three guarantees are being built in from the start rather than retrofitted:
