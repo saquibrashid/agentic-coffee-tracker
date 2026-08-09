@@ -4,6 +4,7 @@
  */
 import { NoopSyncEngine } from './noop';
 import type { SyncEngine } from './types';
+import { isLinkedBackendTopology } from '../platform/topology';
 
 /**
  * Whether this build is allowed to sync.
@@ -21,7 +22,7 @@ import type { SyncEngine } from './types';
  * a live engine cannot be selected by accident once one exists.
  */
 export function isSyncSupported(): boolean {
-  return (import.meta.env.VITE_API_BASE_URL ?? '') === '';
+  return isLinkedBackendTopology();
 }
 
 let engine: SyncEngine | null = null;

@@ -175,6 +175,22 @@ azd env get-value SERVICE_WEB_URI
 
 Walk the smoke path: **Add coffee → capture a bag photo → confirm the parsed fields → save → rate a brew → For You → Analytics → Export**.
 
+## Authentication (optional, off by default)
+
+Sign-in exists in the code but is **switched off unless you turn it on**, because it depends on an identity provider that has to be registered by hand. Shipping it on by default would put a sign-in button on the live site that redirects to an error page.
+
+Nothing about the app requires an account. Local-only is a supported way to run it, and today an account does not yet do anything — `specs/sync.md` Phase 1 gets people in and out of a session; sync itself lands in a later phase.
+
+To enable it:
+
+1. Register a Microsoft Entra app for the SWA origin, and add its client ID and secret to the Static Web App's application settings as `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET`.
+2. Build with `VITE_AUTH_ENABLED=true`. Any other value, including `1` and `yes`, leaves sign-in off — it fails closed on typos deliberately.
+
+Two things the config already enforces:
+
+- **Unused providers are 404'd.** `public/staticwebapp.config.json` explicitly blocks GitHub, Google, Facebook, Twitter and Apple so SWA's defaults cannot silently expose an identity source nobody reviewed. Apple is blocked pending open question 2 in `specs/sync.md` — it needs a paid developer account and a secret that expires every 6 months.
+- **Auth stays off when `VITE_API_BASE_URL` is set.** In that topology the browser calls the Function App directly, so the `x-ms-client-principal` header is attacker-supplied rather than injected by SWA. `VITE_AUTH_ENABLED` cannot override this; see `specs/sync.md` → Identity.
+
 ## Monitoring
 
 Application Insights is wired to the Function App via `APPLICATIONINSIGHTS_CONNECTION_STRING`; the Functions host emits requests, dependencies, traces, and exceptions with no code changes.

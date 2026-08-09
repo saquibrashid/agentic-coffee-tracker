@@ -5,6 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/services/db';
 import { exportCsv, exportJson, exportJsonWithPhotos } from '@/services/export/exporter';
 import { ImportPanel } from './ImportPanel';
+import { AccountPanel } from './AccountPanel';
 import {
   RESET_CONFIRMATION_PHRASE,
   formatBytes,
@@ -55,6 +56,8 @@ export function SettingsPage() {
 
   return (
     <div className="space-y-4">
+      <AccountPanel />
+
       <Card>
         <CardHeader>
           <CardTitle>Export</CardTitle>

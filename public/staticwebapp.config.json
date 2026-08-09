@@ -4,6 +4,7 @@
     "exclude": [
       "/assets/*",
       "/api/*",
+      "/.auth/*",
       "/*.{js,css,map,json,webmanifest,txt,xml}",
       "/*.{png,jpg,jpeg,gif,svg,webp,avif,ico}",
       "/*.{woff,woff2,ttf,otf,eot}"
@@ -27,6 +28,30 @@
       "headers": {
         "cache-control": "public, max-age=31536000, immutable"
       }
+    },
+    {
+      "route": "/api/sync/*",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/.auth/login/apple",
+      "statusCode": 404
+    },
+    {
+      "route": "/.auth/login/github",
+      "statusCode": 404
+    },
+    {
+      "route": "/.auth/login/twitter",
+      "statusCode": 404
+    },
+    {
+      "route": "/.auth/login/facebook",
+      "statusCode": 404
+    },
+    {
+      "route": "/.auth/login/google",
+      "statusCode": 404
     }
   ]
 }
