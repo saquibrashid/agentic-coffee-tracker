@@ -8,6 +8,7 @@ import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { db } from '@/services/db';
+import { enqueueDelete, enqueueUpsert } from '@/services/sync/outbox';
 import type { CoffeeBean, Process, RoastLevel } from '@/types';
 import { PROCESSES, ROAST_LEVELS } from '@/services/beans/library';
 
@@ -91,6 +92,7 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
         draft.needsReview = false;
         draft.updatedAt = new Date().toISOString();
       });
+      await enqueueUpsert('bean', bean.id);
       void navigate(`/beans/${bean.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save this coffee.');
@@ -100,6 +102,7 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
 
   async function onDiscard() {
     await db.beans.delete(bean.id);
+    await enqueueDelete('bean', bean.id);
     await db.pendingAiTasks.where('beanId').equals(bean.id).delete();
     void navigate('/');
   }

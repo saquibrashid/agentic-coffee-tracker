@@ -1,5 +1,6 @@
 import { db } from '@/services/db';
 import { MAX_SCORE, MIN_SCORE, SCORE_STEP, isValidScore } from '@/services/ratings/scale';
+import { enqueueDelete, enqueueUpsert } from '@/services/sync/outbox';
 import type { BrewType, Rating } from '@/types';
 
 /**
@@ -34,7 +35,7 @@ function assertValidScore(score: number): void {
 export async function updateRating(id: string, edit: RatingEdit): Promise<Rating> {
   assertValidScore(edit.score);
 
-  return db.transaction('rw', db.ratings, async () => {
+  return db.transaction('rw', [db.ratings, db.outbox], async () => {
     const existing = await db.ratings.get(id);
     if (!existing) throw new RatingNotFoundError(id);
 
@@ -50,6 +51,7 @@ export async function updateRating(id: string, edit: RatingEdit): Promise<Rating
     if (!notes) delete updated.notes;
 
     await db.ratings.put(updated);
+    await enqueueUpsert('rating', updated.id);
     return updated;
   });
 }
@@ -59,16 +61,21 @@ export async function updateRating(id: string, edit: RatingEdit): Promise<Rating
  * once no surviving rating points at it, so a shared one is left intact.
  */
 export async function deleteRating(id: string): Promise<void> {
-  await db.transaction('rw', [db.ratings, db.photos], async () => {
+  await db.transaction('rw', [db.ratings, db.photos, db.outbox], async () => {
     const existing = await db.ratings.get(id);
     if (!existing) return;
 
     await db.ratings.delete(id);
+    const deletedAt = new Date().toISOString();
+    await enqueueDelete('rating', id, deletedAt);
 
     const cupPhotoId = existing.cupPhotoId;
     if (cupPhotoId) {
       const stillReferenced = await db.ratings.filter((r) => r.cupPhotoId === cupPhotoId).count();
-      if (stillReferenced === 0) await db.photos.delete(cupPhotoId);
+      if (stillReferenced === 0) {
+        await db.photos.delete(cupPhotoId);
+        await enqueueDelete('photo', cupPhotoId, deletedAt);
+      }
     }
   });
 }

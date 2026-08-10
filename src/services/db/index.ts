@@ -7,6 +7,7 @@ import type {
   OcrResult,
   UserPreferences,
   PendingAiTask,
+  OutboxEntry,
 } from '@/types';
 
 interface MetaRecord {
@@ -26,6 +27,7 @@ export class CoffeeDB extends Dexie {
   preferences!: Table<UserPreferences, string>;
   pendingAiTasks!: Table<PendingAiTask, string>;
   meta!: Table<MetaRecord, string>;
+  outbox!: Table<OutboxEntry, string>;
 
   // The name is injectable purely so migration tests can open an isolated
   // database; the app always uses the default.
@@ -59,6 +61,16 @@ export class CoffeeDB extends Dexie {
       // The cached preference profile is derived from those scores, so it is
       // stale the moment they change. Dropping it forces a clean recompute.
       await tx.table('preferences').clear();
+    });
+
+    // v3 adds the sync outbox (specs/sync.md -> Dexie v3 migration). Purely
+    // additive: no existing store changes, so no upgrade() body is needed.
+    //
+    // The compound [type+recordId] index is what lets enqueue coalesce — if an
+    // entry for that pair is already pending it is updated in place rather than
+    // appended, so a record edited ten times still pushes once.
+    this.version(3).stores({
+      outbox: 'id, [type+recordId], queuedAt',
     });
   }
 }

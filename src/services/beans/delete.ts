@@ -1,4 +1,5 @@
 import { db } from '@/services/db';
+import { enqueueManyDeletes } from '@/services/sync/outbox';
 
 /**
  * Removing a bean has to remove everything hanging off it. A bean owns ratings,
@@ -39,7 +40,7 @@ export async function deleteBeans(beanIds: string[]): Promise<DeletionSummary> {
 
   return db.transaction(
     'rw',
-    [db.beans, db.ratings, db.photos, db.ocrResults, db.pendingAiTasks],
+    [db.beans, db.ratings, db.photos, db.ocrResults, db.pendingAiTasks, db.outbox],
     async () => {
       const targets = (await db.beans.bulkGet(beanIds)).filter((b) => b !== undefined);
       const foundIds = targets.map((b) => b.id);
@@ -81,6 +82,15 @@ export async function deleteBeans(beanIds: string[]): Promise<DeletionSummary> {
       }
 
       await db.beans.bulkDelete(foundIds);
+
+      // Cascade deletes reach the server as their own tombstones. The server
+      // deliberately does not cascade (specs/sync.md -> Conflict policy), so
+      // every removed row needs its own entry or it would resurrect on the next
+      // pull from another device.
+      const deletedAt = new Date().toISOString();
+      await enqueueManyDeletes('rating', ratingIds, deletedAt);
+      await enqueueManyDeletes('photo', orphaned, deletedAt);
+      await enqueueManyDeletes('bean', foundIds, deletedAt);
 
       return { beans: foundIds.length, ratings: ratingIds.length, photos: orphaned.length };
     },

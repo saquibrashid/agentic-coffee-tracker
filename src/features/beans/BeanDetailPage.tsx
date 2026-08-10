@@ -10,6 +10,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
+import { enqueueUpsert } from '@/services/sync/outbox';
 import { DEFAULT_SCORE, SCORE_CHOICES, formatOutOf, formatScore } from '@/services/ratings/scale';
 import { BREW_TYPE_OPTIONS, DEFAULT_BREW_TYPE, brewLabel } from '@/services/ratings/brewTypes';
 import { EnrichPanel } from './EnrichPanel';
@@ -351,6 +352,7 @@ function AddRatingForm({ beanId }: { beanId: string }) {
         ...(notes.trim() && { notes: notes.trim() }),
       };
       await db.ratings.add(rating);
+      await enqueueUpsert('rating', rating.id);
       setNotes('');
       setScore(DEFAULT_SCORE);
     } finally {
