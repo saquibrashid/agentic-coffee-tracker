@@ -68,6 +68,9 @@ export function documentId(type: SyncRecordType, recordId: string): string {
   return `${type}:${recordId}`;
 }
 
+const DELETE_PAGE_SIZE = 200;
+const MAX_DELETE_PAGES = 500;
+
 /**
  * Deletes every document in the user's partition, cursor included.
  *
@@ -86,14 +89,19 @@ export async function deleteUserData(userId: string): Promise<number> {
   const container = getSyncContainer();
   let deleted = 0;
 
-  for (;;) {
+  // Bounded so a document that somehow survives its own delete cannot spin
+  // this loop forever. At 200 per page this covers a library far larger than
+  // the photo quota would ever allow.
+  for (let page = 0; page < MAX_DELETE_PAGES; page++) {
     const { resources } = await container.items
       .query<{ id: string }>(
         {
-          query: 'SELECT TOP 200 c.id FROM c WHERE c.userId = @userId AND c.id != @cursorId',
+          query:
+            'SELECT c.id FROM c WHERE c.userId = @userId AND c.id != @cursorId OFFSET 0 LIMIT @limit',
           parameters: [
             { name: '@userId', value: userId },
             { name: '@cursorId', value: CURSOR_ID },
+            { name: '@limit', value: DELETE_PAGE_SIZE },
           ],
         },
         { partitionKey: userId },
