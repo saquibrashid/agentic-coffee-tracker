@@ -77,3 +77,13 @@ output AZURE_PHOTO_STORAGE_ACCOUNT_NAME string = resources.outputs.photoStorageA
 // The SPA calls the BFF through the Static Web App's linked backend when that is
 // available (Standard SKU), in which case /api is same-origin and this is empty.
 output VITE_API_BASE_URL string = resources.outputs.apiBaseUrl
+
+// Sign-in is offered exactly when the topology makes an identity trustworthy,
+// which is the same condition. SWA's pre-configured 'aad' provider needs no app
+// registration — it authorises against login.microsoftonline.com/common, so
+// both work/school and personal Microsoft accounts work out of the box.
+//
+// Deriving this from infrastructure rather than setting it by hand keeps CI and
+// local builds honest: there is no way to end up with a sign-in button on a
+// topology that cannot verify the resulting identity.
+output VITE_AUTH_ENABLED string = staticWebAppSkuName == 'Standard' ? 'true' : 'false'
