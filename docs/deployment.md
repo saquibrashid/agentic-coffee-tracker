@@ -177,19 +177,20 @@ Walk the smoke path: **Add coffee → capture a bag photo → confirm the parsed
 
 ## Authentication (optional, off by default)
 
-Sign-in exists in the code but is **switched off unless you turn it on**, because it depends on an identity provider that has to be registered by hand. Shipping it on by default would put a sign-in button on the live site that redirects to an error page.
+Sign-in is **on** wherever the topology can verify an identity, which in practice means the `Standard` SKU. `VITE_AUTH_ENABLED` is emitted as an infrastructure output by `infra/main.bicep` rather than set by hand, so a build cannot end up offering a sign-in button on a topology that cannot trust the result.
 
-Nothing about the app requires an account. Local-only is a supported way to run it, and today an account does not yet do anything — `specs/sync.md` Phase 1 gets people in and out of a session; sync itself lands in a later phase.
+Nothing about the app requires an account. Local-only is a supported way to run it, and today an account does not yet move any data — `specs/sync.md` Phase 1 gets people in and out of a session; replication lands in a later phase.
 
-To enable it:
+**No app registration is required.** SWA's pre-configured `aad` provider uses a Microsoft-managed application and authorises against `login.microsoftonline.com/common`, so both work/school and personal Microsoft accounts (`outlook.com`, `hotmail.com`) sign in with no setup at all. Register a dedicated Entra app and supply `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` only if you want to restrict the audience to a single tenant, or to control consent yourself.
 
-1. Register a Microsoft Entra app for the SWA origin, and add its client ID and secret to the Static Web App's application settings as `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET`.
-2. Build with `VITE_AUTH_ENABLED=true`. Any other value, including `1` and `yes`, leaves sign-in off — it fails closed on typos deliberately.
+Running `vite dev` locally leaves sign-in hidden, because the dev server does not serve `/.auth/*` and the button would be dead. Only the exact string `'true'` enables it — `1` and `yes` leave it off, deliberately failing closed on typos.
 
 Two things the config already enforces:
 
 - **Unused providers are 404'd.** `public/staticwebapp.config.json` explicitly blocks GitHub, Google, Facebook, Twitter and Apple so SWA's defaults cannot silently expose an identity source nobody reviewed. Microsoft is the only provider this project supports — Apple was dropped rather than deferred, because its client secret expires every 6 months and a rotation that fails closed on a schedule, long after anyone remembers why, is a poor trade for one identity provider (`specs/sync.md` → Decisions § 2).
 - **Auth stays off when `VITE_API_BASE_URL` is set.** In that topology the browser calls the Function App directly, so the `x-ms-client-principal` header is attacker-supplied rather than injected by SWA. `VITE_AUTH_ENABLED` cannot override this; see `specs/sync.md` → Identity.
+
+Because the pre-configured provider accepts any Microsoft account, anyone who finds the URL can sign in and get their own empty, isolated dataset — records are partitioned by `userId`, so no one can read anyone else's. If you would rather restrict that, the options are a single-tenant app registration or an allowlist check in the BFF.
 
 ## Monitoring
 

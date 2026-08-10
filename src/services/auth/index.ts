@@ -19,13 +19,11 @@ import { isLinkedBackendTopology } from '../platform/topology';
  *    (`services/platform/topology.ts`). Signing in on a build that calls the
  *    Function App directly would produce an identity the server cannot verify —
  *    worse than no identity, because it looks like one.
- * 2. **`VITE_AUTH_ENABLED` is explicitly `'true'`.** Sign-in depends on an
- *    identity provider being registered in Azure, which is a manual step
- *    (`docs/deployment.md` → Authentication). Defaulting to on would put a
- *    button on the live site that redirects to an error page the moment this
- *    merges, so the code ships dark and the flag is flipped once the provider
- *    exists. It also keeps `vite dev` and the test runner honest, since neither
- *    serves the `/.auth/*` endpoints at all.
+ * 2. **`VITE_AUTH_ENABLED` is explicitly `'true'`.** Set from infrastructure
+ *    (`infra/main.bicep`), where it tracks the Standard SKU. It exists so that
+ *    `vite dev` and the test runner stay honest — neither serves the `/.auth/*`
+ *    endpoints at all, so a sign-in button there would be a dead control.
+ *    Only the exact string `'true'` counts; `'1'` and `'yes'` fail closed.
  *
  * The flag cannot override the topology check: that one is a security boundary,
  * so it fails closed.
