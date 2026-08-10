@@ -20,10 +20,14 @@ import type * as syncPhotos from './photos';
 
 vi.mock('./api', async () => {
   const actual = await vi.importActual<typeof syncApi>('./api');
-  return { ...actual, pull: vi.fn(), push: vi.fn() };
+  return { ...actual, pull: vi.fn(), push: vi.fn(), deleteCloudData: vi.fn() };
 });
 
 vi.mock('@/services/preferences/compute', () => ({ refreshPreferences: vi.fn() }));
+
+vi.mock('@/services/auth', () => ({
+  getAuthProvider: () => ({ getUser: () => Promise.resolve({ userId: 'user-a' }) }),
+}));
 
 vi.mock('./photos', async () => {
   const actual = await vi.importActual<typeof syncPhotos>('./photos');
@@ -35,6 +39,7 @@ const photos = await import('./photos');
 const { refreshPreferences } = await import('@/services/preferences/compute');
 const pull = vi.mocked(api.pull);
 const push = vi.mocked(api.push);
+const deleteCloudDataRequest = vi.mocked(api.deleteCloudData);
 const uploadPhoto = vi.mocked(photos.uploadPhoto);
 const backfillPhotos = vi.mocked(photos.backfillPhotos);
 
@@ -566,5 +571,79 @@ describe('reset', () => {
     await engine.sync();
 
     expect(engine.status().state).toBe('idle');
+  });
+});
+
+describe('deleting cloud data', () => {
+  beforeEach(() => {
+    deleteCloudDataRequest.mockResolvedValue({ recordsDeleted: 12, photosDeleted: 3 });
+  });
+
+  it('confirms with the signed-in user id', async () => {
+    // The server checks this against the principal it derived itself, so the
+    // irreversible action carries a deliberate signal rather than riding on the
+    // session cookie every request already has.
+    await engine.deleteCloudData();
+
+    expect(deleteCloudDataRequest).toHaveBeenCalledWith('user-a');
+  });
+
+  it('resets local sync state so the library is not re-uploaded', async () => {
+    await setCursor(99);
+    await db.beans.put(bean('bean-1'));
+    await enqueueUpsert('bean', 'bean-1');
+
+    await engine.deleteCloudData();
+
+    // Without this the cursor still points past records that no longer exist,
+    // and the next cycle would push everything straight back up — undoing the
+    // delete the user just asked for.
+    expect(await getCursor()).toBe(0);
+    expect(await db.outbox.count()).toBe(0);
+  });
+
+  it('leaves local records alone', async () => {
+    await db.beans.put(bean('bean-1'));
+
+    await engine.deleteCloudData();
+
+    // This deletes the cloud copy. Conflating it with local deletion would make
+    // an already-frightening button destroy more than it says.
+    expect(await db.beans.count()).toBe(1);
+  });
+
+  it('reports what was removed', async () => {
+    await expect(engine.deleteCloudData()).resolves.toEqual({
+      recordsDeleted: 12,
+      photosDeleted: 3,
+    });
+  });
+
+  it('rejects rather than failing quietly', async () => {
+    deleteCloudDataRequest.mockRejectedValue(new Error('cosmos unavailable'));
+
+    // Telling someone their data is gone when it is not is the worst possible
+    // outcome for this particular action.
+    await expect(engine.deleteCloudData()).rejects.toThrow('cosmos unavailable');
+    expect(engine.status().state).toBe('error');
+  });
+
+  it('does not re-upload after a failed delete', async () => {
+    await db.beans.put(bean('bean-1'));
+    await enqueueUpsert('bean', 'bean-1');
+    deleteCloudDataRequest.mockRejectedValue(new Error('cosmos unavailable'));
+
+    await expect(engine.deleteCloudData()).rejects.toThrow();
+    await engine.sync();
+
+    // The server is in an unknown state; pushing into it could restore data it
+    // has partly removed.
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('clears a reported quota', async () => {
+    await expect(engine.deleteCloudData()).resolves.toBeTruthy();
+
+    expect(engine.status().photoQuota?.used).toBe(0);
   });
 });

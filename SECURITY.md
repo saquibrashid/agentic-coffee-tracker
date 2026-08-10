@@ -97,12 +97,17 @@ can live, so the behaviour is described here rather than summarised.
 - **Photo storage is capped at 500 MB per user.** Past the cap the upload
   endpoint returns 507 and record sync continues unaffected.
 
+- **A user can delete everything the server holds, from inside the app.**
+  Settings → Sync → **Delete cloud data** removes every record and every photo
+  blob in that user's partition. The endpoint requires the caller to echo their
+  own user id in the request body, which the server checks against the principal
+  it derived itself, so a cross-site request riding the session cookie cannot
+  trigger it. The local copy is deliberately untouched: this is a decision about
+  where data lives, not a decision to lose it.
+
 ### Not yet implemented
 
 Recorded here so the gaps are not mistaken for guarantees:
 
-- **Deleting every server-side byte from inside the app.** Sign-out stops sync
-  and leaves the remote copy in place; removing it currently requires access to
-  the Cosmos account and the storage account.
 - **A bound on record storage.** Photo bytes are capped, but nothing limits how
   many records a signed-in account can write.

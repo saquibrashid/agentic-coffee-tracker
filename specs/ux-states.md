@@ -17,6 +17,35 @@ Every screen MUST explicitly handle five states: **loading**, **empty**, **error
 - Persistent thin banner under the app bar when `navigator.onLine === false`:
   > **Offline.** New entries will sync details when you reconnect.
 
+### Sync indicator
+
+Extends the offline indicator rather than adding a second status surface. Shown
+only when the state is `syncing`, `error` or `needs-upgrade` — an idle, working
+sync is invisible on purpose, because a permanent "all good" badge trains people
+to ignore the spot where the genuine warnings appear.
+
+- `syncing` → accent banner, "Syncing…"
+- `error` → destructive banner carrying the actual message, falling back to
+  "Sync failed. It will retry automatically."
+- `needs-upgrade` → destructive banner, "Refresh to continue syncing — this
+  version is out of date."
+
+`offline` says nothing here: it already has its own banner directly above, and
+`disabled` and `idle` say nothing at all.
+
+### `needs-upgrade`
+
+The server holds records written by a newer build than this one. The engine
+halts — applying them would silently downgrade a record, and skipping them would
+advance the cursor past data that is then lost permanently.
+
+The banner is deliberately **not** a full-screen block. Every local record is
+still readable and every local edit is still safe: they queue in the outbox and
+push once the build catches up. Blocking the app would take away working,
+entirely local functionality to punish the user for a deploy they did not
+control. The banner is destructive-coloured and does not dismiss, so it cannot
+be mistaken for routine.
+
 ### Pending-operation badge
 
 - Settings icon shows a dot when `pendingAiTasks` count > 0.
@@ -242,6 +271,29 @@ Trigger rules:
 
 - Two-step confirmation; type the word `RESET`.
 - Recommends export first; offers one-click "Export then reset".
+- Copy must state that a signed-in user's cloud copy survives and will sync
+  back — deleting locally is not deleting everywhere.
+
+### Sync
+
+Hidden entirely when `isSyncSupported()` is false; there is nothing honest to
+say about sync in a build that cannot do it.
+
+**Signed out**: what would be copied (beans, ratings, photos) and what never is
+(preferences, summaries, recommendations — all recomputed per device).
+
+**Signed in**:
+
+- Status line from `describeSync()`. Outstanding work outranks past success:
+  `3 changes pending.` beats `Synced 2 minutes ago.`
+- **Sync now** — also clears a halt, since pressing it is exactly the deliberate
+  user action a halted engine is waiting for.
+- Photo storage used against the 500 MB quota, shown only once a figure is
+  known. When full, says so and says what to do about it.
+- **Delete cloud data** — type `DELETE CLOUD DATA`. Removes the server-side copy
+  only; the copy on this device is untouched, and the copy says so. A failure is
+  always surfaced: reporting success for a delete that did not happen is the
+  worst available outcome.
 
 ---
 

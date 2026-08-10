@@ -69,6 +69,57 @@ export function documentId(type: SyncRecordType, recordId: string): string {
 }
 
 /**
+ * Deletes every document in the user's partition, cursor included.
+ *
+ * Returns the number removed. Not transactional, and deliberately so: a
+ * partition can hold far more than the 100-operation batch limit, so this is a
+ * loop that can be interrupted. Interruption is safe — a partial delete leaves
+ * a smaller partition and the caller retries — whereas refusing to delete
+ * anything until it can all be done at once would mean a large library could
+ * never be deleted at all.
+ *
+ * The cursor goes last. Deleting it first would let a concurrent push
+ * re-create it at seq 0 and start re-numbering records this call is still in
+ * the middle of removing.
+ */
+export async function deleteUserData(userId: string): Promise<number> {
+  const container = getSyncContainer();
+  let deleted = 0;
+
+  for (;;) {
+    const { resources } = await container.items
+      .query<{ id: string }>(
+        {
+          query: 'SELECT TOP 200 c.id FROM c WHERE c.userId = @userId AND c.id != @cursorId',
+          parameters: [
+            { name: '@userId', value: userId },
+            { name: '@cursorId', value: CURSOR_ID },
+          ],
+        },
+        { partitionKey: userId },
+      )
+      .fetchAll();
+
+    if (resources.length === 0) break;
+
+    for (const { id } of resources) {
+      await container.item(id, userId).delete();
+      deleted += 1;
+    }
+  }
+
+  try {
+    await container.item(CURSOR_ID, userId).delete();
+    deleted += 1;
+  } catch (err) {
+    // A user who never pushed has no cursor. Nothing to delete is success.
+    if ((err as { code?: number }).code !== 404) throw err;
+  }
+
+  return deleted;
+}
+
+/**
  * Reads the user's cursor, along with the ETag needed to guard its replace.
  *
  * A user who has never pushed has no cursor document. That is not an error —

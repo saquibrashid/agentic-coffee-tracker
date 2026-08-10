@@ -47,6 +47,16 @@ describe('NoopSyncEngine', () => {
     await expect(engine.sync()).resolves.toBeUndefined();
     await expect(engine.reset()).resolves.toBeUndefined();
   });
+
+  it('reports zero deleted, because nothing was ever uploaded', async () => {
+    // A working implementation rather than a throwing stub: the settings panel
+    // renders the same confirmation flow in every build instead of branching on
+    // which engine it happened to get.
+    await expect(engine.deleteCloudData()).resolves.toEqual({
+      recordsDeleted: 0,
+      photosDeleted: 0,
+    });
+  });
 });
 
 describe('isSyncSupported', () => {
