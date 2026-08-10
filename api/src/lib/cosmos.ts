@@ -39,14 +39,9 @@ export interface CursorDocument {
   userId: string;
   /** Highest seq assigned so far. */
   seq: number;
-  /** Running total of blob bytes, for quota enforcement. */
-  photoBytes: number;
 }
 
 export const CURSOR_ID = 'cursor';
-
-/** `specs/sync.md` -> Blob Storage. */
-export const PHOTO_QUOTA_BYTES = 500 * 1024 * 1024;
 
 /**
  * Cached across invocations. Both the client and the credential hold token and
@@ -87,7 +82,7 @@ export async function readCursor(
   const response = await getSyncContainer().item(CURSOR_ID, userId).read<CursorDocument>();
 
   if (!response.resource) {
-    return { cursor: { id: CURSOR_ID, userId, seq: 0, photoBytes: 0 }, etag: undefined };
+    return { cursor: { id: CURSOR_ID, userId, seq: 0 }, etag: undefined };
   }
   return { cursor: response.resource, etag: response.etag };
 }

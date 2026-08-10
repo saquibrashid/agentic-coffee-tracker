@@ -23,6 +23,14 @@ export type SyncState =
    */
   | 'needs-upgrade';
 
+export interface PhotoQuota {
+  /** Bytes stored server-side for this user, as of the last upload attempt. */
+  used: number;
+  limit: number;
+  /** True once an upload was refused for lack of space. */
+  exceeded: boolean;
+}
+
 export interface SyncStatus {
   state: SyncState;
   /** ISO 8601 of the last fully successful cycle, or null if never. */
@@ -30,6 +38,14 @@ export interface SyncStatus {
   /** Local changes waiting to be pushed. */
   pendingCount: number;
   lastError?: string;
+  /**
+   * Photo storage usage, when known.
+   *
+   * Deliberately outside `state`: a full photo quota must not stop records from
+   * syncing, so it is reported alongside an otherwise healthy status rather
+   * than as a failure of the cycle.
+   */
+  photoQuota?: PhotoQuota;
 }
 
 export interface SyncEngine {

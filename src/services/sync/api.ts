@@ -15,15 +15,19 @@ const SYNC_TIMEOUT_MS = 30_000;
 export interface SyncApiErrorInit {
   status: number;
   message: string;
+  /** The parsed error body, when there was one. Carries fields like `quota`. */
+  details?: Record<string, unknown> | undefined;
 }
 
 export class SyncApiError extends Error {
   readonly status: number;
+  readonly details: Record<string, unknown> | undefined;
 
-  constructor({ status, message }: SyncApiErrorInit) {
+  constructor({ status, message, details }: SyncApiErrorInit) {
     super(message);
     this.name = 'SyncApiError';
     this.status = status;
+    this.details = details;
   }
 
   /**
@@ -110,14 +114,16 @@ async function post<TResp>(path: string, body: unknown): Promise<TResp> {
 
   if (!response.ok) {
     let message = `POST ${path} -> ${response.status}`;
+    let details: Record<string, unknown> | undefined;
     try {
-      const payload = (await response.json()) as { error?: unknown };
+      const payload = (await response.json()) as Record<string, unknown>;
+      details = payload;
       if (typeof payload.error === 'string') message = payload.error;
     } catch {
       // A non-JSON error body is not worth a second failure mode; the status
       // carries the actionable information.
     }
-    throw new SyncApiError({ status: response.status, message });
+    throw new SyncApiError({ status: response.status, message, details });
   }
 
   return (await response.json()) as TResp;
@@ -129,4 +135,79 @@ export function pull(cursor: number, limit?: number): Promise<PullResponse> {
 
 export function push(deviceId: string, records: PushRecord[]): Promise<PushResponse> {
   return post<PushResponse>('/api/sync/push', { deviceId, records });
+}
+
+export interface QuotaInfo {
+  used: number;
+  limit: number;
+}
+
+export interface UploadUrlResponse {
+  url: string;
+  expiresAt: string;
+  quota: QuotaInfo;
+}
+
+export interface DownloadUrlResponse {
+  url: string;
+  expiresAt: string;
+}
+
+/**
+ * The server has no room for this photo.
+ *
+ * Not a `SyncApiError`: it is neither transient (retrying changes nothing until
+ * space is freed) nor terminal for the engine (records must keep syncing). It
+ * is a condition to report, so it gets its own type rather than being forced
+ * into a classification that would make the engine do the wrong thing.
+ */
+export class PhotoQuotaError extends Error {
+  constructor(readonly quota: QuotaInfo) {
+    super('Photo storage is full.');
+    this.name = 'PhotoQuotaError';
+  }
+}
+
+/** Absent bytes — a metadata row can outlive, or precede, its blob. */
+export class PhotoMissingError extends Error {
+  constructor(photoId: string) {
+    super(`No bytes stored for photo ${photoId}`);
+    this.name = 'PhotoMissingError';
+  }
+}
+
+export async function photoUploadUrl(photoId: string, bytes: number): Promise<UploadUrlResponse> {
+  try {
+    return await post<UploadUrlResponse>('/api/sync/photo/upload-url', { photoId, bytes });
+  } catch (err) {
+    if (err instanceof SyncApiError && err.status === 507) {
+      throw new PhotoQuotaError(quotaFrom(err));
+    }
+    throw err;
+  }
+}
+
+export async function photoDownloadUrl(photoId: string): Promise<DownloadUrlResponse> {
+  try {
+    return await post<DownloadUrlResponse>('/api/sync/photo/download-url', { photoId });
+  } catch (err) {
+    if (err instanceof SyncApiError && err.status === 404) throw new PhotoMissingError(photoId);
+    throw err;
+  }
+}
+
+function quotaFrom(err: SyncApiError): QuotaInfo {
+  const quota = err.details?.quota;
+  if (
+    typeof quota === 'object' &&
+    quota !== null &&
+    typeof (quota as QuotaInfo).used === 'number' &&
+    typeof (quota as QuotaInfo).limit === 'number'
+  ) {
+    return { used: (quota as QuotaInfo).used, limit: (quota as QuotaInfo).limit };
+  }
+  // The server always sends this, but a proxy or an older build might not, and
+  // losing the whole error to a missing field would be worse than losing the
+  // numbers.
+  return { used: 0, limit: 0 };
 }

@@ -4,12 +4,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/services/db';
 import type { CoffeeBean } from '@/types';
 
-import { SyncApiError, SyncTimeoutError, type PullResponse, type PushResponse } from './api';
+import {
+  PhotoQuotaError,
+  SyncApiError,
+  SyncTimeoutError,
+  type PullResponse,
+  type PushResponse,
+} from './api';
 import { CloudSyncEngine } from './cloud';
 import { enqueueDelete, enqueueUpsert } from './outbox';
 import { getCursor, setCursor } from './state';
 
 import type * as syncApi from './api';
+import type * as syncPhotos from './photos';
 
 vi.mock('./api', async () => {
   const actual = await vi.importActual<typeof syncApi>('./api');
@@ -18,10 +25,18 @@ vi.mock('./api', async () => {
 
 vi.mock('@/services/preferences/compute', () => ({ refreshPreferences: vi.fn() }));
 
+vi.mock('./photos', async () => {
+  const actual = await vi.importActual<typeof syncPhotos>('./photos');
+  return { ...actual, uploadPhoto: vi.fn(), backfillPhotos: vi.fn() };
+});
+
 const api = await import('./api');
+const photos = await import('./photos');
 const { refreshPreferences } = await import('@/services/preferences/compute');
 const pull = vi.mocked(api.pull);
 const push = vi.mocked(api.push);
+const uploadPhoto = vi.mocked(photos.uploadPhoto);
+const backfillPhotos = vi.mocked(photos.backfillPhotos);
 
 const NOW = '2026-01-02T00:00:00.000Z';
 
@@ -68,6 +83,8 @@ beforeEach(async () => {
   await db.meta.clear();
   pull.mockResolvedValue(emptyPull());
   push.mockResolvedValue(pushOk());
+  uploadPhoto.mockResolvedValue({ used: 0, limit: 500 * 1024 * 1024 });
+  backfillPhotos.mockResolvedValue(0);
   engine = new CloudSyncEngine();
 });
 
@@ -166,6 +183,22 @@ describe('the sync cycle', () => {
 
     expect(push).not.toHaveBeenCalled();
   });
+
+  it('backfills photo bytes after a successful cycle', async () => {
+    await engine.sync();
+
+    expect(backfillPhotos).toHaveBeenCalled();
+  });
+
+  it('reports a healthy cycle even when backfill fails', async () => {
+    // Bytes are cosmetic next to records; a photo service that is down must not
+    // make a fully successful record sync look broken.
+    backfillPhotos.mockRejectedValue(new Error('storage down'));
+
+    await engine.sync();
+
+    expect(engine.status().state).toBe('idle');
+  });
 });
 
 describe('pushing queued work', () => {
@@ -200,9 +233,21 @@ describe('pushing queued work', () => {
     expect(records[0]).toMatchObject({ recordId: 'bean-1', deleted: true, payload: null });
   });
 
-  it('never sends photo bytes', async () => {
-    // Blobs go to Blob Storage in Phase 6; putting them in the record stream
-    // would blow past the document size limit on the first real photo.
+  it('uploads photo bytes before the metadata record, and never in it', async () => {
+    // Blobs go to Blob Storage: putting them in the record stream would blow
+    // past the document size limit on the first real photo. And the order is
+    // load-bearing — metadata first publishes a pointer to bytes that are not
+    // there yet, and every device pulling in that window shows a broken photo.
+    const order: string[] = [];
+    uploadPhoto.mockImplementation(async () => {
+      order.push('upload');
+      return { used: 0, limit: 500 * 1024 * 1024 };
+    });
+    push.mockImplementation(async () => {
+      order.push('push');
+      return pushOk();
+    });
+
     await db.photos.put({
       id: 'photo-1',
       schemaVersion: 1,
@@ -214,8 +259,50 @@ describe('pushing queued work', () => {
 
     await engine.sync();
 
+    expect(order).toEqual(['upload', 'push']);
     const [, records] = push.mock.calls[0]!;
     expect(records[0]?.payload).not.toHaveProperty('blob');
+  });
+
+  it('keeps syncing records when photo storage is full', async () => {
+    uploadPhoto.mockRejectedValue(new PhotoQuotaError({ used: 500, limit: 500 }));
+    await db.photos.put({
+      id: 'photo-1',
+      schemaVersion: 1,
+      kind: 'bag',
+      blob: new Blob(['bytes']),
+      createdAt: NOW,
+    } as never);
+    await db.beans.put(bean('bean-1'));
+    await enqueueUpsert('photo', 'photo-1');
+    await enqueueUpsert('bean', 'bean-1');
+
+    await engine.sync();
+
+    // A full quota is a condition to report, not a failed cycle: the bean still
+    // reaches the server and the status stays healthy.
+    const [, records] = push.mock.calls[0]!;
+    expect(records.map((r) => r.recordId)).toEqual(['bean-1']);
+    expect(engine.status().state).toBe('idle');
+    expect(engine.status().photoQuota).toEqual({ used: 500, limit: 500, exceeded: true });
+  });
+
+  it('leaves a refused photo queued for a later cycle', async () => {
+    uploadPhoto.mockRejectedValue(new PhotoQuotaError({ used: 500, limit: 500 }));
+    await db.photos.put({
+      id: 'photo-1',
+      schemaVersion: 1,
+      kind: 'bag',
+      blob: new Blob(['bytes']),
+      createdAt: NOW,
+    } as never);
+    await enqueueUpsert('photo', 'photo-1');
+
+    await engine.sync();
+
+    // Dropping it would lose the photo permanently; the user frees space and it
+    // syncs on the next cycle.
+    expect(await db.outbox.count()).toBe(1);
   });
 
   it('drops an upsert whose record no longer exists', async () => {
