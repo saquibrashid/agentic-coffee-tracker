@@ -615,6 +615,40 @@ Single-region, matching the region the existing resources are deployed to, so
 sync introduces no new residency question beyond the one already answered by the
 current deployment.
 
+### 7. Access policy — who may sync
+
+Authentication is not a restriction. Microsoft accounts are free and unlimited,
+so "signed in" admits anyone on the internet, and each new account mints a
+partition in the owner's Cosmos container and spends the owner's RUs.
+
+Access is therefore a separate, explicit decision, expressed as configuration
+rather than code so the deployment can widen without a code change:
+
+| `SYNC_ACCESS_MODE` | Who may sync                                     |
+| ------------------ | ------------------------------------------------ |
+| `owner` (default)  | Only accounts named in `SYNC_ALLOWLIST`          |
+| `allowlist`        | Identical enforcement; states a different intent |
+| `open`             | Any signed-in account from an approved provider  |
+
+`owner` and `allowlist` behave identically on purpose. Keeping them distinct
+means widening from one person to a group is a one-word change whose meaning is
+legible in the deployment configuration, rather than a list that quietly grows.
+
+Two rules make the failure modes safe:
+
+- **An empty allowlist denies everyone, including the owner.** Treating
+  "unconfigured" as "unrestricted" would open the deployment the moment a
+  parameter went missing.
+- **An unrecognised mode falls back to membership, never to `open`.** A typo
+  must not be the thing that publishes a library to the world.
+
+Enforced server-side in `api/src/lib/access.ts`, on both push and pull. Pull
+alone would be insufficient: a rejected account could still write records that a
+later policy change would start serving.
+
+The rejection message names the caller's own id so the fix is a copy-and-paste,
+and never names an approved account.
+
 ---
 
 ## Companion specs

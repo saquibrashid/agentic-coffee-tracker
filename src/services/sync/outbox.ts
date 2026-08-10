@@ -106,7 +106,14 @@ async function enqueue(input: EnqueueInput): Promise<void> {
   }
 }
 
-/** Oldest-first, so changes push in roughly the order they were made. */
+/**
+ * Oldest-first, so changes push in roughly the order they were made.
+ *
+ * "Roughly" is the honest word: entries queued within the same millisecond tie,
+ * and the tie is broken by a random primary key. That is harmless — coalescing
+ * leaves at most one entry per record, and records merge independently of each
+ * other — so ordering only ever needs to be approximate.
+ */
 export async function takeBatch(limit = 99): Promise<OutboxEntry[]> {
   return db.outbox.orderBy('queuedAt').limit(limit).toArray();
 }

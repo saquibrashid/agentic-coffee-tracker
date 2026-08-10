@@ -47,9 +47,9 @@ can live, so the behaviour is described here rather than summarised.
   network storage, no change from earlier builds. Sync only ever runs for a
   signed-in user.
 - **Signing in** replicates beans, ratings, and photo _metadata_ to Cosmos DB,
-  in a partition keyed by the user's stable provider identifier. Photo bytes
-  are not yet uploaded — they remain on the device until the Blob Storage
-  transfer ships.
+  in a partition keyed by the user's stable provider identifier — and only for
+  accounts this deployment has approved. Photo bytes are not yet uploaded — they
+  remain on the device until the Blob Storage transfer ships.
 - **Derived data is never uploaded.** Preferences, summaries and
   recommendations are recomputed on each device from the records it already
   holds.
@@ -65,6 +65,12 @@ can live, so the behaviour is described here rather than summarised.
 
 ### Controls enforced in code
 
+- **Only approved accounts may sync.** Signing in proves who someone is; it does
+  not entitle them to storage in this deployment. `SYNC_ACCESS_MODE` and
+  `SYNC_ALLOWLIST` decide who is admitted, enforced in `api/src/lib/access.ts`
+  on both push and pull. The default is closed: an empty allowlist rejects every
+  account, including the owner's, so a missing parameter cannot silently open
+  the deployment. See `specs/sync.md` → Decisions § 7 and `docs/deployment.md`.
 - **Sync and sign-in are hard-disabled in any build configured to call the
   Function App directly** (`VITE_API_BASE_URL`). In that topology the
   `x-ms-client-principal` header is attacker-supplied rather than injected by

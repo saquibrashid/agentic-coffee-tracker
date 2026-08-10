@@ -29,6 +29,13 @@ param openAiDeployment string = ''
 @description('Optional. Comma-separated hosts the /api/scrape endpoint may fetch. Empty (the default) allows any publicly routable host, which is what lets enrichment read arbitrary roaster storefronts; the endpoint still refuses private, loopback, and link-local addresses on every redirect hop. Set this to pin the deployment to a fixed set of stores.')
 param scrapeAllowlist string = ''
 
+@allowed(['owner', 'allowlist', 'open'])
+@description('Who may use sync once signed in. "owner" and "allowlist" admit only the accounts named in syncAllowlist; "open" admits any signed-in Microsoft account. Defaults to closed, because authentication alone is not a restriction — Microsoft accounts are free and unlimited.')
+param syncAccessMode string = 'owner'
+
+@description('Comma-separated user ids or sign-in names permitted to sync. An empty list denies everyone, including the owner: treating unconfigured as unrestricted would open the deployment the moment this parameter went missing. Sign in and visit /.auth/me to find your userId.')
+param syncAllowlist string = ''
+
 @allowed(['Free', 'Standard'])
 @description('Static Web App SKU. Standard adds linked backends (same-origin /api) but is not free.')
 param staticWebAppSkuName string = 'Free'
@@ -55,6 +62,8 @@ module resources 'resources.bicep' = {
     openAiKey: openAiKey
     openAiDeployment: openAiDeployment
     scrapeAllowlist: scrapeAllowlist
+    syncAccessMode: syncAccessMode
+    syncAllowlist: syncAllowlist
     staticWebAppSkuName: staticWebAppSkuName
   }
 }

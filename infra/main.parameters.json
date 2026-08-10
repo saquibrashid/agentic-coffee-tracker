@@ -25,6 +25,12 @@
     },
     "staticWebAppSkuName": {
       "value": "${STATIC_WEB_APP_SKU=Free}"
+    },
+    "syncAccessMode": {
+      "value": "${SYNC_ACCESS_MODE=owner}"
+    },
+    "syncAllowlist": {
+      "value": "${SYNC_ALLOWLIST=}"
     }
   }
 }

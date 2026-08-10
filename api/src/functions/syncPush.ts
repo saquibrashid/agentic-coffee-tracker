@@ -14,6 +14,7 @@ import {
   type SyncDocument,
 } from '../lib/cosmos.js';
 import { UnauthenticatedError, requirePrincipal } from '../lib/principal.js';
+import { ForbiddenError, requireAccess } from '../lib/access.js';
 import {
   MAX_RECORDS,
   isPushRecord,
@@ -132,9 +133,15 @@ app.http('syncPush', {
   handler: async (req: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
     let userId: string;
     try {
-      ({ userId } = requirePrincipal(req));
+      const principal = requirePrincipal(req);
+      // Enforced on push as well as pull, and not only at the read path: a
+      // rejected account must not be able to write records that a later policy
+      // change would then start serving.
+      requireAccess(principal);
+      ({ userId } = principal);
     } catch (err) {
       if (err instanceof UnauthenticatedError) return json(401, { error: err.message });
+      if (err instanceof ForbiddenError) return json(403, { error: err.message });
       return errorResponse(ctx, 500, 'Could not resolve the caller identity', err);
     }
 
