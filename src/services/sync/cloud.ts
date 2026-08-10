@@ -10,7 +10,16 @@ import { db } from '@/services/db';
 import { refreshPreferences } from '@/services/preferences/compute';
 import type { CoffeeBean, OutboxEntry, PhotoBlob, Rating } from '@/types';
 import { NeedsUpgradeError, applyPulled } from './apply';
-import { SyncApiError, SyncTimeoutError, pull, push, type PushRecord } from './api';
+import {
+  PhotoQuotaError,
+  SyncApiError,
+  SyncTimeoutError,
+  pull,
+  push,
+  type PushRecord,
+  type QuotaInfo,
+} from './api';
+import { backfillPhotos, needsBackfill, uploadPhoto } from './photos';
 import {
   pendingCount,
   recordFailure,
@@ -28,7 +37,6 @@ import {
   setLastSyncedAt,
 } from './state';
 import type { SyncEngine, SyncStatus } from './types';
-
 /** `specs/sync.md` -> Backoff. Same schedule the AI queue already uses. */
 const BASE_BACKOFF_MS = 60_000;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
@@ -65,6 +73,15 @@ export class CloudSyncEngine implements SyncEngine {
   #nextAttemptAt = 0;
   /** Set by a terminal failure. Only a fresh sign-in or an explicit retry clears it. */
   #halted = false;
+
+  /** Latest known photo storage usage, reported alongside status. */
+  #photoQuota: QuotaInfo | undefined;
+  /**
+   * Set when an upload was refused for lack of space. Ends the push loop for
+   * this cycle — the refused entry stays queued, so continuing would re-take
+   * the same batch and spin — but never fails the cycle.
+   */
+  #quotaBlocked = false;
 
   #running: Promise<void> | null = null;
   #started = false;
@@ -198,6 +215,7 @@ export class CloudSyncEngine implements SyncEngine {
 
   async #runCycle(): Promise<void> {
     await this.#publish({ state: 'syncing', lastError: undefined });
+    this.#quotaBlocked = false;
 
     try {
       const pulled = await this.#pullLoop();
@@ -206,6 +224,13 @@ export class CloudSyncEngine implements SyncEngine {
       // Preferences are derived from beans and ratings, so a merge that changed
       // either invalidated the cached profile.
       if (pulled) await refreshPreferences();
+
+      // Last, and deliberately outside anything that can fail the cycle: bytes
+      // are cosmetic next to records, and a photo server that is down must not
+      // make a fully successful record sync look broken. `backfillPhotos` is
+      // written not to reject, but the guarantee is restated here rather than
+      // depended upon from a distance.
+      await backfillPhotos().catch(() => undefined);
 
       const now = new Date().toISOString();
       await setLastSyncedAt(now);
@@ -250,6 +275,7 @@ export class CloudSyncEngine implements SyncEngine {
       // would spin on them forever.
       if (hydrated.records.length === 0) {
         await removeEntries(hydrated.resolvedIds);
+        if (this.#quotaBlocked) break;
         continue;
       }
 
@@ -264,6 +290,10 @@ export class CloudSyncEngine implements SyncEngine {
       // and the winning version arrives on the next pull. Retrying it would
       // just lose again.
       await removeEntries(hydrated.resolvedIds);
+
+      // A refused upload left its entry queued, so another pass would re-take
+      // the same batch and refuse it again.
+      if (this.#quotaBlocked) break;
 
       // A short batch means the outbox is drained.
       if (entries.length < PUSH_CHUNK) break;
@@ -282,9 +312,8 @@ export class CloudSyncEngine implements SyncEngine {
     const resolvedIds: string[] = [];
 
     for (const entry of entries) {
-      resolvedIds.push(entry.id);
-
       if (entry.op === 'delete') {
+        resolvedIds.push(entry.id);
         records.push({
           type: entry.type,
           recordId: entry.recordId,
@@ -301,8 +330,25 @@ export class CloudSyncEngine implements SyncEngine {
       const record = await this.#read(entry);
       // Queued as an upsert, but the record has since been deleted and that
       // delete has its own entry. Nothing to send.
-      if (!record) continue;
+      if (!record) {
+        resolvedIds.push(entry.id);
+        continue;
+      }
 
+      // Bytes before metadata (`specs/sync.md` -> Photos). The reverse order
+      // publishes a pointer to bytes that do not exist, and every device that
+      // pulls in that window renders a broken photo.
+      if (entry.type === 'photo' && 'blob' in record) {
+        const uploaded = await this.#uploadBytes(record);
+        // No room server-side. The entry stays queued so the photo syncs once
+        // space is freed, and the loop stops rather than re-taking it.
+        if (!uploaded) {
+          this.#quotaBlocked = true;
+          continue;
+        }
+      }
+
+      resolvedIds.push(entry.id);
       records.push({
         type: entry.type,
         recordId: entry.recordId,
@@ -314,6 +360,28 @@ export class CloudSyncEngine implements SyncEngine {
     }
 
     return { records, resolvedIds };
+  }
+
+  /**
+   * Uploads a photo's bytes. Returns false only when the quota refused them.
+   *
+   * A placeholder — a photo pulled from another device whose bytes have not
+   * been backfilled yet — has nothing to upload, and sending its zero bytes
+   * would overwrite the real photo on the server with an empty blob.
+   */
+  async #uploadBytes(photo: PhotoBlob): Promise<boolean> {
+    if (needsBackfill(photo)) return true;
+
+    try {
+      this.#photoQuota = await uploadPhoto(photo);
+      return true;
+    } catch (err) {
+      if (err instanceof PhotoQuotaError) {
+        this.#photoQuota = err.quota;
+        return false;
+      }
+      throw err;
+    }
   }
 
   async #read(entry: OutboxEntry): Promise<CoffeeBean | Rating | PhotoBlob | undefined> {
@@ -384,6 +452,10 @@ export class CloudSyncEngine implements SyncEngine {
     // carries the previous one forward.
     const error = 'lastError' in patch ? patch.lastError : this.#status.lastError;
     if (error !== undefined) next.lastError = error;
+
+    if (this.#photoQuota) {
+      next.photoQuota = { ...this.#photoQuota, exceeded: this.#quotaBlocked };
+    }
 
     this.#status = next;
     for (const fn of this.#subscribers) fn(next);

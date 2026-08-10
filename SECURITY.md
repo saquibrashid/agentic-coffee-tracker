@@ -46,10 +46,10 @@ can live, so the behaviour is described here rather than summarised.
 - **Signed out is the default and stores nothing remotely.** No account, no
   network storage, no change from earlier builds. Sync only ever runs for a
   signed-in user.
-- **Signing in** replicates beans, ratings, and photo _metadata_ to Cosmos DB,
-  in a partition keyed by the user's stable provider identifier — and only for
-  accounts this deployment has approved. Photo bytes are not yet uploaded — they
-  remain on the device until the Blob Storage transfer ships.
+- **Signing in** replicates beans, ratings, and photos to the operator's
+  subscription, in a partition keyed by the user's stable provider identifier —
+  and only for accounts this deployment has approved. Records go to Cosmos DB;
+  photo _bytes_ go to Blob Storage, out-of-band from the record stream.
 - **Derived data is never uploaded.** Preferences, summaries and
   recommendations are recomputed on each device from the records it already
   holds.
@@ -87,12 +87,22 @@ can live, so the behaviour is described here rather than summarised.
   provider, and a principal from an unconfigured one is rejected client-side as
   well.
 
+- **Photo bytes never travel through the API, and never through a shared
+  credential.** The browser uploads and downloads directly against Blob Storage
+  using a user-delegation SAS — signed via the managed identity, so there is no
+  account key to leak — scoped to a single blob, restricted to HTTPS, valid for
+  15 minutes, and write-only for uploads. The blob path is derived from the
+  caller's own principal in `api/src/lib/blob.ts`, so a signed URL cannot be
+  made to address another user's photo.
+- **Photo storage is capped at 500 MB per user.** Past the cap the upload
+  endpoint returns 507 and record sync continues unaffected.
+
 ### Not yet implemented
 
 Recorded here so the gaps are not mistaken for guarantees:
 
 - **Deleting every server-side byte from inside the app.** Sign-out stops sync
   and leaves the remote copy in place; removing it currently requires access to
-  the Cosmos account.
-- **A per-user storage quota.** Nothing bounds how much a signed-in account can
-  write.
+  the Cosmos account and the storage account.
+- **A bound on record storage.** Photo bytes are capped, but nothing limits how
+  many records a signed-in account can write.

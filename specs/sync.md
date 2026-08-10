@@ -431,12 +431,16 @@ Photo bytes are the dominant payload and are handled out-of-band from the record
 
 **Download** is lazy. On pulling a `photo` record whose blob is absent locally:
 
-1. Insert the metadata row with no `blob`
-2. Fetch bytes on first render, or during idle backfill, whichever comes first
+1. Insert the metadata row with a zero-length placeholder blob
+2. `POST /api/sync/photo/download-url`, then `GET` the SAS URL, during idle backfill
+
+A zero-length blob is the marker for "row present, bytes still to come" — there is no separate flag, so the two cannot disagree. Backfill is capped per cycle: a device signing in against a large library must not open one request per photo for images nobody is waiting on. `404` from the download endpoint is a legitimate state, not an error — the uploading device may simply still be offline.
 
 This works because `CoffeeBean.thumbnailDataUrl` is already stored inline on the bean record. A newly-signed-in device renders the full bean library correctly from metadata alone, and full-resolution images fill in behind it. Bandwidth on first sync drops by roughly two orders of magnitude.
 
-**Quota**: 500 MB per user. `/api/sync/photo/upload-url` returns `507` past the cap; the client surfaces it in Settings and continues syncing records, which must not be blocked by a photo problem.
+**Quota**: 500 MB per user. `/api/sync/photo/upload-url` returns `507` past the cap; the client surfaces it in Settings and continues syncing records, which must not be blocked by a photo problem. Usage is measured by listing the user's blob prefix rather than by maintaining a counter: a counter has to be incremented when the credential is issued, before the upload has happened, so every abandoned upload inflates it permanently and silently.
+
+**Credentials**: every URL is a user-delegation SAS, signed with a key obtained through the managed identity — there is no account key to leak. Uploads get `create`+`write` only and downloads `read` only, both HTTPS-only and valid for 15 minutes. The blob path is derived from the caller's own principal, so a signed URL can only ever address the caller's own photo.
 
 ---
 
