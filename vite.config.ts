@@ -44,8 +44,12 @@ export default defineConfig({
         name: 'Agentic Coffee Tracker',
         short_name: 'Coffee',
         description: 'Offline-first, AI-powered coffee tracking.',
-        theme_color: '#6b3f1d',
-        background_color: '#fbf6ef',
+        // Manifest colours are static — they are read at install time and
+        // cannot follow the theme, unlike the <meta name="theme-color"> the
+        // app rewrites at runtime. They match the light palette so the splash
+        // screen agrees with the first paint for the common case.
+        theme_color: '#faf7f2',
+        background_color: '#faf7f2',
         display: 'standalone',
         orientation: 'any',
         start_url: '/',

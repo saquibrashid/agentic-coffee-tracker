@@ -86,7 +86,9 @@
 @layer base {
   :root {
     /* Light theme — coffee-bag palette */
-    --background: 30 40% 98%;
+    /* Warm paper rather than near-white, so cards read as a lifted surface
+       instead of a same-colour rectangle outlined in grey. */
+    --background: 30 33% 96%;
     --foreground: 25 30% 15%;
 
     --card: 30 40% 100%;
@@ -107,37 +109,54 @@
     --destructive: 0 72% 45%;
     --destructive-foreground: 30 40% 98%;
 
-    --border: 30 20% 88%;
-    --input: 30 20% 88%;
+    /* --border is decoration; --input is the boundary that tells you a control
+       exists. They were the same value, which left every text field outlined
+       at 1.25:1 — technically present, practically invisible. --input is now
+       held to the 3:1 that WCAG 1.4.11 requires of control boundaries. */
+    --border: 30 22% 85%;
+    --input: 28 18% 52%;
     --ring: 25 60% 35%;
 
     --radius: 0.75rem;
   }
 
   .dark {
-    --background: 25 20% 9%;
+    /*
+     * Deep roasted brown, not near-black. The previous values (9% lightness,
+     * 20% saturation) were warm in theory but read as black with a tint —
+     * below roughly 12% lightness the hue stops being perceptible at all.
+     *
+     * Raising lightness costs contrast against --foreground, so every pairing
+     * here is asserted in src/styles/contrast.test.ts rather than eyeballed.
+     * That test is what makes this palette safe to keep tuning.
+     *
+     * The trade-off taken deliberately: a lighter background uses more power
+     * on OLED than true black would. The warmth is worth it for an app whose
+     * whole subject is roasted coffee.
+     */
+    --background: 24 30% 13%;
     --foreground: 30 30% 95%;
 
-    --card: 25 20% 12%;
+    --card: 24 28% 17%; /* lifts off the background without a border */
     --card-foreground: 30 30% 95%;
 
     --primary: 28 70% 60%; /* warm crema */
     --primary-foreground: 25 30% 10%;
 
-    --secondary: 25 15% 18%;
+    --secondary: 24 24% 23%;
     --secondary-foreground: 30 30% 95%;
 
-    --muted: 25 15% 16%;
-    --muted-foreground: 30 15% 65%;
+    --muted: 24 22% 21%;
+    --muted-foreground: 30 25% 72%;
 
-    --accent: 25 30% 22%;
+    --accent: 26 32% 27%;
     --accent-foreground: 30 30% 95%;
 
-    --destructive: 0 65% 50%;
-    --destructive-foreground: 30 30% 95%;
+    --destructive: 0 70% 62%;
+    --destructive-foreground: 25 30% 10%;
 
-    --border: 25 15% 20%;
-    --input: 25 15% 20%;
+    --border: 24 20% 28%; /* must stay visible against a lighter background */
+    --input: 26 22% 50%;
     --ring: 28 70% 60%;
   }
 }
