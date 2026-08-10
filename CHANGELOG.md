@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Bean library filters** (#109): roaster, origin and varietal multi-selects
+  whose options and counts are derived from the beans themselves rather than a
+  constant list, plus minimum rating and roast-date freshness. The controls sit
+  behind a collapsed `<details>` disclosure carrying a badge with the number of
+  active constraints, so the list stays above the fold on a phone. Rating and
+  freshness exclude beans missing the field, stated in the UI rather than left
+  implicit.
 - **Project scaffold**: Vite + React 18 + TypeScript, Tailwind CSS theme tokens,
   shadcn-style `Button`/`Card`/`Skeleton` primitives, `lucide-react` icons,
   React Router shell with bottom nav, offline banner, PWA manifest via

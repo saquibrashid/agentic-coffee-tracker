@@ -120,6 +120,36 @@ test.describe('Bean library', () => {
     await expect(rows).toHaveCount(7);
   });
 
+  test('filters are collapsed until asked for, then narrow the list', async ({ page }) => {
+    await page.goto('/beans');
+    const rows = page.getByRole('list', { name: 'Beans' }).getByRole('listitem');
+    const roasterGroup = page.getByRole('group', { name: 'Roaster' });
+
+    // The point of the disclosure: the list, not six controls, is above the fold.
+    await expect(roasterGroup).toBeHidden();
+
+    await page.getByRole('search', { name: 'Filter beans' }).getByText('Filters').click();
+    await expect(roasterGroup).toBeVisible();
+
+    // The seeds carry no origin or varietal, so those groups must not appear at
+    // all rather than render as empty boxes the user cannot act on.
+    await expect(page.getByRole('group', { name: 'Origin' })).toHaveCount(0);
+    await expect(page.getByRole('group', { name: 'Varietal' })).toHaveCount(0);
+
+    await roasterGroup.getByText('Onyx').click();
+    await expect(rows).toHaveCount(1);
+    await expect(page.getByText('Huila')).toBeVisible();
+
+    // Multi-select is a union, not an intersection: picking a second roaster
+    // must widen the list, which is the opposite of what a second select does.
+    await roasterGroup.getByText('Verve').click();
+    await expect(rows).toHaveCount(2);
+
+    await page.getByRole('button', { name: /clear filters/i }).click();
+    await expect(rows).toHaveCount(7);
+    await expect(roasterGroup.getByRole('checkbox', { name: /^Onyx/ })).not.toBeChecked();
+  });
+
   test('sorting by name reorders the list', async ({ page }) => {
     await page.goto('/beans');
     await page.getByLabel(/sort by/i).selectOption('name');

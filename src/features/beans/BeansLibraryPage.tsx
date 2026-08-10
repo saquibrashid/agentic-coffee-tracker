@@ -7,7 +7,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Coffee, Plus, Search, Trash2, X } from 'lucide-react';
+import { Coffee, Plus, Trash2, X } from 'lucide-react';
 
 import { db } from '@/services/db';
 import { Button } from '@/components/ui/button';
@@ -15,22 +15,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
+import { BeanFilters } from './BeanFilters';
 import {
   DEFAULT_FILTERS,
-  PROCESSES,
-  ROAST_LEVELS,
-  SORT_OPTIONS,
+  collectFacets,
   filterAndSortBeans,
-  hasActiveFilters,
   summariseBeans,
-  type BeanSortKey,
   type BeanSummary,
   type LibraryFilters,
 } from '@/services/beans/library';
-import type { Process, RoastLevel } from '@/types';
-
-const selectClass =
-  'h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring';
 
 export function BeansLibraryPage() {
   const [filters, setFilters] = useState<LibraryFilters>(DEFAULT_FILTERS);
@@ -49,9 +42,20 @@ export function BeansLibraryPage() {
     return filterAndSortBeans(summariseBeans(beans, ratings), filters);
   }, [beans, ratings, filters]);
 
-  function set<K extends keyof LibraryFilters>(key: K, value: LibraryFilters[K]) {
+  // Options come from the beans in scope rather than a constant, so the
+  // controls can only ever offer values that match something. Recomputed with
+  // `includeArchived` because an archived-only roaster must not be offered
+  // while archived beans are hidden.
+  const facets = useMemo(
+    () => collectFacets(beans ?? [], filters.includeArchived),
+    [beans, filters.includeArchived],
+  );
+
+  const set = useCallback(<K extends keyof LibraryFilters>(key: K, value: LibraryFilters[K]) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
-  }
+  }, []);
+
+  const resetFilters = useCallback(() => setFilters(DEFAULT_FILTERS), []);
 
   const toggleSelected = useCallback((id: string) => {
     setSelected((prev) => {
@@ -190,121 +194,7 @@ export function BeansLibraryPage() {
         </p>
       )}
 
-      <form
-        className="space-y-3"
-        role="search"
-        aria-label="Filter beans"
-        onSubmit={(e) => e.preventDefault()}
-      >
-        <div>
-          <label htmlFor="bean-search" className="mb-1 block text-sm font-medium">
-            Search
-          </label>
-          <div className="relative">
-            <Search
-              className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-              aria-hidden="true"
-            />
-            <input
-              id="bean-search"
-              type="search"
-              value={filters.search}
-              onChange={(e) => set('search', e.target.value)}
-              placeholder="Name, roaster, origin or tasting note"
-              className="border-input bg-background focus-visible:ring-ring h-10 w-full rounded-md border pr-3 pl-9 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
-            />
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <div>
-            <label htmlFor="filter-roast" className="mb-1 block text-sm font-medium">
-              Roast
-            </label>
-            <select
-              id="filter-roast"
-              className={selectClass}
-              value={filters.roastLevel}
-              onChange={(e) => set('roastLevel', e.target.value as RoastLevel | 'all')}
-            >
-              <option value="all">All roasts</option>
-              {ROAST_LEVELS.map((level) => (
-                <option key={level} value={level}>
-                  {level}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="filter-process" className="mb-1 block text-sm font-medium">
-              Process
-            </label>
-            <select
-              id="filter-process"
-              className={selectClass}
-              value={filters.process}
-              onChange={(e) => set('process', e.target.value as Process | 'all')}
-            >
-              <option value="all">All processes</option>
-              {PROCESSES.map((process) => (
-                <option key={process} value={process}>
-                  {process}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label htmlFor="filter-sort" className="mb-1 block text-sm font-medium">
-              Sort by
-            </label>
-            <select
-              id="filter-sort"
-              className={selectClass}
-              value={filters.sort}
-              onChange={(e) => set('sort', e.target.value as BeanSortKey)}
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-4">
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4"
-              checked={filters.needsReviewOnly}
-              onChange={(e) => set('needsReviewOnly', e.target.checked)}
-            />
-            Needs review only
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              className="size-4"
-              checked={filters.includeArchived}
-              onChange={(e) => set('includeArchived', e.target.checked)}
-            />
-            Include archived
-          </label>
-          {hasActiveFilters(filters) && (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => setFilters(DEFAULT_FILTERS)}
-            >
-              Clear filters
-            </Button>
-          )}
-        </div>
-      </form>
+      <BeanFilters filters={filters} facets={facets} onChange={set} onReset={resetFilters} />
 
       {visible.length === 0 ? (
         <Card>
@@ -315,7 +205,7 @@ export function BeansLibraryPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button variant="outline" onClick={() => setFilters(DEFAULT_FILTERS)}>
+            <Button variant="outline" onClick={resetFilters}>
               Clear filters
             </Button>
           </CardContent>
