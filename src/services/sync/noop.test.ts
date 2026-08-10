@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { getSyncEngine, isSyncSupported, NoopSyncEngine, resetSyncEngineForTests } from './index';
+import {
+  CloudSyncEngine,
+  getSyncEngine,
+  isSyncSupported,
+  NoopSyncEngine,
+  resetSyncEngineForTests,
+} from './index';
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -44,8 +50,9 @@ describe('NoopSyncEngine', () => {
 });
 
 describe('isSyncSupported', () => {
-  it('allows sync when the client goes through the SWA linked backend', () => {
+  it('allows sync on the SWA linked backend with sign-in available', () => {
     vi.stubEnv('VITE_API_BASE_URL', '');
+    vi.stubEnv('VITE_AUTH_ENABLED', 'true');
     expect(isSyncSupported()).toBe(true);
   });
 
@@ -54,23 +61,39 @@ describe('isSyncSupported', () => {
     // x-ms-client-principal header is attacker-supplied rather than injected by
     // Static Web Apps, so a forged principal would read another user's data.
     vi.stubEnv('VITE_API_BASE_URL', 'https://func-coffee.azurewebsites.net');
+    vi.stubEnv('VITE_AUTH_ENABLED', 'true');
+    expect(isSyncSupported()).toBe(false);
+  });
+
+  it('refuses to sync when sign-in is unavailable', () => {
+    // Sync with no signed-in user has no partition to write to, so an engine
+    // that could never authenticate would just generate 401s on a timer.
+    vi.stubEnv('VITE_API_BASE_URL', '');
+    vi.stubEnv('VITE_AUTH_ENABLED', 'false');
     expect(isSyncSupported()).toBe(false);
   });
 });
 
 describe('getSyncEngine', () => {
   it('returns the same instance every time', () => {
-    // Subscribers must all observe one status, and the real engine will hold a
+    // Subscribers must all observe one status, and the real engine holds a
     // cursor and a Web Lock that must not be duplicated across re-renders.
     expect(getSyncEngine()).toBe(getSyncEngine());
   });
 
-  it('is a no-op engine in this build', () => {
+  it('is a no-op engine when sign-in is unavailable', () => {
     expect(getSyncEngine()).toBeInstanceOf(NoopSyncEngine);
+  });
+
+  it('selects the live engine once the topology can be trusted', () => {
+    vi.stubEnv('VITE_API_BASE_URL', '');
+    vi.stubEnv('VITE_AUTH_ENABLED', 'true');
+    expect(getSyncEngine()).toBeInstanceOf(CloudSyncEngine);
   });
 
   it('stays disabled even in the untrusted topology', () => {
     vi.stubEnv('VITE_API_BASE_URL', 'https://func-coffee.azurewebsites.net');
+    vi.stubEnv('VITE_AUTH_ENABLED', 'true');
     expect(getSyncEngine().status().state).toBe('disabled');
   });
 });

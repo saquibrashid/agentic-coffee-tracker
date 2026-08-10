@@ -64,6 +64,13 @@ function Shell() {
     void import('@/services/queue/queueRunner').then((m) => m.startQueueRunner());
   }, []);
 
+  // Sync starts on app open, per specs/sync.md -> Triggers. Lazy for the same
+  // reason as the queue runner: neither is needed for first paint, and the
+  // Cosmos-facing engine pulls in code a signed-out user never runs.
+  useEffect(() => {
+    void import('@/services/sync').then((m) => m.startSyncEngine());
+  }, []);
+
   return (
     <div className="flex min-h-full flex-col">
       <header className="bg-background/95 sticky top-0 z-30 border-b backdrop-blur-sm">

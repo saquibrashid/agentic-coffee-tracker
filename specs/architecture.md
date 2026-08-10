@@ -395,13 +395,13 @@ Storage quotas: request `navigator.storage.persist()` after the first save; surf
 
 ## Security & Privacy
 
-- **All user data is local.** No analytics, no third-party SDKs in v1.
+- **User data is local while signed out.** Signing in replicates records to Cosmos DB per user; see `specs/sync.md` and `SECURITY.md`. No analytics, no third-party SDKs.
 - BFF logs request metadata only (timing, status, model name) — never OCR text, parsed JSON, or photos.
 - BFF strips EXIF from incoming images before forwarding.
 - CSP: default-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://<bff-host>.
 - Settings → **Reset** wipes IndexedDB, Cache Storage, and unregisters the service worker.
 - Settings → **Export then delete** option encouraged before reset.
-- Privacy notice page lists: where photos go (Azure Vision/OpenAI for processing only), retention (none, server-side), and how to delete.
+- Privacy notice page lists: where photos go (Azure Vision/OpenAI for processing only), what sync stores when signed in, and how to delete.
 
 ---
 

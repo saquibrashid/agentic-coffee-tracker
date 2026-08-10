@@ -85,6 +85,7 @@ async function enqueue(input: EnqueueInput): Promise<void> {
         entry.attempts = 0;
         delete entry.lastError;
       });
+      notifyEnqueued();
       return;
     }
 
@@ -98,6 +99,7 @@ async function enqueue(input: EnqueueInput): Promise<void> {
       ...(input.deletedAt ? { deletedAt: input.deletedAt } : {}),
     };
     await db.outbox.add(entry);
+    notifyEnqueued();
   } catch {
     // Deliberately swallowed. See the module comment: recording a change for
     // sync must never fail the user's edit.
@@ -132,4 +134,30 @@ export async function recordFailure(ids: readonly string[], message: string): Pr
 /** Clears the queue. Used by `SyncEngine.reset()`. */
 export async function clear(): Promise<void> {
   await db.outbox.clear();
+}
+
+/**
+ * Notified whenever an entry is queued.
+ *
+ * A registry rather than a direct call into the engine, because the engine
+ * imports this module — calling back the other way would be a cycle. It also
+ * keeps mutation sites unaware of whether an engine exists at all: they enqueue
+ * and move on.
+ */
+const listeners = new Set<() => void>();
+
+export function onEnqueue(fn: () => void): () => void {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+function notifyEnqueued(): void {
+  for (const fn of listeners) {
+    try {
+      fn();
+    } catch {
+      // Same contract as the enqueue itself: a sync trigger must never fail the
+      // user's edit.
+    }
+  }
 }
