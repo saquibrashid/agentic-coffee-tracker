@@ -22,6 +22,7 @@ import { ulid } from 'ulid';
 import { fetchImage } from '@/services/ai';
 import { db } from '@/services/db';
 import { createThumbnail, dataUrlToBlob, resizeDataUrl } from '@/services/image/imagePipeline';
+import { enqueueDelete, enqueueUpsert } from '@/services/sync/outbox';
 import type { CoffeeBean, PhotoBlob } from '@/types';
 
 /** The fields an attached photo contributes to the bean record. */
@@ -156,6 +157,7 @@ export async function commitStagedPhoto(staged: StagedPhoto): Promise<PhotoUpdat
     byteSize: staged.blob.size,
     createdAt: new Date().toISOString(),
   });
+  await enqueueUpsert('photo', photoId);
   return { photoId, thumbnailDataUrl: staged.thumbnailDataUrl };
 }
 
@@ -191,7 +193,7 @@ export async function releasePhotoIfOrphaned(photoId: string | undefined): Promi
   try {
     return await db.transaction(
       'rw',
-      [db.beans, db.ratings, db.photos, db.ocrResults],
+      [db.beans, db.ratings, db.photos, db.ocrResults, db.outbox],
       async () => {
         const stillOwned = await db.beans.filter((b) => b.photoId === photoId).count();
         if (stillOwned > 0) return false;
@@ -201,6 +203,7 @@ export async function releasePhotoIfOrphaned(photoId: string | undefined): Promi
         const ocrIds = await db.ocrResults.where('photoId').equals(photoId).primaryKeys();
         await db.ocrResults.bulkDelete(ocrIds);
         await db.photos.delete(photoId);
+        await enqueueDelete('photo', photoId);
         return true;
       },
     );

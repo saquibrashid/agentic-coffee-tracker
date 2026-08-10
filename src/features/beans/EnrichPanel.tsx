@@ -10,6 +10,7 @@ import { Globe, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { db } from '@/services/db';
+import { enqueueUpsert } from '@/services/sync/outbox';
 import { isSchemaError } from '@/services/ai';
 import {
   EmptyPageError,
@@ -160,6 +161,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
       return;
     }
     await db.beans.update(bean.id, update);
+    await enqueueUpsert('bean', bean.id);
 
     // Only after the bean points at the new photo, so the outgoing one looks
     // like the orphan it now is. Skipped if the photo failed, since nothing

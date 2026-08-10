@@ -149,6 +149,41 @@ export interface PhotoBlob {
   createdAt: string;
 }
 
+/**
+ * A record type that participates in sync.
+ *
+ * `specs/sync.md` → Scope of synchronised data. Deliberately excludes derived
+ * and device-local state: `preferences` is recomputed from ratings,
+ * `ocrResults` is a cache keyed to a photo, and `pendingAiTasks` is a work
+ * queue whose entries mean nothing on another device.
+ */
+export type SyncRecordType = 'bean' | 'rating' | 'photo';
+
+/**
+ * One pending local change, waiting to be pushed.
+ *
+ * Two deliberate choices, both from `specs/sync.md` → Dexie v3 migration:
+ *
+ * - **Upserts carry no payload.** The record is read fresh from its table at
+ *   push time, so a queued entry can never push a stale snapshot, and repeated
+ *   edits to one record collapse into a single push.
+ * - **This doubles as the tombstone store.** A delete removes the row and
+ *   writes an entry carrying `deletedAt`, which avoids adding a `deletedAt`
+ *   column to `CoffeeBean` and `Rating` — that would force every existing query
+ *   in the app to filter soft-deleted rows.
+ */
+export interface OutboxEntry {
+  id: string;
+  type: SyncRecordType;
+  recordId: string;
+  op: 'upsert' | 'delete';
+  /** Set when `op === 'delete'`; the LWW clock for the tombstone. */
+  deletedAt?: string;
+  queuedAt: string;
+  attempts: number;
+  lastError?: string;
+}
+
 export interface OcrResult {
   id: string;
   photoId: string;

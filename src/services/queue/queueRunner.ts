@@ -10,6 +10,7 @@ import { db } from '@/services/db';
 import { extractBeanFromPhoto, PipelineUnavailableError } from '@/services/ai/pipeline';
 import { parsedBeanToUpdate } from '@/services/ai/mapping';
 import { autoEnrichBean, isTerminalEnrichFailure } from '@/services/enrich/autoEnrich';
+import { enqueueUpsert } from '@/services/sync/outbox';
 import type { CoffeeBean, PendingAiTask } from '@/types';
 
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
@@ -62,6 +63,7 @@ async function processTask(task: PendingAiTask): Promise<void> {
       };
       if (result.model) update.llmModel = result.model;
       await db.beans.update(task.beanId, update);
+      await enqueueUpsert('bean', task.beanId);
     }
   }
 
@@ -88,7 +90,10 @@ async function processEnrichTask(task: PendingAiTask): Promise<void> {
   }
 
   const result = await autoEnrichBean(bean);
-  if (result) await db.beans.update(bean.id, result.update);
+  if (result) {
+    await db.beans.update(bean.id, result.update);
+    await enqueueUpsert('bean', bean.id);
+  }
   await db.pendingAiTasks.delete(task.id);
 }
 

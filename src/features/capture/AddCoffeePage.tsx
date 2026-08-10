@@ -8,6 +8,7 @@ import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { db } from '@/services/db';
+import { enqueueUpsert } from '@/services/sync/outbox';
 import { createThumbnail, dataUrlToBlob, resizeDataUrl } from '@/services/image/imagePipeline';
 import { extractBeanFromPhoto, PipelineUnavailableError } from '@/services/ai/pipeline';
 import { parsedBeanToUpdate } from '@/services/ai/mapping';
@@ -89,6 +90,7 @@ export function AddCoffeePage() {
         ...(photo ?? {}),
         sourceUrl: trimmed,
       });
+      await enqueueUpsert('bean', beanId);
       const bean = await db.beans.get(beanId);
       setConfirmState({
         bean: bean ?? draft,
@@ -136,7 +138,7 @@ export function AddCoffeePage() {
         byteSize: blob.size,
         createdAt: now,
       });
-
+      await enqueueUpsert('photo', photoId);
       const draft: CoffeeBean = {
         id: beanId,
         schemaVersion: 1,
@@ -151,6 +153,7 @@ export function AddCoffeePage() {
         updatedAt: now,
       };
       await db.beans.add(draft);
+      await enqueueUpsert('bean', beanId);
 
       setStage('extracting');
 
@@ -163,6 +166,7 @@ export function AddCoffeePage() {
         };
         if (result.model) update.llmModel = result.model;
         await db.beans.update(beanId, update);
+        await enqueueUpsert('bean', beanId);
 
         const bean = await db.beans.get(beanId);
         setConfirmState({

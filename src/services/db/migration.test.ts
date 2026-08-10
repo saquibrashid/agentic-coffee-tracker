@@ -87,6 +87,6 @@ describe('v2 rating-scale migration', () => {
     const db = await openUpgraded('migrate-fresh');
 
     expect(await db.ratings.count()).toBe(0);
-    expect(db.verno).toBe(2);
+    expect(db.verno).toBe(3);
   });
 });

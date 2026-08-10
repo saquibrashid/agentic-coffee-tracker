@@ -1,6 +1,7 @@
 import { db } from '@/services/db';
 import { dataUrlToBlob } from '@/services/image/imagePipeline';
 import { rescaleLegacyScore } from '@/services/ratings/scale';
+import { enqueueManyUpserts } from '@/services/sync/outbox';
 import type { CoffeeBean, PhotoBlob, Rating } from '@/types';
 import { ImportFormatError } from './ratingsImport';
 
@@ -121,9 +122,22 @@ export async function planJsonImport(text: string): Promise<JsonImportPlan> {
 export async function applyJsonImportPlan(plan: JsonImportPlan): Promise<void> {
   const { newBeans, newRatings, newPhotos } = plan;
   if (newBeans.length === 0 && newRatings.length === 0 && newPhotos.length === 0) return;
-  await db.transaction('rw', [db.beans, db.ratings, db.photos], async () => {
+  await db.transaction('rw', [db.beans, db.ratings, db.photos, db.outbox], async () => {
     if (newBeans.length > 0) await db.beans.bulkPut(newBeans);
     if (newRatings.length > 0) await db.ratings.bulkPut(newRatings);
     if (newPhotos.length > 0) await db.photos.bulkPut(newPhotos);
+
+    await enqueueManyUpserts(
+      'photo',
+      newPhotos.map((p) => p.id),
+    );
+    await enqueueManyUpserts(
+      'bean',
+      newBeans.map((b) => b.id),
+    );
+    await enqueueManyUpserts(
+      'rating',
+      newRatings.map((r) => r.id),
+    );
   });
 }

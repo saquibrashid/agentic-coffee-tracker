@@ -10,6 +10,7 @@ import {
   rescaleLegacyScore,
   roundToStep,
 } from '@/services/ratings/scale';
+import { enqueueManyUpserts } from '@/services/sync/outbox';
 import type {
   BrewType,
   CoffeeBean,
@@ -515,10 +516,19 @@ export async function applyImportPlan(plan: ImportPlan, options: ApplyOptions = 
     createdAt: now,
   }));
 
-  await db.transaction('rw', [db.beans, db.ratings, db.pendingAiTasks], async () => {
+  await db.transaction('rw', [db.beans, db.ratings, db.pendingAiTasks, db.outbox], async () => {
     if (plan.newBeans.length > 0) await db.beans.bulkAdd(plan.newBeans);
     if (plan.newRatings.length > 0) await db.ratings.bulkAdd(plan.newRatings);
     if (tasks.length > 0) await db.pendingAiTasks.bulkAdd(tasks);
+
+    await enqueueManyUpserts(
+      'bean',
+      plan.newBeans.map((b) => b.id),
+    );
+    await enqueueManyUpserts(
+      'rating',
+      plan.newRatings.map((r) => r.id),
+    );
   });
 }
 
