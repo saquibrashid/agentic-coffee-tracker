@@ -119,8 +119,11 @@ describe('draining', () => {
 
     await removeEntries([entries[0]!.id, entries[1]!.id]);
 
+    // Asserted against the entry that was not acknowledged rather than a fixed
+    // record id: entries queued in the same millisecond tie on `queuedAt`, and
+    // Dexie breaks that tie by primary key, which is a random id.
     const remaining = await takeBatch();
-    expect(remaining.map((e) => e.recordId)).toEqual(['c']);
+    expect(remaining.map((e) => e.recordId)).toEqual([entries[2]!.recordId]);
   });
 
   it('tolerates an empty acknowledgement', async () => {

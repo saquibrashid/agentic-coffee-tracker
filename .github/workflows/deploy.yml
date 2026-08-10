@@ -26,6 +26,13 @@ jobs:
       AZURE_ENV_NAME: ${{ vars.AZURE_ENV_NAME || 'coffee-dev' }}
       AZURE_LOCATION: ${{ vars.AZURE_LOCATION || 'eastus2' }}
       STATIC_WEB_APP_SKU: ${{ vars.STATIC_WEB_APP_SKU || 'Free' }}
+      # Who may sync. Defaults to closed: with no SYNC_ALLOWLIST the endpoints
+      # reject every account, including the owner's, because authentication
+      # alone is not a restriction — Microsoft accounts are free and unlimited.
+      # Sign in, open /.auth/me, and put the userId in the SYNC_ALLOWLIST
+      # repository variable. See docs/deployment.md.
+      SYNC_ACCESS_MODE: ${{ vars.SYNC_ACCESS_MODE || 'owner' }}
+      SYNC_ALLOWLIST: ${{ vars.SYNC_ALLOWLIST }}
       AZURE_VISION_ENDPOINT: ${{ vars.AZURE_VISION_ENDPOINT }}
       AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
       AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}

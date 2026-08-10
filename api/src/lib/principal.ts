@@ -25,6 +25,12 @@ export const ALLOWED_PROVIDERS: ReadonlySet<string> = new Set(['aad']);
 export interface Principal {
   userId: string;
   provider: string;
+  /**
+   * The sign-in name (usually an email or UPN). Carried only for access
+   * decisions and logging — never as a partition key, because it is
+   * user-visible, re-assignable, and not guaranteed unique over time.
+   */
+  userDetails?: string;
 }
 
 export class UnauthenticatedError extends Error {
@@ -53,6 +59,7 @@ export function assertSyncTopology(): void {
 interface RawPrincipal {
   userId?: unknown;
   identityProvider?: unknown;
+  userDetails?: unknown;
 }
 
 /**
@@ -75,7 +82,7 @@ export function requirePrincipal(req: HttpRequest): Principal {
     throw new UnauthenticatedError();
   }
 
-  const { userId, identityProvider } = raw;
+  const { userId, identityProvider, userDetails } = raw;
   // A blank subject would collide every such caller into a single partition,
   // which is a data leak rather than a login failure.
   if (typeof userId !== 'string' || userId === '') throw new UnauthenticatedError();
@@ -83,5 +90,7 @@ export function requirePrincipal(req: HttpRequest): Principal {
     throw new UnauthenticatedError();
   }
 
-  return { userId, provider: identityProvider };
+  return typeof userDetails === 'string' && userDetails !== ''
+    ? { userId, provider: identityProvider, userDetails }
+    : { userId, provider: identityProvider };
 }

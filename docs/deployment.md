@@ -179,7 +179,7 @@ Walk the smoke path: **Add coffee → capture a bag photo → confirm the parsed
 
 Sign-in is **on** wherever the topology can verify an identity, which in practice means the `Standard` SKU. `VITE_AUTH_ENABLED` is emitted as an infrastructure output by `infra/main.bicep` rather than set by hand, so a build cannot end up offering a sign-in button on a topology that cannot trust the result.
 
-Nothing about the app requires an account. Local-only is a supported way to run it, and today an account does not yet move any data — `specs/sync.md` Phase 1 gets people in and out of a session; replication lands in a later phase.
+Nothing about the app requires an account. Local-only is a supported way to run it; an account exists to move data between devices, which is gated separately by the access policy below.
 
 **No app registration is required.** SWA's pre-configured `aad` provider uses a Microsoft-managed application and authorises against `login.microsoftonline.com/common`, so both work/school and personal Microsoft accounts (`outlook.com`, `hotmail.com`) sign in with no setup at all. Register a dedicated Entra app and supply `AZURE_CLIENT_ID` / `AZURE_CLIENT_SECRET` only if you want to restrict the audience to a single tenant, or to control consent yourself.
 
@@ -190,7 +190,43 @@ Two things the config already enforces:
 - **Unused providers are 404'd.** `public/staticwebapp.config.json` explicitly blocks GitHub, Google, Facebook, Twitter and Apple so SWA's defaults cannot silently expose an identity source nobody reviewed. Microsoft is the only provider this project supports — Apple was dropped rather than deferred, because its client secret expires every 6 months and a rotation that fails closed on a schedule, long after anyone remembers why, is a poor trade for one identity provider (`specs/sync.md` → Decisions § 2).
 - **Auth stays off when `VITE_API_BASE_URL` is set.** In that topology the browser calls the Function App directly, so the `x-ms-client-principal` header is attacker-supplied rather than injected by SWA. `VITE_AUTH_ENABLED` cannot override this; see `specs/sync.md` → Identity.
 
-Because the pre-configured provider accepts any Microsoft account, anyone who finds the URL can sign in and get their own empty, isolated dataset — records are partitioned by `userId`, so no one can read anyone else's. If you would rather restrict that, the options are a single-tenant app registration or an allowlist check in the BFF.
+Because the pre-configured provider accepts any Microsoft account, anyone who finds the URL can sign in. That grants no storage on its own — sync is gated by the allowlist described in the next section, and records are partitioned by `userId` regardless, so no one can read anyone else's.
+
+## Who may sync (required before sync works)
+
+Signing in proves who someone is. It does not entitle them to storage in your subscription — Microsoft accounts are free and unlimited, so "signed in" means "anyone on the internet". Sync therefore enforces a second, explicit decision.
+
+**Sync is closed until you configure it.** With no allowlist the endpoints return 403 to every account, including yours. That is deliberate: treating "unconfigured" as "unrestricted" would open the deployment the moment a parameter went missing.
+
+To grant yourself access:
+
+1. Sign in to the deployed site.
+2. Open `/.auth/me` and copy the `userId` value.
+3. Set it as a repository variable and re-run the deploy:
+
+   ```bash
+   gh variable set SYNC_ALLOWLIST --body "<your-userId>"
+   ```
+
+Until then the app shows the reason inline: `This deployment is restricted to approved accounts. Add "<id>" to SYNC_ALLOWLIST to grant access.` The message names your own id and never names anyone else's.
+
+Two variables control the policy:
+
+| Variable           | Values                                 | Effect                                                                                                   |
+| ------------------ | -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| `SYNC_ACCESS_MODE` | `owner` (default), `allowlist`, `open` | `owner`/`allowlist` admit only listed accounts; `open` admits any sign-in                                |
+| `SYNC_ALLOWLIST`   | comma-separated ids or sign-in names   | Empty denies everyone. Sign-in names are accepted so you can pre-approve someone who has never signed in |
+
+`owner` and `allowlist` enforce identically — they differ only in stated intent, so widening from one person to a group is a one-word change with a legible meaning. An unrecognised mode falls back to membership, never to `open`: a typo must not be what publishes your library.
+
+Opening up later is a configuration change, not a code change:
+
+```bash
+gh variable set SYNC_ACCESS_MODE --body "allowlist"
+gh variable set SYNC_ALLOWLIST --body "id-one,id-two,colleague@example.com"
+```
+
+Before choosing `open`, note what is not built yet: there is no per-user storage quota and no in-app way to delete another account's data, so a public deployment currently has no bound on what it will store.
 
 ## Monitoring
 
