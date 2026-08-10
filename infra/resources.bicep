@@ -515,6 +515,25 @@ var syncSettings = useLinkedBackend
         name: 'PHOTO_CONTAINER'
         value: photoContainerName
       }
+      // The linked backend is the whole basis for trusting
+      // x-ms-client-principal: it is set by the Static Web Apps front door, and
+      // a linked Function App is not reachable any other way. This flag is what
+      // the sync endpoints check before honouring the header, so that the
+      // Free-tier direct-call topology — where the header is attacker-supplied
+      // — refuses to serve sync rather than leaking another user's partition.
+      // See specs/sync.md -> Security constraint (blocking).
+      {
+        name: 'SYNC_TRUSTED_PRINCIPAL_HEADER'
+        value: 'true'
+      }
+      // The Function App carries a user-assigned identity, so
+      // DefaultAzureCredential has to be told which one; without this it picks
+      // the system-assigned identity, which holds none of the Cosmos or blob
+      // role assignments granted below.
+      {
+        name: 'AZURE_CLIENT_ID'
+        value: functionAppIdentity.properties.clientId
+      }
     ]
   : []
 
