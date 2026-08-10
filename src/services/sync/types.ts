@@ -57,4 +57,18 @@ export interface SyncEngine {
   sync(): Promise<void>;
   /** Clears the cursor and outbox, forcing a full re-pull on the next cycle. */
   reset(): Promise<void>;
+  /**
+   * Erases everything the server holds for this user, then resets local sync
+   * state so nothing re-uploads it. Local records are untouched.
+   *
+   * Rejects on failure, unlike `sync()`: this one has a UI waiting on the
+   * outcome, and silently failing to delete data someone asked to have deleted
+   * would be the worst possible failure mode.
+   */
+  deleteCloudData(): Promise<DeleteCloudDataResult>;
+}
+
+export interface DeleteCloudDataResult {
+  recordsDeleted: number;
+  photosDeleted: number;
 }

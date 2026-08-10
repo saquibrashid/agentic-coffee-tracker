@@ -7,6 +7,7 @@
  * yet seen, which defeats the merge entirely.
  */
 import { db } from '@/services/db';
+import { getAuthProvider } from '@/services/auth';
 import { refreshPreferences } from '@/services/preferences/compute';
 import type { CoffeeBean, OutboxEntry, PhotoBlob, Rating } from '@/types';
 import { NeedsUpgradeError, applyPulled } from './apply';
@@ -14,6 +15,7 @@ import {
   PhotoQuotaError,
   SyncApiError,
   SyncTimeoutError,
+  deleteCloudData as deleteCloudDataRequest,
   pull,
   push,
   type PushRecord,
@@ -36,7 +38,7 @@ import {
   setCursor,
   setLastSyncedAt,
 } from './state';
-import type { SyncEngine, SyncStatus } from './types';
+import type { DeleteCloudDataResult, SyncEngine, SyncStatus } from './types';
 /** `specs/sync.md` -> Backoff. Same schedule the AI queue already uses. */
 const BASE_BACKOFF_MS = 60_000;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
@@ -121,6 +123,36 @@ export class CloudSyncEngine implements SyncEngine {
     this.#nextAttemptAt = 0;
     this.#halted = false;
     await this.#publish({ state: 'idle', lastError: undefined });
+  }
+
+  /**
+   * Erases the server-side copy, then resets local sync state.
+   *
+   * The reset is not optional bookkeeping. Without it the cursor still points
+   * past records that no longer exist, and the next cycle would push the local
+   * library straight back up — undoing the delete the user just asked for.
+   *
+   * Local records are deliberately untouched: this deletes the *cloud* copy.
+   */
+  async deleteCloudData(): Promise<DeleteCloudDataResult> {
+    const userId = await requireUserId();
+
+    // Halt first, so a cycle already scheduled cannot re-upload between the
+    // delete completing and the reset landing.
+    this.#halted = true;
+    try {
+      const result = await deleteCloudDataRequest(userId);
+      await this.reset();
+      this.#photoQuota = { used: 0, limit: this.#photoQuota?.limit ?? 0 };
+      this.#quotaBlocked = false;
+      await this.#publish({ state: 'idle', lastError: undefined });
+      return result;
+    } catch (err) {
+      // Leave the halt in place: retrying a sync while a delete is in an
+      // unknown state could re-upload data the server has partly removed.
+      await this.#publish({ state: 'error', lastError: messageOf(err) });
+      throw err;
+    }
   }
 
   /**
@@ -469,8 +501,9 @@ export class CloudSyncEngine implements SyncEngine {
   }
 }
 
-/** Photo bytes travel through Blob Storage, never the record stream. */
-function stripBlob(record: CoffeeBean | Rating | PhotoBlob): unknown {
+/** Photo bytes travel through Blob Storage, never the record stream. */ function stripBlob(
+  record: CoffeeBean | Rating | PhotoBlob,
+): unknown {
   if (!('blob' in record)) return record;
   const { blob: _blob, ...rest } = record;
   return rest;
@@ -486,4 +519,17 @@ function isNetworkError(err: unknown): boolean {
 
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+/**
+ * The signed-in user's id, which the delete endpoint requires echoed back.
+ *
+ * Throws rather than proceeding: sending a confirmation the server cannot match
+ * would fail anyway, and doing so with an empty string would be a confirmation
+ * of nothing.
+ */
+async function requireUserId(): Promise<string> {
+  const user = await getAuthProvider().getUser();
+  if (!user) throw new Error('Sign in again to delete your cloud data.');
+  return user.userId;
 }

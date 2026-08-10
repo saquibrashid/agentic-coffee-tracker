@@ -1,10 +1,10 @@
 /**
  * Sign-in, for the Settings page.
  *
- * Phase 1 of `specs/sync.md`: an account exists and can be signed in and out of,
- * but nothing is uploaded yet. The copy has to be honest about that — an account
- * that quietly does nothing is worse than no account, because people will assume
- * their data is backed up when it is not.
+ * Identity only. What is actually synced, and the controls for it, live in
+ * `SyncPanel` directly below — keeping them apart means the sign-in copy does
+ * not have to be rewritten every time the sync feature set changes, which is
+ * exactly how it came to be wrong once already.
  */
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,8 +31,8 @@ export function AccountPanel() {
               Signed in as <span className="font-medium">{user.displayName ?? user.userId}</span>.
             </p>
             <p className="text-muted-foreground text-sm">
-              Syncing between devices is not switched on yet, so your coffees still live only on
-              this device. Signing out leaves all of them exactly where they are.
+              Signing out stops syncing and leaves every coffee on this device exactly where it is.
+              The cloud copy stays until you delete it below.
             </p>
             <Button variant="outline" onClick={() => void logout()}>
               Sign out
@@ -41,8 +41,8 @@ export function AccountPanel() {
         ) : (
           <>
             <p className="text-muted-foreground text-sm">
-              Signing in will let you use the same coffees on more than one device. Nothing is
-              uploaded yet — that arrives in a later update, and it stays optional.
+              Signing in keeps your coffees in step across every device you use. It stays optional,
+              and you can delete the cloud copy at any time.
             </p>
             <Button onClick={() => void login('aad')}>Sign in with Microsoft</Button>
           </>

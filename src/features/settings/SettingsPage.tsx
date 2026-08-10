@@ -6,6 +6,7 @@ import { db } from '@/services/db';
 import { exportCsv, exportJson, exportJsonWithPhotos } from '@/services/export/exporter';
 import { ImportPanel } from './ImportPanel';
 import { AccountPanel } from './AccountPanel';
+import { SyncPanel } from './SyncPanel';
 import {
   RESET_CONFIRMATION_PHRASE,
   formatBytes,
@@ -57,6 +58,7 @@ export function SettingsPage() {
   return (
     <div className="space-y-4">
       <AccountPanel />
+      <SyncPanel />
 
       <Card>
         <CardHeader>
@@ -174,8 +176,9 @@ function DangerZone() {
           <h3 className="text-sm font-medium">Delete all data</h3>
           <p className="text-muted-foreground text-sm">
             This permanently removes every coffee, rating and photo from this device, along with
-            cached files and the offline service worker. Nothing is stored on a server, so anything
-            you have not exported above is unrecoverable.
+            cached files and the offline service worker. If you are signed in, the cloud copy is
+            left alone and will sync back — use <strong>Delete cloud data</strong> above first if
+            you want it gone everywhere.
           </p>
           <label htmlFor="reset-confirm" className="block text-sm font-medium">
             Type <code>{RESET_CONFIRMATION_PHRASE}</code> to confirm

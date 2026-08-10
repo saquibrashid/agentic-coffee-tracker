@@ -196,6 +196,22 @@ export async function photoDownloadUrl(photoId: string): Promise<DownloadUrlResp
   }
 }
 
+export interface DeleteCloudDataResponse {
+  recordsDeleted: number;
+  photosDeleted: number;
+}
+
+/**
+ * `confirm` is the caller's own user id, echoed back.
+ *
+ * The server checks it against the principal it derived itself, so the
+ * irreversible action needs a deliberate signal in the request body rather than
+ * just the session cookie every request already carries.
+ */
+export function deleteCloudData(confirm: string): Promise<DeleteCloudDataResponse> {
+  return post<DeleteCloudDataResponse>('/api/sync/delete', { confirm });
+}
+
 function quotaFrom(err: SyncApiError): QuotaInfo {
   const quota = err.details?.quota;
   if (

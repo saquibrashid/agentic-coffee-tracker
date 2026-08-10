@@ -7,7 +7,7 @@
  * post-mutation trigger — can then be written once against `SyncEngine` and be
  * correct in v1, where the honest answer to "what is syncing?" is "nothing".
  */
-import type { SyncEngine, SyncStatus } from './types';
+import type { DeleteCloudDataResult, SyncEngine, SyncStatus } from './types';
 
 const DISABLED: SyncStatus = Object.freeze({
   state: 'disabled',
@@ -36,5 +36,14 @@ export class NoopSyncEngine implements SyncEngine {
 
   reset(): Promise<void> {
     return Promise.resolve();
+  }
+
+  /**
+   * Nothing was ever uploaded, so nothing needs deleting. Reporting zeroes is
+   * the truth here, and it lets the settings panel render the same confirmation
+   * flow in every build rather than branching on which engine it got.
+   */
+  deleteCloudData(): Promise<DeleteCloudDataResult> {
+    return Promise.resolve({ recordsDeleted: 0, photosDeleted: 0 });
   }
 }

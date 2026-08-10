@@ -188,6 +188,27 @@ export async function photoExists(userId: string, photoId: string): Promise<bool
   return client.exists();
 }
 
+/**
+ * Deletes every photo blob belonging to this user. Returns the count.
+ *
+ * Prefix-scoped, so it can only ever reach the caller's own blobs. Like the
+ * Cosmos side, this is a loop rather than a batch: it can be interrupted, and a
+ * partial delete leaves less data than before, which is the direction the user
+ * asked for.
+ */
+export async function deleteUserPhotos(userId: string): Promise<number> {
+  if (!isSafeId(userId)) throw new Error('Unsafe identifier for a blob path');
+
+  const container = getService().getContainerClient(containerName());
+  let deleted = 0;
+
+  for await (const blob of container.listBlobsFlat({ prefix: `${userId}/` })) {
+    await container.deleteBlob(blob.name, { deleteSnapshots: 'include' });
+    deleted += 1;
+  }
+  return deleted;
+}
+
 /** Test seam: drops the cached client so a new environment takes effect. */
 export function resetBlobClientForTests(): void {
   service = undefined;
