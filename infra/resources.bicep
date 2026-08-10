@@ -46,7 +46,17 @@ var abbrev = {
   staticWebApp: 'stapp-${resourceToken}'
   vision: 'vision-${resourceToken}'
   openAi: 'oai-${resourceToken}'
+  // Sync backend. Both names are well inside their limits: Cosmos allows 44
+  // characters, storage accounts 24, and resourceToken is 13.
+  cosmos: 'cosmos-${resourceToken}'
+  photoStorage: 'stphoto${resourceToken}'
 }
+
+// Fixed names for the sync data plane. These are referenced from app settings as
+// literals rather than as resource properties — see syncSettings below.
+var syncDatabaseName = 'coffee'
+var syncContainerName = 'sync'
+var photoContainerName = 'photos'
 
 var deploymentContainerName = 'deploymentpackage'
 
@@ -239,6 +249,170 @@ resource openAiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
 }
 
 // ---------------------------------------------------------------------------
+// Sync backend: Cosmos DB (records) and Blob Storage (photo bytes)
+//
+// Gated on useLinkedBackend, mirroring the client's isSyncSupported() in
+// src/services/platform/topology.ts. On the Free SKU the SPA calls the Function
+// App cross-origin, which makes the x-ms-client-principal header attacker-
+// controlled (specs/sync.md -> Identity). Sync is refused there, so provisioning
+// its storage would pay for resources the security gate forbids using.
+//
+// COST: both are pure consumption with no idle floor. Serverless Cosmos bills
+// $0.25/1M RUs and $0.25/GB-month; Hot LRS blob is $0.02/GB-month. Expected
+// total for a single user is a few cents a month — see
+// docs/deployment.md#what-this-costs.
+// ---------------------------------------------------------------------------
+
+resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2024-05-15' = if (useLinkedBackend) {
+  name: abbrev.cosmos
+  location: location
+  tags: tags
+  kind: 'GlobalDocumentDB'
+  properties: {
+    databaseAccountOfferType: 'Standard'
+    // Serverless: no provisioned throughput, no idle cost. Individual containers
+    // must not declare throughput or the deployment is rejected.
+    capabilities: [
+      {
+        name: 'EnableServerless'
+      }
+    ]
+    // Enforces "no keys in app settings" at the resource rather than by
+    // convention: with local auth disabled, the connection strings and keys
+    // simply do not work, so a future contributor cannot quietly reintroduce
+    // them. Access is via the data-plane role assignment below.
+    disableLocalAuth: true
+    // Session is the correct level for this workload. The seq cursor requires a
+    // client to read its own writes; it does not require other devices to see
+    // them instantly, and they poll anyway.
+    consistencyPolicy: {
+      defaultConsistencyLevel: 'Session'
+    }
+    locations: [
+      {
+        locationName: location
+        failoverPriority: 0
+        isZoneRedundant: false
+      }
+    ]
+    minimalTlsVersion: 'Tls12'
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+resource syncDatabase 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2024-05-15' = if (useLinkedBackend) {
+  parent: cosmos
+  name: syncDatabaseName
+  properties: {
+    resource: {
+      id: syncDatabaseName
+    }
+  }
+}
+
+// One container for every record type. Partitioning on /userId puts a user's
+// entire dataset in a single logical partition, which is the scope of a Cosmos
+// transactional batch — and that is what allows seq to be assigned atomically
+// with the records it numbers (specs/sync.md -> The seq cursor).
+resource syncContainer 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases/containers@2024-05-15' = if (useLinkedBackend) {
+  parent: syncDatabase
+  name: syncContainerName
+  properties: {
+    resource: {
+      id: syncContainerName
+      partitionKey: {
+        paths: [
+          '/userId'
+        ]
+        kind: 'Hash'
+      }
+      indexingPolicy: {
+        indexingMode: 'consistent'
+        automatic: true
+        includedPaths: [
+          {
+            path: '/seq/?'
+          }
+          {
+            path: '/type/?'
+          }
+        ]
+        // Payload holds whole records and is never queried by its interior
+        // fields; indexing it would inflate write RUs for nothing.
+        excludedPaths: [
+          {
+            path: '/*'
+          }
+        ]
+      }
+    }
+  }
+}
+
+// A dedicated account, deliberately not the Functions runtime storage above.
+// User photos and the deployment container have different lifecycles: the
+// privacy commitments in SECURITY.md require deleting every byte a user owns on
+// request, and that must never be able to touch the deployment package. An
+// extra empty storage account has no standing charge.
+resource photoStorage 'Microsoft.Storage/storageAccounts@2023-05-01' = if (useLinkedBackend) {
+  name: abbrev.photoStorage
+  location: location
+  tags: tags
+  sku: {
+    name: 'Standard_LRS'
+  }
+  kind: 'StorageV2'
+  properties: {
+    minimumTlsVersion: 'TLS1_2'
+    supportsHttpsTrafficOnly: true
+    allowBlobPublicAccess: false
+    // Photos are served exclusively through short-lived user-delegation SAS,
+    // which is signed with Entra credentials rather than the account key.
+    // Disabling key auth makes that the only possible path.
+    allowSharedKeyAccess: false
+    publicNetworkAccess: 'Enabled'
+  }
+}
+
+resource photoBlobService 'Microsoft.Storage/storageAccounts/blobServices@2023-05-01' = if (useLinkedBackend) {
+  parent: photoStorage
+  name: 'default'
+  properties: {
+    cors: {
+      corsRules: [
+        {
+          // The browser PUTs photo bytes straight to blob storage with a SAS,
+          // so the SPA origin must be allowed here as well as on the BFF.
+          allowedOrigins: [
+            'https://${staticWebApp.properties.defaultHostname}'
+          ]
+          allowedMethods: [
+            'GET'
+            'HEAD'
+            'PUT'
+          ]
+          allowedHeaders: [
+            '*'
+          ]
+          exposedHeaders: [
+            '*'
+          ]
+          maxAgeInSeconds: 3600
+        }
+      ]
+    }
+  }
+}
+
+resource photoContainer 'Microsoft.Storage/storageAccounts/blobServices/containers@2023-05-01' = if (useLinkedBackend) {
+  parent: photoBlobService
+  name: photoContainerName
+  properties: {
+    publicAccess: 'None'
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Function App (BFF) on Flex Consumption
 // ---------------------------------------------------------------------------
 
@@ -311,6 +485,39 @@ var openAiSettings = [
   }
 ]
 
+// Every value here is a deterministic string, never a property of the
+// conditional resources above. Referencing `cosmos.properties.documentEndpoint`
+// from a context that also evaluates when useLinkedBackend is false is
+// unreliable — ARM does not consistently short-circuit the ternary, and the
+// deployment fails resolving a resource that was never deployed. The same
+// hazard is documented around provisionedOpenAiEndpoint earlier in this file.
+//
+// The endpoint format is stable and documented, so composing it is safe.
+var syncSettings = useLinkedBackend
+  ? [
+      {
+        name: 'COSMOS_ENDPOINT'
+        value: 'https://${abbrev.cosmos}.documents.azure.com:443/'
+      }
+      {
+        name: 'COSMOS_DATABASE'
+        value: syncDatabaseName
+      }
+      {
+        name: 'COSMOS_CONTAINER'
+        value: syncContainerName
+      }
+      {
+        name: 'PHOTO_STORAGE_ACCOUNT'
+        value: abbrev.photoStorage
+      }
+      {
+        name: 'PHOTO_CONTAINER'
+        value: photoContainerName
+      }
+    ]
+  : []
+
 resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
   name: abbrev.functionApp
   location: location
@@ -359,7 +566,7 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         ]
         supportCredentials: false
       }
-      appSettings: concat(baseAppSettings, visionSettings, openAiSettings)
+      appSettings: concat(baseAppSettings, visionSettings, openAiSettings, syncSettings)
     }
   }
   dependsOn: [
@@ -372,6 +579,13 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
     visionKeySecret
     openAiKeySecret
     openAiModelDeployment
+    // The sync settings above name these by string, so ARM infers no
+    // dependency. Without these the app can boot pointing at a Cosmos account
+    // or container that does not exist yet.
+    syncContainer
+    photoContainer
+    cosmosDataContributor
+    photoBlobDataContributor
   ]
 }
 
@@ -406,6 +620,50 @@ resource keyVaultSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01
     roleDefinitionId: subscriptionResourceId(
       'Microsoft.Authorization/roleDefinitions',
       keyVaultSecretsUserRoleId
+    )
+  }
+}
+
+// Cosmos data-plane access is NOT a Microsoft.Authorization/roleAssignments.
+// Control-plane RBAC grants nothing over documents; the data plane has its own
+// assignment type and its own built-in role ids. Granting a control-plane role
+// here would deploy cleanly and then 403 at runtime.
+// 00000000-...-0002 is Cosmos DB Built-in Data Contributor.
+var cosmosDataContributorRoleId = '00000000-0000-0000-0000-000000000002'
+
+resource cosmosDataContributor 'Microsoft.DocumentDB/databaseAccounts/sqlRoleAssignments@2024-05-15' = if (useLinkedBackend) {
+  parent: cosmos
+  name: guid(cosmos.id, abbrev.functionApp, cosmosDataContributorRoleId)
+  properties: {
+    principalId: functionAppIdentity.properties.principalId
+    roleDefinitionId: resourceId(
+      'Microsoft.DocumentDB/databaseAccounts/sqlRoleDefinitions',
+      abbrev.cosmos,
+      cosmosDataContributorRoleId
+    )
+    scope: cosmos.id
+  }
+}
+
+// Storage Blob Data Contributor on the photo account only — the BFF has no
+// reason to touch the deployment account's data, which already has its own
+// narrower grant above.
+//
+// This role already includes generateUserDelegationKey/action, verified against
+// the live role definition, so it is sufficient to mint the user-delegation SAS
+// that specs/sync.md requires. A separate Storage Blob Delegator assignment is
+// NOT needed; please do not add one.
+var storageBlobDataContributorRoleId = 'ba92f5b4-2d11-453d-a403-e96b0029c9fe'
+
+resource photoBlobDataContributor 'Microsoft.Authorization/roleAssignments@2022-04-01' = if (useLinkedBackend) {
+  scope: photoStorage
+  name: guid(photoStorage.id, abbrev.functionApp, storageBlobDataContributorRoleId)
+  properties: {
+    principalId: functionAppIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      storageBlobDataContributorRoleId
     )
   }
 }
@@ -509,3 +767,8 @@ output keyVaultName string = keyVault.name
 
 // Empty when the SPA can reach the BFF same-origin via the linked backend.
 output apiBaseUrl string = useLinkedBackend ? '' : 'https://${functionApp.properties.defaultHostName}'
+
+// Empty on Free, where sync is refused. Composed rather than read back off the
+// resource for the same short-circuit reason described at syncSettings.
+output cosmosAccountName string = useLinkedBackend ? abbrev.cosmos : ''
+output photoStorageAccountName string = useLinkedBackend ? abbrev.photoStorage : ''

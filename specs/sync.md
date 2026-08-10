@@ -492,9 +492,15 @@ Follow the existing optional-dependency pattern from `architecture.md` → Secre
 connect-src 'self' https://<bff-host> https://<storage-account>.blob.core.windows.net
 ```
 
+> **Not yet actionable.** No `Content-Security-Policy` header is emitted anywhere today — `public/staticwebapp.config.json` sets only `cache-control`, so this requirement has no implementation to modify. Tracked in [#113](https://github.com/saquibrashid/agentic-coffee-tracker/issues/113); apply this line when the policy first ships, and no earlier than phase 4, when the storage account name is actually known.
+
 ### Estimated cost
 
-At single-user volumes — a few thousand records, a few hundred MB of photos — Cosmos serverless and Blob hot storage land in the low single-digit dollars per month. Cosmos serverless has no idle floor, so an unused deployment costs only storage.
+At single-user volumes — a few thousand records, a few hundred MB of photos — this is **a few cents a month**, verified against the East US 2 retail prices (Cosmos serverless $0.25/1M RUs and $0.25/GB-month; blob hot LRS $0.02/GB-month).
+
+The dominant term is the 5-minute poll under [Triggers](#triggers), not the writes. A tab left open 24 hours a day is ~288 polls/day at roughly 6 RU for an empty pull, which is about 52,000 RUs a month — under two cents. Records occupy a couple of megabytes and photos are bounded by the 500 MB per-user quota, so storage is another cent.
+
+Neither service has an idle floor, so an unused deployment bills essentially nothing. The failure modes are bounded too: backoff caps at 8 attempts and one hour, and even a pathological once-per-second retry sustained for a full month would reach only about $4.
 
 ---
 
