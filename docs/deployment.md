@@ -228,6 +228,8 @@ Rough monthly estimate for personal usage (US East, pay-as-you-go, USD). Prices 
 | Key Vault                      | $0.03 per 10k operations                                        | <$0.01       |
 | Azure AI Vision                | `F0`: 5,000 transactions/month free                             | $0           |
 | Azure OpenAI (`gpt-4o`)        | Pay-per-token; a bag scan is ~1k tokens                         | ~$0.50       |
+| Cosmos DB (sync)               | Serverless; `Standard` SKU only. ~$0.25/1M RUs, $0.25/GB-month  | ~$0.02       |
+| Photo Blob Storage (sync)      | Hot LRS; `Standard` SKU only. $0.02/GB-month, 500 MB user quota | ~$0.01       |
 | **Total**                      |                                                                 | **~$27**     |
 
 The availability test is the entire bill. Everything else combined is under a dollar, because a personal-scale workload sits inside the Functions and Azure Monitor free grants.
@@ -237,6 +239,7 @@ Knobs, in order of impact:
 - **Availability test** — `infra/resources.bicep`, the `availabilityTest` resource. Billing is per location per run, so cost scales linearly with both. Dropping to one location every 15 minutes costs ~$3/month; setting `Enabled: false` costs nothing. Three locations is the right default for a service people depend on, and overkill for a personal app — pick deliberately.
 - **`STATIC_WEB_APP_SKU=Standard`** — adds a flat **$9/month** in exchange for a linked backend (same-origin `/api`). The `Free` default works identically from the user's perspective; the SPA just makes a cross-origin call.
 - **AI services** — barely register. Azure AI Vision `F0` includes 5,000 free transactions/month, and a bag scan through Azure OpenAI costs a fraction of a cent. Expect pennies. Note the `F0` one-per-subscription-per-region limit if you stand up a second environment.
+- **Sync (Cosmos + photo storage)** — only provisioned on the `Standard` SKU, and effectively free at personal scale. Both are pure consumption with no idle floor, so an unused deployment bills nothing. The dominant cost is the 5-minute sync poll in `specs/sync.md` → Triggers: leaving a tab open 24/7 is ~288 polls/day at roughly 6 RU each, which is about 52,000 RUs a month, or **$0.013**. Records are a couple of megabytes and photos are capped at 500 MB per user by quota. Even a runaway sync loop is bounded — backoff caps at 8 attempts and one hour, and a pathological once-per-second retry sustained for a month would still only reach ~$4.
 
 > **Note:** `/api/search` needs no search-API key. It asks the model for the roaster's storefront domain and then queries that store's own product search, so its only cost is the model call.
 

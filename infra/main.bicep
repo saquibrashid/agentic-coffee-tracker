@@ -68,6 +68,12 @@ output SERVICE_WEB_URI string = resources.outputs.staticWebAppUri
 output APPLICATIONINSIGHTS_CONNECTION_STRING string = resources.outputs.appInsightsConnectionString
 output AZURE_KEY_VAULT_NAME string = resources.outputs.keyVaultName
 
+// Both empty on the Free SKU, where sync is refused for the reason in
+// specs/sync.md -> Identity. Their presence is what /api/health reports as
+// sync: 'live'.
+output AZURE_COSMOS_ACCOUNT_NAME string = resources.outputs.cosmosAccountName
+output AZURE_PHOTO_STORAGE_ACCOUNT_NAME string = resources.outputs.photoStorageAccountName
+
 // The SPA calls the BFF through the Static Web App's linked backend when that is
 // available (Standard SKU), in which case /api is same-origin and this is empty.
 output VITE_API_BASE_URL string = resources.outputs.apiBaseUrl

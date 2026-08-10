@@ -10,6 +10,17 @@ function modeOf(...vars: string[]): 'live' | 'mock' {
   return vars.every((name) => Boolean(process.env[name])) ? 'live' : 'mock';
 }
 
+/**
+ * Sync deliberately reports 'disabled' rather than 'mock'. The AI endpoints fall
+ * back to synthetic data, which is a reasonable degraded state. There is no
+ * honest mock for durable storage: reporting a working sync while records went
+ * nowhere would tell people their notes were safe on another device when they
+ * were not.
+ */
+function syncModeOf(...vars: string[]): 'live' | 'disabled' {
+  return vars.every((name) => Boolean(process.env[name])) ? 'live' : 'disabled';
+}
+
 export interface HealthResponse {
   status: 'ok';
   version: string;
@@ -19,6 +30,7 @@ export interface HealthResponse {
     parse: 'live' | 'mock';
     search: 'live' | 'mock';
     recommend: 'live' | 'mock';
+    sync: 'live' | 'disabled';
   };
 }
 
@@ -39,6 +51,13 @@ app.http('health', {
         // that store directly, so it is live whenever the model is.
         search: openAi,
         recommend: openAi,
+        sync: syncModeOf(
+          'COSMOS_ENDPOINT',
+          'COSMOS_DATABASE',
+          'COSMOS_CONTAINER',
+          'PHOTO_STORAGE_ACCOUNT',
+          'PHOTO_CONTAINER',
+        ),
       },
     };
     ctx.log('health probe', body.services);
