@@ -235,33 +235,64 @@ components.json          # shadcn CLI config
 Colors and radii are defined as CSS variables in `globals.css` (HSL channels, shadcn convention) and referenced from `tailwind.config.ts`. This makes dark mode and brand re-skinning a one-file change.
 
 ```css
-/* src/styles/globals.css (excerpt) */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* src/styles/globals.css (excerpt — the file is authoritative) */
+@import 'tailwindcss';
 
 @layer base {
   :root {
-    --background: 30 40% 98%;
+    --background: 30 33% 96%; /* warm paper, so cards lift off it */
     --foreground: 25 30% 15%;
-    --primary: 25 60% 35%; /* coffee brown */
-    --primary-foreground: 30 40% 98%;
+    --primary: 25 60% 30%; /* deep espresso */
+    --border: 30 22% 85%; /* decoration */
+    --input: 28 18% 52%; /* a control boundary — held to 3:1 */
     --radius: 0.75rem;
     /* ...full shadcn token set... */
   }
   .dark {
-    --background: 25 20% 10%;
+    --background: 24 30% 13%; /* deep roasted brown, not near-black */
     --foreground: 30 30% 95%;
-    --primary: 28 70% 55%;
+    --primary: 28 70% 60%; /* warm crema */
     /* ... */
   }
 }
 ```
 
+`--border` and `--input` are deliberately different values. `--border` is
+decoration between surfaces; `--input` is the edge that tells a user a control
+exists, which WCAG 1.4.11 holds to 3:1. They were previously identical, which
+left every text field outlined at 1.25:1 — present in the markup, invisible on
+screen.
+
 ### Dark mode
 
 - Class strategy (`darkMode: 'class'`).
-- User pref stored in `meta` IndexedDB store; default = follow `prefers-color-scheme`.
+- Three-way preference — **System / Light / Dark** — in Settings → Appearance. A
+  two-way toggle is deliberately rejected: once it has been touched there is no
+  way back to following the device.
+- Default = follow `prefers-color-scheme`, and keep following it live. While the
+  preference is `system` a `matchMedia` listener re-applies the theme when the
+  device changes, so a phone that dims at sunset is tracked without a reload.
+- **Stored in `localStorage`, not the `meta` IndexedDB store.** This spec
+  originally said `meta`, and that turns out to be impossible: the theme has to
+  be applied before the first paint or the app visibly flashes the wrong palette
+  on every load, and IndexedDB reads are asynchronous, so its value does not
+  exist yet at that moment. A synchronous store is therefore mandatory and
+  `localStorage` is the only one. Keeping a copy in `meta` as well was rejected —
+  a second source that can disagree with the one actually used at boot is worse
+  than a documented deviation. See `src/services/theme/theme.ts`.
+- Applied by an **inline script in `index.html`**, which duplicates a few lines
+  of that module on purpose; an imported module runs after first paint and so
+  cannot prevent the flash. `theme.test.ts` asserts the copy still agrees with
+  the module.
+- `color-scheme` is set alongside the class so browser-drawn UI (scrollbars,
+  native controls) matches. Without it a dark page keeps white scrollbars.
+- `<meta name="theme-color">` is rewritten to the active background so browser
+  chrome matches. The PWA manifest colours cannot follow the theme — they are
+  read once at install time — so they track the light palette.
+- The dark background is a **deep roasted brown**, not near-black: below roughly
+  12% lightness the hue stops being perceptible and a warm palette reads as
+  grey. Contrast for every pairing in both palettes is asserted in
+  `src/styles/contrast.test.ts` rather than checked by eye.
 - All shadcn components handle dark variants natively via the token set above.
 
 ### Rules
