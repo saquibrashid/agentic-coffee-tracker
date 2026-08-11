@@ -49,7 +49,8 @@ can live, so the behaviour is described here rather than summarised.
 - **Signing in** replicates beans, ratings, and photos to the operator's
   subscription, in a partition keyed by the user's stable provider identifier —
   and only for accounts this deployment has approved. Records go to Cosmos DB;
-  photo _bytes_ go to Blob Storage, out-of-band from the record stream.
+  photo _bytes_ go to Blob Storage, out-of-band from the record stream. Storage
+  is bounded: 500 MB of photos and 20,000 records per account.
 - **Derived data is never uploaded.** Preferences, summaries and
   recommendations are recomputed on each device from the records it already
   holds.
@@ -94,8 +95,20 @@ can live, so the behaviour is described here rather than summarised.
   15 minutes, and write-only for uploads. The blob path is derived from the
   caller's own principal in `api/src/lib/blob.ts`, so a signed URL cannot be
   made to address another user's photo.
-- **Photo storage is capped at 500 MB per user.** Past the cap the upload
-  endpoint returns 507 and record sync continues unaffected.
+- **Photo storage is capped at 500 MB per user, and records at 20,000.** Past
+  either cap the relevant endpoint returns 507 and the client keeps the data
+  locally rather than discarding it. The record count is maintained on the
+  cursor document inside the same transactional batch that writes the records,
+  so it cannot drift from what it is counting. `SYNC_RECORD_QUOTA` raises the
+  ceiling; a malformed value falls back to the default rather than to zero.
+- **Sync requests are rate-limited per user**, in `api/src/lib/rateLimit.ts`.
+  This is a cost control rather than a security boundary and is documented as
+  such: the bucket lives in the Function worker's memory, so a scaled-out app
+  enforces it once per instance. It exists to bound a runaway client — a retry
+  loop that does not back off, a photo backfill that does not terminate —
+  spending RUs against the operator's subscription. The budget is charged only
+  after authentication and access have both passed, so an anonymous or rejected
+  caller cannot starve the account whose id they name.
 
 - **A user can delete everything the server holds, from inside the app.**
   Settings → Sync → **Delete cloud data** removes every record and every photo
@@ -109,5 +122,35 @@ can live, so the behaviour is described here rather than summarised.
 
 Recorded here so the gaps are not mistaken for guarantees:
 
-- **A bound on record storage.** Photo bytes are capped, but nothing limits how
-  many records a signed-in account can write.
+- **A globally consistent rate limit.** The per-user budget above is
+  per-instance, so a scaled-out deployment permits proportionally more. It
+  bounds a runaway client, which is what it is for; it would not stop a
+  determined attacker, and no part of the design depends on it doing so.
+- **Server-side audit logging.** Requests are logged with a status and a count,
+  never a body. There is no record of which records a given session read, so a
+  compromised session cannot be retroactively scoped.
+
+## What is stored, and where
+
+A plain-language summary of the same facts, for anyone deciding whether to sign
+in. The controls above are what enforce it.
+
+| Data                                    | Signed out         | Signed in                                            |
+| --------------------------------------- | ------------------ | ---------------------------------------------------- |
+| Beans, ratings, roasters, tasting notes | This device only   | This device **and** the operator's Cosmos DB         |
+| Bean photos                             | This device only   | This device **and** the operator's Blob Storage      |
+| Preferences, summaries, recommendations | This device only   | This device only — recomputed, never uploaded        |
+| Your name and email                     | Not collected      | Held by Microsoft Entra, not stored by this app      |
+| Images sent for AI extraction           | Sent, not retained | Sent, not retained — EXIF stripped before forwarding |
+
+Three things follow from that table and are worth stating outright:
+
+- **Signing in is the only thing that puts your data on a server.** There is no
+  telemetry path, no analytics, and no background upload while signed out.
+- **The operator can read what you sync.** Encryption is in transit and at rest,
+  not end-to-end, for the reasons in `specs/sync.md` → Decisions § 1.
+- **Deleting cloud data does not delete local data, and signing out does not
+  delete either.** Settings → Sync → Delete cloud data removes the server copy;
+  Settings → Delete all data removes the local one. They are separate on
+  purpose, because "stop storing this in the cloud" and "lose my coffee
+  library" are very different requests.

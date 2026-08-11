@@ -172,6 +172,10 @@ Transactional batches cap at **100 operations**, so a push chunk is at most **99
 
 All under `/api/sync/*`. All POST except where noted. All require an authenticated principal and the existing `x-app-version` header. All follow the existing convention: JSON in, JSON out, no request bodies logged.
 
+Every one of them opens with `resolveSyncCaller` (`api/src/lib/syncAuth.ts`), which runs authentication, the access policy and the rate limit in that order and returns either the principal or the response to send instead. It exists as one function rather than a copied preamble because the failure mode of the copied version is a new endpoint shipping with one of the three checks missing, and that is not a failure anything else would catch.
+
+The order matters: the rate-limit bucket is keyed by `userId`, so charging it before establishing that the id is real and admitted would let a forged header starve the account it names.
+
 ### `POST /api/sync/pull`
 
 ```text
@@ -209,6 +213,10 @@ interface PushRecord {
 ```
 
 `outcome: 'stale'` means the server held a newer `updatedAt` and rejected the write. The client drops the outbox entry and waits for the winning version to arrive on the next pull.
+
+A chunk that would take the partition past `SYNC_RECORD_QUOTA` (default 20,000 live records) is refused **whole**, with 507 and `{ quota: { used, limit } }`. Refusing whole rather than truncating is forced by the response shape: a partial apply would leave the remainder reported as neither `applied` nor `stale`, and the client has no third state to file them under. Deletes are accepted even at the ceiling, or a full partition would have no way to become less full.
+
+The count lives on the cursor document and is updated inside the same transactional batch that writes the records, so it costs no extra RU and cannot drift from what it counts. A partition whose cursor predates the quota is counted once, lazily, on its next push.
 
 ### `POST /api/sync/photo/upload-url`
 

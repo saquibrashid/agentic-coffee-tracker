@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Sync phase 8, part one — limits** (`specs/sync.md` → Delivery phases): a
+  per-user request budget on every `/api/sync/*` endpoint and a 20,000-record
+  ceiling per account, closing the "no bound on record storage" gap
+  `SECURITY.md` had recorded. The record count rides on the cursor document
+  inside push's existing transactional batch, so it costs no extra RU and
+  cannot drift from the writes it counts. `SECURITY.md` gains a plain-language
+  "What is stored, and where" table.
 - **Professional UI pass** (#111): Fraunces as a self-hosted, latin-subset
   variable display face for headings; a real `components/ui` set (`Input`,
   `Select`, `Textarea`, `Label`, `Badge`, `CheckboxField`, `EmptyState`,

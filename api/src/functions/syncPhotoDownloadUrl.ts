@@ -5,8 +5,7 @@ import {
   type InvocationContext,
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
-import { UnauthenticatedError, requirePrincipal } from '../lib/principal.js';
-import { ForbiddenError, requireAccess } from '../lib/access.js';
+import { resolveSyncCaller } from '../lib/syncAuth.js';
 import { grantDownload, isSafeId, photoExists } from '../lib/blob.js';
 
 /**
@@ -32,16 +31,9 @@ app.http('syncPhotoDownloadUrl', {
   authLevel: 'anonymous',
   route: 'sync/photo/download-url',
   handler: async (req: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    let userId: string;
-    try {
-      const principal = requirePrincipal(req);
-      requireAccess(principal);
-      ({ userId } = principal);
-    } catch (err) {
-      if (err instanceof UnauthenticatedError) return json(401, { error: err.message });
-      if (err instanceof ForbiddenError) return json(403, { error: err.message });
-      return errorResponse(ctx, 500, 'Could not resolve the caller identity', err);
-    }
+    const caller = resolveSyncCaller(req, ctx);
+    if (!caller.ok) return caller.response;
+    const { userId } = caller.principal;
 
     let body: DownloadUrlRequest;
     try {
