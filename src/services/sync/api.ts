@@ -42,6 +42,10 @@ export class SyncApiError extends Error {
     // 409 is contention from another device pushing concurrently, which is the
     // most retryable failure there is: the next attempt sees the new cursor.
     if (this.status === 409 || this.status === 429) return true;
+    // 507 sits inside the 5xx range but is not a server fault: the partition is
+    // full, and every retry will be refused identically until the user frees
+    // space. Retrying would spend the rate budget to learn nothing.
+    if (this.status === 507) return false;
     return this.status >= 500;
   }
 }

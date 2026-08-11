@@ -1,10 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  DEFAULT_RECORD_QUOTA,
   MAX_RECORDS,
   documentId,
   isPushRecord,
   planPush,
+  readRecordQuota,
   wins,
   type PushRecord,
   type StoredRecord,
@@ -25,8 +27,8 @@ function record(overrides: Partial<PushRecord> = {}): PushRecord {
   };
 }
 
-function stored(updatedAt: string): StoredRecord {
-  return { updatedAt };
+function stored(updatedAt: string, deleted = false): StoredRecord {
+  return { updatedAt, deleted };
 }
 
 describe('wins', () => {
@@ -140,6 +142,131 @@ describe('planPush', () => {
     const plan = planPush(records, [undefined, undefined], 0);
 
     expect(plan.writes.map((w) => w.id)).toEqual(['bean:shared', 'photo:shared']);
+  });
+});
+
+describe('planPush record quota', () => {
+  const QUOTA = 5;
+
+  function creates(n: number): PushRecord[] {
+    return Array.from({ length: n }, (_, i) => record({ recordId: `bean-${i}` }));
+  }
+
+  it('counts a new record against the quota', () => {
+    const plan = planPush(creates(2), [undefined, undefined], 0, 3, QUOTA);
+    expect(plan.nextRecords).toBe(5);
+    expect(plan.quotaExceeded).toBeUndefined();
+  });
+
+  it('allows a chunk that lands exactly on the quota', () => {
+    // An off-by-one here would make the last slot permanently unusable.
+    const plan = planPush(creates(1), [undefined], 0, QUOTA - 1, QUOTA);
+    expect(plan.quotaExceeded).toBeUndefined();
+    expect(plan.nextRecords).toBe(QUOTA);
+  });
+
+  it('refuses a chunk that would cross the quota, and writes nothing', () => {
+    const plan = planPush(creates(2), [undefined, undefined], 0, QUOTA, QUOTA);
+
+    expect(plan.quotaExceeded).toEqual({ count: QUOTA + 2, quota: QUOTA });
+    // Whole-chunk refusal. A partial apply would leave the rejected remainder
+    // in neither the applied nor the stale bucket, and the client has no third
+    // state to put them in.
+    expect(plan.writes).toHaveLength(0);
+    expect(plan.results).toHaveLength(0);
+    expect(plan.nextSeq).toBe(0);
+    expect(plan.nextRecords).toBe(QUOTA);
+  });
+
+  it('does not charge for editing a record the server already holds', () => {
+    const plan = planPush([record({ updatedAt: LATER })], [stored(EARLIER)], 0, QUOTA, QUOTA);
+
+    expect(plan.quotaExceeded).toBeUndefined();
+    expect(plan.nextRecords).toBe(QUOTA);
+  });
+
+  it('refunds a slot when a live record is deleted', () => {
+    const plan = planPush(
+      [record({ deleted: true, updatedAt: LATER })],
+      [stored(EARLIER)],
+      0,
+      QUOTA,
+      QUOTA,
+    );
+
+    expect(plan.nextRecords).toBe(QUOTA - 1);
+  });
+
+  it('accepts deletes even at the quota, so a full partition can be emptied', () => {
+    // The alternative is a partition that is full and has no way to stop being
+    // full, which would be an unrecoverable state.
+    const deletes = Array.from({ length: 3 }, (_, i) =>
+      record({ recordId: `bean-${i}`, deleted: true, updatedAt: LATER }),
+    );
+
+    const plan = planPush(
+      deletes,
+      [stored(EARLIER), stored(EARLIER), stored(EARLIER)],
+      0,
+      QUOTA,
+      QUOTA,
+    );
+
+    expect(plan.quotaExceeded).toBeUndefined();
+    expect(plan.writes).toHaveLength(3);
+    expect(plan.nextRecords).toBe(QUOTA - 3);
+  });
+
+  it('does not double-refund a record that is already a tombstone', () => {
+    const plan = planPush(
+      [record({ deleted: true, updatedAt: LATER })],
+      [stored(EARLIER, true)],
+      0,
+      QUOTA,
+      QUOTA,
+    );
+
+    expect(plan.nextRecords).toBe(QUOTA);
+  });
+
+  it('charges for resurrecting a tombstoned record', () => {
+    const plan = planPush(
+      [record({ updatedAt: LATER })],
+      [stored(EARLIER, true)],
+      0,
+      QUOTA - 1,
+      QUOTA,
+    );
+
+    expect(plan.nextRecords).toBe(QUOTA);
+  });
+
+  it('does not charge for a record rejected as stale', () => {
+    const plan = planPush([record({ updatedAt: EARLIER })], [stored(LATER)], 0, QUOTA, QUOTA);
+
+    expect(plan.quotaExceeded).toBeUndefined();
+    expect(plan.nextRecords).toBe(QUOTA);
+  });
+});
+
+describe('readRecordQuota', () => {
+  it('falls back to the default when unset', () => {
+    expect(readRecordQuota({})).toBe(DEFAULT_RECORD_QUOTA);
+  });
+
+  it('honours a configured value', () => {
+    expect(readRecordQuota({ SYNC_RECORD_QUOTA: '500' })).toBe(500);
+  });
+
+  it.each([
+    ['', '0'],
+    ['a negative', '-1'],
+    ['a fraction', '1.5'],
+    ['a word', 'lots'],
+  ])('ignores %s value rather than locking the user out', (_label, value) => {
+    // A typo must never resolve to zero: that would refuse every write to
+    // every account until someone noticed.
+    expect(readRecordQuota({ SYNC_RECORD_QUOTA: value })).toBe(DEFAULT_RECORD_QUOTA);
   });
 });
 

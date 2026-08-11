@@ -8,17 +8,18 @@ import type { JSONObject, OperationInput } from '@azure/cosmos';
 import { errorResponse, json, readJson } from '../lib/http.js';
 import {
   CURSOR_ID,
+  countLiveRecords,
   documentId,
   getSyncContainer,
   readCursor,
   type SyncDocument,
 } from '../lib/cosmos.js';
-import { UnauthenticatedError, requirePrincipal } from '../lib/principal.js';
-import { ForbiddenError, requireAccess } from '../lib/access.js';
+import { resolveSyncCaller } from '../lib/syncAuth.js';
 import {
   MAX_RECORDS,
   isPushRecord,
   planPush,
+  readRecordQuota,
   type PushOutcome,
   type PushRecord,
 } from '../lib/syncBatch.js';
@@ -38,6 +39,17 @@ import {
 
 /** Contention is normal with two devices; unbounded retry is not. */
 const MAX_ATTEMPTS = 3;
+
+/** Distinguishes "no room" from "someone else got there first". */
+class RecordQuotaError extends Error {
+  constructor(
+    readonly count: number,
+    readonly quota: number,
+  ) {
+    super(`Record quota exceeded: ${count} of ${quota}.`);
+    this.name = 'RecordQuotaError';
+  }
+}
 
 interface PushRequest {
   deviceId?: unknown;
@@ -73,6 +85,10 @@ async function attemptPush(
   const container = getSyncContainer();
   const { cursor, etag } = await readCursor(userId);
 
+  // Backfill for partitions that predate the quota. Costs one COUNT query,
+  // once, and only for a cursor that has never carried the field.
+  const liveRecords = cursor.records ?? (await countLiveRecords(userId));
+
   const existing = await Promise.all(
     records.map(async (record) => {
       const response = await container
@@ -82,7 +98,11 @@ async function attemptPush(
     }),
   );
 
-  const plan = planPush(records, existing, cursor.seq);
+  const plan = planPush(records, existing, cursor.seq, liveRecords, readRecordQuota());
+
+  if (plan.quotaExceeded) {
+    throw new RecordQuotaError(plan.quotaExceeded.count, plan.quotaExceeded.quota);
+  }
 
   // Everything was stale. No write, and no reason to burn a cursor replace.
   if (plan.writes.length === 0) return { cursor: cursor.seq, results: plan.results };
@@ -97,7 +117,7 @@ async function attemptPush(
       ? {
           operationType: 'Replace',
           id: CURSOR_ID,
-          resourceBody: asBatchBody({ ...cursor, seq: plan.nextSeq }),
+          resourceBody: asBatchBody({ ...cursor, seq: plan.nextSeq, records: plan.nextRecords }),
           ifMatch: etag,
         }
       : {
@@ -105,7 +125,7 @@ async function attemptPush(
           // racing on a brand-new account resolve by the loser's create failing
           // instead of both claiming seq 1.
           operationType: 'Create',
-          resourceBody: asBatchBody({ ...cursor, seq: plan.nextSeq }),
+          resourceBody: asBatchBody({ ...cursor, seq: plan.nextSeq, records: plan.nextRecords }),
         },
   );
 
@@ -131,19 +151,9 @@ app.http('syncPush', {
   authLevel: 'anonymous',
   route: 'sync/push',
   handler: async (req: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    let userId: string;
-    try {
-      const principal = requirePrincipal(req);
-      // Enforced on push as well as pull, and not only at the read path: a
-      // rejected account must not be able to write records that a later policy
-      // change would then start serving.
-      requireAccess(principal);
-      ({ userId } = principal);
-    } catch (err) {
-      if (err instanceof UnauthenticatedError) return json(401, { error: err.message });
-      if (err instanceof ForbiddenError) return json(403, { error: err.message });
-      return errorResponse(ctx, 500, 'Could not resolve the caller identity', err);
-    }
+    const caller = resolveSyncCaller(req, ctx);
+    if (!caller.ok) return caller.response;
+    const { userId } = caller.principal;
 
     let body: PushRequest;
     try {
@@ -184,6 +194,17 @@ app.http('syncPush', {
       // us retrying forever and holding a Function invocation open.
       return json(409, { error: 'The sync store is busy. Try again shortly.' });
     } catch (err) {
+      if (err instanceof RecordQuotaError) {
+        // 507, matching the photo quota, and for the same reason: the caller is
+        // authorised and the request is well-formed — there is simply no room.
+        // The client keeps the records locally and surfaces the state in
+        // Settings rather than discarding anything.
+        ctx.warn('record quota exceeded', { count: err.count, quota: err.quota });
+        return json(507, {
+          error: 'Cloud storage is full. Delete some coffees to free up space.',
+          quota: { used: err.count, limit: err.quota },
+        });
+      }
       return errorResponse(ctx, 502, 'Could not write to the sync store', err);
     }
   },

@@ -6,8 +6,7 @@ import {
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
 import { CURSOR_ID, getSyncContainer, type SyncDocument } from '../lib/cosmos.js';
-import { UnauthenticatedError, requirePrincipal } from '../lib/principal.js';
-import { ForbiddenError, requireAccess } from '../lib/access.js';
+import { resolveSyncCaller } from '../lib/syncAuth.js';
 
 /**
  * Returns every record written after the client's cursor.
@@ -55,19 +54,9 @@ app.http('syncPull', {
   authLevel: 'anonymous',
   route: 'sync/pull',
   handler: async (req: HttpRequest, ctx: InvocationContext): Promise<HttpResponseInit> => {
-    let userId: string;
-    try {
-      const principal = requirePrincipal(req);
-      // Authentication proves who the caller is; this decides whether they are
-      // welcome. Microsoft accounts are free, so without it anyone could mint a
-      // partition here.
-      requireAccess(principal);
-      ({ userId } = principal);
-    } catch (err) {
-      if (err instanceof UnauthenticatedError) return json(401, { error: err.message });
-      if (err instanceof ForbiddenError) return json(403, { error: err.message });
-      return errorResponse(ctx, 500, 'Could not resolve the caller identity', err);
-    }
+    const caller = resolveSyncCaller(req, ctx);
+    if (!caller.ok) return caller.response;
+    const { userId } = caller.principal;
 
     let body: PullRequest;
     try {

@@ -39,6 +39,20 @@ export interface CursorDocument {
   userId: string;
   /** Highest seq assigned so far. */
   seq: number;
+  /**
+   * Live (non-tombstoned) documents in this partition, maintained by `push`.
+   *
+   * It lives here rather than being counted per request because the cursor is
+   * already read and rewritten inside push's transactional batch — so the count
+   * rides along for free and cannot drift from the writes it is counting. A
+   * `COUNT(1)` query per push would be correct too, and would add an RU charge
+   * and a round trip to the hot path in order to learn something the write
+   * already knows.
+   *
+   * Optional because partitions created before the quota shipped have no value
+   * yet; `countLiveRecords` backfills it on the next push.
+   */
+  records?: number;
 }
 
 export const CURSOR_ID = 'cursor';
@@ -144,4 +158,30 @@ export async function readCursor(
     return { cursor: { id: CURSOR_ID, userId, seq: 0 }, etag: undefined };
   }
   return { cursor: response.resource, etag: response.etag };
+}
+
+/**
+ * Counts live documents in a partition, for the one-time backfill of
+ * `CursorDocument.records`.
+ *
+ * Only ever called when the cursor has no count — either a partition that
+ * predates the quota, or one whose cursor was deleted. Steady state never pays
+ * for this.
+ */
+export async function countLiveRecords(userId: string): Promise<number> {
+  const { resources } = await getSyncContainer()
+    .items.query<number>(
+      {
+        query:
+          'SELECT VALUE COUNT(1) FROM c WHERE c.userId = @userId AND c.id != @cursorId AND c.deleted = false',
+        parameters: [
+          { name: '@userId', value: userId },
+          { name: '@cursorId', value: CURSOR_ID },
+        ],
+      },
+      { partitionKey: userId },
+    )
+    .fetchAll();
+
+  return resources[0] ?? 0;
 }
