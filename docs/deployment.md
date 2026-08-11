@@ -198,15 +198,23 @@ Signing in proves who someone is. It does not entitle them to storage in your su
 
 **Sync is closed until you configure it.** With no allowlist the endpoints return 403 to every account, including yours. That is deliberate: treating "unconfigured" as "unrestricted" would open the deployment the moment a parameter went missing.
 
-To grant yourself access:
+To grant yourself access, either:
 
-1. Sign in to the deployed site.
-2. Open `/.auth/me` and copy the `userId` value.
-3. Set it as a repository variable and re-run the deploy:
+- **Before ever signing in** — set your Microsoft sign-in address. Sign-in names
+  are matched as well as ids, which is what makes bootstrapping possible at all,
+  since the id does not exist until the first sign-in:
 
-   ```bash
-   gh variable set SYNC_ALLOWLIST --body "<your-userId>"
-   ```
+  ```bash
+  gh variable set SYNC_ALLOWLIST --body "you@example.com"
+  ```
+
+- **Or, for the stable identifier** — sign in to the deployed site, open
+  `/.auth/me`, copy the `userId`, and set that instead. Preferred long term: the
+  id survives an address change.
+
+Either way the value is baked into the Function App as an app setting at deploy
+time, so **re-run the Deploy workflow afterwards** — setting the variable alone
+changes nothing until the next deploy.
 
 Until then the app shows the reason inline: `This deployment is restricted to approved accounts. Add "<id>" to SYNC_ALLOWLIST to grant access.` The message names your own id and never names anyone else's.
 
