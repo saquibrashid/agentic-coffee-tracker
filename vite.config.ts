@@ -23,14 +23,35 @@ export default defineConfig({
     // recharts is the largest single dependency and is only pulled in by the
     // (lazy) analytics route, so it sits above the app-code threshold on purpose.
     chunkSizeWarningLimit: 400,
-    rollupOptions: {
+    // Vite 8 bundles with Rolldown, which dropped the object form of
+    // `manualChunks` and deprecated the function form. `codeSplitting.groups`
+    // is the replacement. `includeDependenciesRecursively` (on by default, set
+    // explicitly here because the whole point of these groups is the subtree)
+    // restores what the object form did implicitly: pull each package's private
+    // dependencies in with it, so recharts' d3 modules land in the charts chunk
+    // rather than leaking back into the entry.
+    rolldownOptions: {
       output: {
-        manualChunks: {
-          // Framework code changes rarely — splitting it out keeps it cached
-          // across app deploys.
-          react: ['react', 'react-dom', 'react-router-dom'],
-          charts: ['recharts'],
-          db: ['dexie', 'dexie-react-hooks'],
+        codeSplitting: {
+          groups: [
+            {
+              // Framework code changes rarely — splitting it out keeps it cached
+              // across app deploys.
+              name: 'react',
+              test: /node_modules[\\/](?:react|react-dom|react-router-dom)(?:[\\/]|$)/,
+              includeDependenciesRecursively: true,
+            },
+            {
+              name: 'charts',
+              test: /node_modules[\\/]recharts(?:[\\/]|$)/,
+              includeDependenciesRecursively: true,
+            },
+            {
+              name: 'db',
+              test: /node_modules[\\/](?:dexie|dexie-react-hooks)(?:[\\/]|$)/,
+              includeDependenciesRecursively: true,
+            },
+          ],
         },
       },
     },
