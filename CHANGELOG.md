@@ -64,6 +64,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Take a photo inside the app.** Adding a coffee now offers a live camera
+  preview with a shutter button, instead of handing off to the OS file picker.
+  The previous `capture="environment"` hint was a delegation that behaved
+  differently everywhere: it opened the camera on Android, opened the camera on
+  iOS but removed the "Photo Library" option, and was silently ignored on
+  desktop — so a laptop webcam could not be used at all. The button appears only
+  where a camera can actually be opened, permission denial and missing hardware
+  are explained specifically rather than dead-ending, and the stream is released
+  on capture, on cancel, and on unmount. Captured frames rejoin the existing
+  photo pipeline, so resize, offline queueing, and OCR are unchanged. The file
+  input remains for choosing an existing image and no longer suppresses the
+  photo library on iOS.
+
 - **Roast level inferred from text.** Most roasters never publish a labelled
   roast level, and a ratings export has no roast column at all, so imported
   coffees landed as `unknown` — contributing nothing to the preference profile.

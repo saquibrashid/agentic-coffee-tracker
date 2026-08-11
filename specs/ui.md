@@ -30,6 +30,20 @@ Primary flow:
 4. User confirmation
 5. Save bean entry
 
+Photo capture has two entry points, both feeding the same pipeline from step 2
+onward:
+
+- **In-app camera** — a live preview with a shutter button, via
+  `getUserMedia({ video: { facingMode: 'environment' } })`. Offered only where
+  `navigator.mediaDevices.getUserMedia` exists, so an insecure origin or a
+  device with no camera simply does not see the button. Permission denial, no
+  camera, and a camera held by another app are each explained specifically
+  rather than shown as one generic failure. The stream is released on capture,
+  on cancel, and on unmount.
+- **File input** — for choosing an existing image. Deliberately carries no
+  `capture` attribute: on iOS Safari that attribute removes the "Photo Library"
+  option entirely, so an existing photo of a bag could not be used.
+
 Secondary flows:
 
 - Manual entry
