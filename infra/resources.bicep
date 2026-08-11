@@ -23,6 +23,9 @@ param syncAccessMode string = 'owner'
 @description('Comma-separated user ids or sign-in names permitted to sync. Empty denies everyone, including the owner. Find your id at /.auth/me after signing in.')
 param syncAllowlist string = ''
 
+@description('Ceiling on live sync records in one user partition, as a positive integer. A value the API cannot parse falls back to its 20,000 default rather than failing the deploy.')
+param syncRecordQuota string = '20000'
+
 @description('SKU for the Azure AI Vision account. F0 is free (5,000 transactions/month) but a subscription may only hold one F0 Computer Vision account — use S1 for a second environment.')
 param visionSkuName string = 'F0'
 
@@ -546,6 +549,13 @@ var syncSettings = useLinkedBackend
       {
         name: 'SYNC_ALLOWLIST'
         value: syncAllowlist
+      }
+      // Bounds the record stream. Photo *bytes* were already capped, but until
+      // this reached the app the API read an env var nobody could set, so the
+      // 20,000 default was effectively hard-coded. See specs/sync.md -> Quotas.
+      {
+        name: 'SYNC_RECORD_QUOTA'
+        value: syncRecordQuota
       }
       // The Function App carries a user-assigned identity, so
       // DefaultAzureCredential has to be told which one; without this it picks
