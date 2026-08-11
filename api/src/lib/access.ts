@@ -65,9 +65,12 @@ export function readAccessPolicy(env: NodeJS.ProcessEnv = process.env): AccessPo
  * Whether this principal may sync under the given policy.
  *
  * Matching accepts either the stable `userId` or the sign-in name. The id is
- * the durable identifier and the one to configure; the sign-in name is
- * supported because it is the only value an operator can know *before* the
- * first sign-in, which is what makes bootstrapping possible at all.
+ * the durable identifier and the one to configure. The sign-in name is
+ * supported so an operator can pre-approve someone who has never signed in —
+ * but it is not a reliable bootstrap for the operator's own account: the `aad`
+ * provider reports an opaque identifier rather than an address for personal
+ * Microsoft accounts, so an allowlist holding only the owner's email refuses
+ * the owner. Hence the 403 below names the caller's id.
  */
 export function isAllowed(principal: Principal, policy: AccessPolicy): boolean {
   if (policy.mode === 'open') return true;
