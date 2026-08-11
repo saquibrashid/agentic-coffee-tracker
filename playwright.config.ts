@@ -21,7 +21,20 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // A fake capture device, so the in-app camera (#145) can be exercised
+        // against a real getUserMedia rather than a jsdom stand-in. The fake UI
+        // flag auto-accepts the permission prompt, which is otherwise
+        // unanswerable in a headless run. Harmless for every other spec: it
+        // only makes a camera available, it does not use one.
+        launchOptions: {
+          args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
+        },
+      },
+    },
     { name: 'mobile-safari', use: { ...devices['iPhone 14'] } },
   ],
   webServer: {

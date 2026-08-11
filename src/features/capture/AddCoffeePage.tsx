@@ -5,6 +5,7 @@
  * capture is never lost; the AI work is queued and reconciled by the queue runner.
  */
 import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { Camera } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +18,8 @@ import { parsedBeanToUpdate } from '@/services/ai/mapping';
 import { EmptyPageError, enrichFromUrl } from '@/services/enrich';
 import { attachPhotoFromUrl } from '@/services/enrich/photo';
 import { isSchemaError } from '@/services/ai';
+import { isCameraSupported } from '@/services/camera';
+import { CameraCapture } from './CameraCapture';
 import { ConfirmForm } from './ConfirmForm';
 import type { CoffeeBean } from '@/types';
 import { ulid } from 'ulid';
@@ -45,6 +48,10 @@ export function AddCoffeePage() {
   const [confirmState, setConfirmState] = useState<ConfirmState | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [url, setUrl] = useState('');
+  const [cameraOpen, setCameraOpen] = useState(false);
+  // Read once on mount rather than on every render: the answer cannot change
+  // during a visit, and it decides whether a control exists at all.
+  const [cameraAvailable] = useState(() => isCameraSupported());
 
   function reset() {
     setStage('idle');
@@ -52,6 +59,7 @@ export function AddCoffeePage() {
     setConfirmState(null);
     setError(null);
     setUrl('');
+    setCameraOpen(false);
   }
 
   /**
@@ -117,83 +125,108 @@ export function AddCoffeePage() {
 
     try {
       const dataUrl = await readFileAsDataUrl(file);
-      setPreview(dataUrl);
-
-      const [resized, thumb] = await Promise.all([
-        resizeDataUrl(dataUrl, 1600),
-        createThumbnail(dataUrl, 160),
-      ]);
-      const blob = dataUrlToBlob(resized.dataUrl);
-
-      const now = new Date().toISOString();
-      const photoId = ulid();
-      const beanId = ulid();
-
-      await db.photos.add({
-        id: photoId,
-        schemaVersion: 1,
-        kind: 'bag',
-        mimeType: blob.type,
-        blob,
-        widthPx: resized.width,
-        heightPx: resized.height,
-        byteSize: blob.size,
-        createdAt: now,
-      });
-      await enqueueUpsert('photo', photoId);
-      const draft: CoffeeBean = {
-        id: beanId,
-        schemaVersion: 1,
-        roaster: 'Unknown',
-        name: 'Draft from photo',
-        source: 'photo-ocr',
-        thumbnailDataUrl: thumb.dataUrl,
-        photoId,
-        isArchived: false,
-        needsReview: true,
-        createdAt: now,
-        updatedAt: now,
-      };
-      await db.beans.add(draft);
-      await enqueueUpsert('bean', beanId);
-
-      setStage('extracting');
-
-      try {
-        const result = await extractBeanFromPhoto(blob);
-        const update: Partial<CoffeeBean> = {
-          rawOcrText: result.rawText,
-          updatedAt: new Date().toISOString(),
-          ...(result.parsed ? parsedBeanToUpdate(result.parsed) : {}),
-        };
-        if (result.model) update.llmModel = result.model;
-        await db.beans.update(beanId, update);
-        await enqueueUpsert('bean', beanId);
-
-        const bean = await db.beans.get(beanId);
-        setConfirmState({
-          bean: bean ?? { ...draft, ...update },
-          rawText: result.rawText,
-          usedMock: result.usedMock,
-          ...(result.schemaErrors ? { schemaErrors: result.schemaErrors } : {}),
-        });
-        setStage('confirm');
-      } catch (err) {
-        if (!(err instanceof PipelineUnavailableError)) throw err;
-        // Offline or BFF down: queue the OCR task and let the user move on.
-        await db.pendingAiTasks.add({
-          id: ulid(),
-          schemaVersion: 1,
-          type: 'ocr',
-          payload: { photoId },
-          beanId,
-          attempts: 0,
-          createdAt: new Date().toISOString(),
-        });
-        setStage('queued');
-      }
+      await processPhoto(dataUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong reading that photo.');
+      setStage('idle');
+    }
+  }
+
+  /**
+   * Everything after "we have an image": resize, persist, then read the label.
+   *
+   * Both entry points converge here — a file the user chose and a frame taken
+   * with the in-app camera — so there is one photo path to reason about and the
+   * camera cannot drift away from the offline and queueing behaviour that the
+   * upload path already gets right.
+   */
+  async function processPhoto(dataUrl: string) {
+    setPreview(dataUrl);
+
+    const [resized, thumb] = await Promise.all([
+      resizeDataUrl(dataUrl, 1600),
+      createThumbnail(dataUrl, 160),
+    ]);
+    const blob = dataUrlToBlob(resized.dataUrl);
+
+    const now = new Date().toISOString();
+    const photoId = ulid();
+    const beanId = ulid();
+
+    await db.photos.add({
+      id: photoId,
+      schemaVersion: 1,
+      kind: 'bag',
+      mimeType: blob.type,
+      blob,
+      widthPx: resized.width,
+      heightPx: resized.height,
+      byteSize: blob.size,
+      createdAt: now,
+    });
+    await enqueueUpsert('photo', photoId);
+    const draft: CoffeeBean = {
+      id: beanId,
+      schemaVersion: 1,
+      roaster: 'Unknown',
+      name: 'Draft from photo',
+      source: 'photo-ocr',
+      thumbnailDataUrl: thumb.dataUrl,
+      photoId,
+      isArchived: false,
+      needsReview: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await db.beans.add(draft);
+    await enqueueUpsert('bean', beanId);
+
+    setStage('extracting');
+
+    try {
+      const result = await extractBeanFromPhoto(blob);
+      const update: Partial<CoffeeBean> = {
+        rawOcrText: result.rawText,
+        updatedAt: new Date().toISOString(),
+        ...(result.parsed ? parsedBeanToUpdate(result.parsed) : {}),
+      };
+      if (result.model) update.llmModel = result.model;
+      await db.beans.update(beanId, update);
+      await enqueueUpsert('bean', beanId);
+
+      const bean = await db.beans.get(beanId);
+      setConfirmState({
+        bean: bean ?? { ...draft, ...update },
+        rawText: result.rawText,
+        usedMock: result.usedMock,
+        ...(result.schemaErrors ? { schemaErrors: result.schemaErrors } : {}),
+      });
+      setStage('confirm');
+    } catch (err) {
+      if (!(err instanceof PipelineUnavailableError)) throw err;
+      // Offline or BFF down: queue the OCR task and let the user move on.
+      await db.pendingAiTasks.add({
+        id: ulid(),
+        schemaVersion: 1,
+        type: 'ocr',
+        payload: { photoId },
+        beanId,
+        attempts: 0,
+        createdAt: new Date().toISOString(),
+      });
+      setStage('queued');
+    }
+  }
+
+  async function handleCameraCapture(dataUrl: string) {
+    setCameraOpen(false);
+    setError(null);
+    setStage('processing');
+
+    try {
+      await processPhoto(dataUrl);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong saving that photo.');
       setStage('idle');
     }
   }
@@ -210,21 +243,38 @@ export function AddCoffeePage() {
       <CardContent className="space-y-4">
         {stage === 'idle' && (
           <div>
-            <label htmlFor="bag-photo" className="mb-2 block text-sm font-medium">
-              Photo of the coffee bag
-            </label>
-            <input
-              id="bag-photo"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              onChange={(e) => void handleFile(e)}
-              className="file:bg-primary file:text-primary-foreground block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2 file:text-sm file:font-medium"
-            />
-            {error && (
-              <p role="alert" className="text-destructive mt-3 text-sm">
-                {error}
-              </p>
+            {cameraOpen ? (
+              <CameraCapture
+                onCapture={(dataUrl) => void handleCameraCapture(dataUrl)}
+                onCancel={() => setCameraOpen(false)}
+              />
+            ) : (
+              <>
+                {cameraAvailable && (
+                  <div className="mb-4">
+                    <Button type="button" onClick={() => setCameraOpen(true)}>
+                      <Camera aria-hidden="true" className="mr-2 h-4 w-4" />
+                      Take a photo
+                    </Button>
+                  </div>
+                )}
+
+                <label htmlFor="bag-photo" className="mb-2 block text-sm font-medium">
+                  {cameraAvailable ? 'Or choose a photo of the bag' : 'Photo of the coffee bag'}
+                </label>
+                <input
+                  id="bag-photo"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => void handleFile(e)}
+                  className="file:bg-primary file:text-primary-foreground block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2 file:text-sm file:font-medium"
+                />
+                {error && (
+                  <p role="alert" className="text-destructive mt-3 text-sm">
+                    {error}
+                  </p>
+                )}
+              </>
             )}
 
             <div className="mt-6 border-t pt-4">
