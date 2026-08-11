@@ -7,7 +7,12 @@ import {
 import { errorResponse, json, readJson } from '../lib/http.js';
 import { safeFetch, UnsafeUrlError } from '../lib/safeFetch.js';
 import { callResponses, getOpenAiConfig, parseJsonOutput } from '../lib/openai.js';
-import { buildQueryLadder, rankHits, type RankableHit } from '../lib/productSearch.js';
+import {
+  buildQueryLadder,
+  rankHits,
+  roasterDomainCandidates,
+  type RankableHit,
+} from '../lib/productSearch.js';
 
 interface SearchRequest {
   roaster?: unknown;
@@ -28,13 +33,22 @@ export interface SearchHit {
  * app that already pays for a language model.
  *
  * So this endpoint does the one search that actually matters: find the coffee
- * on the roaster's own store. The model is asked only for the roaster's
- * storefront domain — a fact it knows reliably — and the product lookup runs
- * against that store's own search, which returns real listings.
+ * on the roaster's own store. The product lookup runs against that store's own
+ * search, which returns real listings.
  *
  * Asking the model for full product URLs was tried first and does not work: it
  * confidently returns plausible paths that 404. Every URL returned here came
  * back from a store that actually listed the product.
+ *
+ * Finding the store is therefore the whole problem, and it is done twice over:
+ * the model is asked, and candidates are derived from the roaster's name. The
+ * model alone is not enough — it answers from recognition, so it goes quiet on
+ * smaller roasters and on spellings it has not seen. Both are only guesses, and
+ * a wrong one costs a single request that returns nothing.
+ *
+ * The known limit of this approach is that it can only find roasters who sell
+ * through Shopify. One who does not is invisible to it no matter how the domain
+ * is spelled, which is what the manual URL entry in the app is for.
  */
 
 interface DomainGuess {
@@ -107,14 +121,22 @@ function stripHtml(html: string): string {
 }
 
 /**
+ * Asks a store for products matching a query.
+ *
  * Most specialty roasters run Shopify, which exposes a predictable JSON search
  * endpoint. When it answers, the results are real products with real URLs.
+ *
+ * Returns `null` — as distinct from an empty list — when the endpoint is not a
+ * usable Shopify store search at all. The caller needs that difference to tell
+ * "this domain does not exist" from "this store has no such coffee", so a
+ * guessed domain that turns out to be nothing costs one request rather than a
+ * whole ladder of them.
  */
 export async function searchShopify(
   domain: string,
   query: string,
   max: number,
-): Promise<RankableHit[]> {
+): Promise<RankableHit[] | null> {
   const params = new URLSearchParams({
     q: query,
     'resources[type]': 'product',
@@ -123,13 +145,13 @@ export async function searchShopify(
   const result = await safeFetch(`https://${domain}/search/suggest.json?${params.toString()}`, {
     accept: 'application/json',
   });
-  if (result.status !== 200 || !result.contentType.includes('json')) return [];
+  if (result.status !== 200 || !result.contentType.includes('json')) return null;
 
   let data: ShopifySuggestResponse;
   try {
     data = JSON.parse(result.body) as ShopifySuggestResponse;
   } catch {
-    return [];
+    return null;
   }
 
   const products = data.resources?.results?.products ?? [];
@@ -167,7 +189,11 @@ async function searchStore(
   ctx: InvocationContext,
 ): Promise<RankableHit[]> {
   for (const query of buildQueryLadder(name)) {
-    const ranked = rankHits(name, await searchShopify(domain, query, max));
+    const hits = await searchShopify(domain, query, max);
+    // Not a store: loosening the query cannot change that, so stop paying for it.
+    if (hits === null) return [];
+
+    const ranked = rankHits(name, hits);
     if (ranked.length > 0) {
       if (query !== name) ctx.log('matched on a relaxed query', { name, query });
       return ranked;
@@ -211,13 +237,29 @@ app.http('search', {
         });
       }
 
-      const domains = await guessRoasterDomains(body.roaster, ctx);
-      const hits: RankableHit[] = [];
+      const guessed = await guessRoasterDomains(body.roaster, ctx);
 
-      for (const domain of domains) {
-        if (hits.length >= max) break;
+      // The model's answers first — it handles the cases a name cannot predict,
+      // such as a national TLD or a domain unrelated to the roaster's name —
+      // then the derived candidates, which cover the far more common case of a
+      // roaster the model simply does not recognise under that spelling.
+      const domains: string[] = [];
+      for (const domain of [...guessed, ...roasterDomainCandidates(body.roaster)]) {
+        if (!domains.includes(domain)) domains.push(domain);
+      }
+
+      let hits: RankableHit[] = [];
+      for (const domain of domains.slice(0, 8)) {
         try {
-          hits.push(...(await searchStore(domain, body.name, max, ctx)));
+          const found = await searchStore(domain, body.name, max, ctx);
+          if (found.length > 0) {
+            // The first store that recognises the coffee is the roaster's own.
+            // Carrying on would only add the same product from lookalike
+            // domains, at a round-trip each.
+            hits = found;
+            ctx.log('matched on store', { domain, guessed: guessed.includes(domain) });
+            break;
+          }
         } catch (err) {
           // One unreachable or non-Shopify store must not fail the whole search.
           if (!(err instanceof UnsafeUrlError)) ctx.warn('store search failed', { domain });
@@ -225,11 +267,8 @@ app.http('search', {
       }
 
       const seen = new Set<string>();
-      const deduped = hits.filter((h) => (seen.has(h.url) ? false : seen.add(h.url)));
-
-      // Re-ranked across stores, since each store was only ever ranked against
-      // its own results and the better match may have come from the second one.
-      const results = rankHits(body.name, deduped)
+      const results = hits
+        .filter((h) => (seen.has(h.url) ? false : seen.add(h.url)))
         .slice(0, max)
         .map(({ url, title, snippet }) => ({ url, title, snippet }));
 

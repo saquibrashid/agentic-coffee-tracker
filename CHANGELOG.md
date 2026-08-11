@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Coffees whose roaster the model does not recognise can now be found.** Every
+  lookup starts by working out where the roaster sells, and that was left
+  entirely to the language model — which answers from recognition, so it goes
+  quiet on smaller roasters and, less obviously, on spellings it has not seen.
+  Asked about "High Wire Coffee Roasters" it returned nothing usable, even
+  though the coffee sits on `highwirecoffee.com` and that store answers for
+  every form of the query. The name itself is a strong clue, so candidate
+  domains are now also derived from it directly — trade words such as "Coffee"
+  and "Roasters" dropped or folded in the handful of ways roasters actually
+  build their domains. Checked against real roasters, this alone places most of
+  them without the model recognising anything, and a wrong candidate costs a
+  single request that returns nothing.
+
 - **Coffees with shortened names can now be found on the roaster's store.** A
   store's product search requires _every_ word of the query to match, so one
   abbreviation sank the whole lookup: "Holler Mtn." returned nothing from
@@ -98,6 +111,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diff.
 
 ### Added
+
+- **Paste a product page address to enrich a coffee.** Automatic lookup finds a
+  coffee by working out where its roaster sells online, so it can only ever
+  reach roasters it manages to place — one selling through a platform it does
+  not understand is invisible to it, no matter how the search is improved. The
+  enrichment panel now takes a pasted address directly, skipping the search and
+  going straight to reading the page. It is offered up front and again when a
+  search comes back empty, so anyone who has already found the coffee in another
+  tab is never stuck: it is the one path that works for every coffee.
 
 - **"Look up missing details" in Settings.** A lookup that finds no product page
   is deliberately dropped rather than retried forever, which left every coffee

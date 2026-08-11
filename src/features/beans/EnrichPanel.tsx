@@ -5,10 +5,12 @@
  * fields as an opt-in diff. Nothing is written without an explicit choice, and
  * enrichment failing must never get in the way of manual editing.
  */
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Globe, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { db } from '@/services/db';
 import { enqueueUpsert } from '@/services/sync/outbox';
 import { isSchemaError } from '@/services/ai';
@@ -36,6 +38,7 @@ import {
   type PhotoDimensions,
   type StagedPhoto,
 } from '@/services/enrich/photo';
+import { normaliseEnrichUrl } from '@/services/enrich/url';
 import type { CoffeeBean } from '@/types';
 
 type Phase = 'idle' | 'searching' | 'candidates' | 'fetching' | 'review' | 'saving' | 'done';
@@ -56,6 +59,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
   const [selected, setSelected] = useState<ReadonlySet<EnrichableField>>(new Set());
   const [photoOffer, setPhotoOffer] = useState<PhotoOffer>({ kind: 'none' });
   const [usePhoto, setUsePhoto] = useState(false);
+  const [manualUrl, setManualUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const photoOffered = photoOffer.kind !== 'none';
@@ -106,7 +110,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
     return { kind: 'upgrade', staged, current, ratio };
   }
 
-  async function choose(url: string) {
+  async function choose(url: string, onFailure: Phase = 'candidates') {
     setError(null);
     setPhase('fetching');
     try {
@@ -124,8 +128,27 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
       setPhase('review');
     } catch (err) {
       fail(err, 'Could not read that page.');
-      setPhase('candidates');
+      setPhase(onFailure);
     }
+  }
+
+  /**
+   * The way out when the search cannot find a coffee.
+   *
+   * Automatic lookup can only reach roasters whose storefront it knows how to
+   * find, so there will always be coffees it misses. Someone who has the
+   * product page open in another tab should never be stuck: pasting the link
+   * skips the search entirely and goes straight to reading the page, which is
+   * the part that was always going to do the real work.
+   */
+  function submitManualUrl(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const url = normaliseEnrichUrl(manualUrl);
+    if (!url) {
+      setError('That does not look like a web address. Paste the whole link to the product page.');
+      return;
+    }
+    void choose(url, phase);
   }
 
   function toggle(field: EnrichableField) {
@@ -180,8 +203,31 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
     setSelected(new Set());
     setPhotoOffer({ kind: 'none' });
     setUsePhoto(false);
+    setManualUrl('');
     setError(null);
   }
+
+  const manualUrlForm = (
+    <form className="space-y-2 border-t pt-3" onSubmit={submitManualUrl}>
+      <Label htmlFor={`enrich-url-${bean.id}`} className="text-xs">
+        Or paste the product page address
+      </Label>
+      <div className="flex gap-2">
+        <Input
+          id={`enrich-url-${bean.id}`}
+          type="text"
+          inputMode="url"
+          autoComplete="url"
+          placeholder="https://roaster.com/products/…"
+          value={manualUrl}
+          onChange={(event) => setManualUrl(event.target.value)}
+        />
+        <Button type="submit" variant="outline" size="sm" disabled={manualUrl.trim() === ''}>
+          Read page
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <section className="rounded border p-3">
@@ -202,6 +248,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
           <Button variant="outline" size="sm" onClick={() => void runSearch()}>
             <Globe aria-hidden="true" /> Find details on the web
           </Button>
+          {manualUrlForm}
         </div>
       )}
 
@@ -217,7 +264,10 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
       {phase === 'candidates' && (
         <div className="mt-2 space-y-2">
           {candidates.length === 0 ? (
-            <p className="text-muted-foreground text-sm">No results for this coffee.</p>
+            <p className="text-muted-foreground text-sm">
+              No results for this coffee. If you can find its page on the roaster&rsquo;s site,
+              paste the address below and we will read it.
+            </p>
           ) : (
             <ul aria-label="Search results" className="space-y-2">
               {candidates.map((candidate) => (
@@ -240,6 +290,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
           <Button variant="ghost" size="sm" onClick={restart}>
             Cancel
           </Button>
+          {manualUrlForm}
         </div>
       )}
 

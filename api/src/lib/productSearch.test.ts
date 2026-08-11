@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildQueryLadder, rankHits, scoreMatch, tokenise } from './productSearch.js';
+import {
+  buildQueryLadder,
+  rankHits,
+  roasterDomainCandidates,
+  scoreMatch,
+  tokenise,
+} from './productSearch.js';
 
 /**
  * The case these exist for: a ratings import carried "Holler Mtn.", and
@@ -111,5 +117,56 @@ describe('rankHits', () => {
     // Every product on a store shares the vendor name, so counting it would
     // hand a free match to coffees that have nothing else in common.
     expect(rankHits('Holler Mtn.', [hit('Homestead')])).toEqual([]);
+  });
+});
+
+describe('roasterDomainCandidates', () => {
+  // Each expectation is the roaster's real storefront, confirmed by asking it
+  // for a product. The model is asked first and covers some of these, but it
+  // misses others entirely — "High Wire" is the case that started this, where
+  // the product page existed and the search still came back empty.
+  it.each([
+    ['High Wire Coffee Roasters', 'highwirecoffee.com'],
+    ['Stumptown Coffee Roasters', 'stumptowncoffee.com'],
+    ['Onyx Coffee Lab', 'onyxcoffeelab.com'],
+    ['Verve Coffee Roasters', 'vervecoffee.com'],
+    ['Ruby Coffee Roasters', 'rubycoffeeroasters.com'],
+    ['Black & White Roasters', 'blackwhiteroasters.com'],
+  ])('finds the real storefront for %s', (roaster, expected) => {
+    expect(roasterDomainCandidates(roaster)).toContain(expected);
+  });
+
+  it('puts the most likely form first', () => {
+    expect(roasterDomainCandidates('High Wire Coffee Roasters')[0]).toBe('highwirecoffee.com');
+  });
+
+  it('keeps the trade words when they are the whole name', () => {
+    // Stripping every generic word would leave nothing to build a domain from.
+    expect(roasterDomainCandidates('Coffee Company')).toContain('coffeecompany.com');
+  });
+
+  it('spells out an ampersand the way domains do', () => {
+    expect(roasterDomainCandidates('Black & White Roasters')).toContain(
+      'blackandwhiteroasters.com',
+    );
+  });
+
+  it('produces no candidates for a name with nothing in it', () => {
+    expect(roasterDomainCandidates('')).toEqual([]);
+    expect(roasterDomainCandidates('   ---   ')).toEqual([]);
+  });
+
+  it('does not build a domain out of a two-letter fragment', () => {
+    // "Ao" would yield "ao.com", which belongs to somebody else entirely.
+    expect(roasterDomainCandidates('Ao')).not.toContain('ao.com');
+  });
+
+  it('never repeats a candidate', () => {
+    const candidates = roasterDomainCandidates('Anchorhead Coffee');
+    expect(new Set(candidates).size).toBe(candidates.length);
+  });
+
+  it('stays within the requested limit', () => {
+    expect(roasterDomainCandidates('Ruby Coffee Roasters', 2)).toHaveLength(2);
   });
 });

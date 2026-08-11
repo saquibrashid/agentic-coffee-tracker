@@ -201,3 +201,69 @@ export function rankHits<T extends RankableHit>(
     .sort((a, b) => b.score - a.score)
     .map((entry) => entry.hit);
 }
+
+/**
+ * Words that appear in a roaster's name but not usually in its domain.
+ *
+ * "Stumptown Coffee Roasters" trades at `stumptowncoffee.com`, and "High Wire
+ * Coffee Roasters" at `highwirecoffee.com` — in both cases the trailing trade
+ * words are dropped or partly dropped. Stripping them yields the distinctive
+ * part that the domain is actually built from.
+ */
+const GENERIC_ROASTER_WORDS = new Set([
+  'coffee',
+  'coffees',
+  'roasters',
+  'roaster',
+  'roasting',
+  'roastery',
+  'roasterie',
+  'co',
+  'company',
+  'the',
+  'and',
+]);
+
+/**
+ * Guesses the roaster's own storefront domain from its name alone.
+ *
+ * The model is asked for this first, and is better at the awkward cases — a
+ * national TLD, or a name that bears no relation to the domain. But it answers
+ * from recognition, so it goes quiet on smaller roasters and, more subtly, on
+ * ones whose name it has only seen spelled differently: it resolves "Highwire
+ * Coffee Roasters" and not "High Wire Coffee Roasters", which is how a coffee
+ * whose product page exists came back with nothing at all.
+ *
+ * These candidates cost nothing to produce and are checked by simply asking
+ * each one for a product, so a domain that does not exist or is not a store
+ * falls out on its own. Measured against real roasters, this resolves the large
+ * majority without the model needing to recognise anything.
+ */
+export function roasterDomainCandidates(roaster: string, max = 5): string[] {
+  const all = roaster
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+  if (all.length === 0) return [];
+
+  const core = all.filter((token) => !GENERIC_ROASTER_WORDS.has(token));
+  const distinctive = (core.length > 0 ? core : all).join('');
+  const verbatim = all.join('');
+
+  const candidates: string[] = [];
+  const add = (domain: string) => {
+    // Two characters before the suffix is not a roaster name, it is a typo.
+    if (domain.length > 6 && !candidates.includes(domain)) candidates.push(domain);
+  };
+
+  add(`${distinctive}coffee.com`);
+  add(`${verbatim}.com`);
+  add(`${distinctive}.com`);
+  add(`${distinctive}coffeeroasters.com`);
+  add(`${distinctive}roasters.com`);
+
+  return candidates.slice(0, max);
+}
