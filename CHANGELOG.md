@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Professional UI pass** (#111): Fraunces as a self-hosted, latin-subset
+  variable display face for headings; a real `components/ui` set (`Input`,
+  `Select`, `Textarea`, `Label`, `Badge`, `CheckboxField`, `EmptyState`,
+  `RoastScale`) replacing the class string that had been copied to nine call
+  sites; an elevation and density pass on `Card`; distinctive empty states; a
+  zero-byte CSS kraft grain; and roast level rendered as a five-step colour
+  scale rather than a word.
+
+  Two accessibility bugs surfaced during the pass and are fixed here: every
+  hand-styled control in the app was 40px tall against the 44px minimum
+  `specs/ux-states.md` requires, and `--destructive` used as text failed AA in
+  dark mode once card titles were no longer large text. `@radix-ui/react-label`
+  is now actually used; `@radix-ui/react-dropdown-menu` and
+  `@radix-ui/react-toast` were dependencies with no importer and were dropped.
+
 - **Bean library filters** (#109): roaster, origin and varietal multi-selects
   whose options and counts are derived from the beans themselves rather than a
   constant list, plus minimum rating and roast-date freshness. The controls sit

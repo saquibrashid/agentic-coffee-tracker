@@ -7,6 +7,8 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { db } from '@/services/db';
 import { enqueueUpsert } from '@/services/sync/outbox';
 import { createThumbnail, dataUrlToBlob, resizeDataUrl } from '@/services/image/imagePipeline';
@@ -227,22 +229,22 @@ export function AddCoffeePage() {
 
             <div className="mt-6 border-t pt-4">
               <form onSubmit={(e) => void handleUrlImport(e)}>
-                <label htmlFor="bean-url" className="mb-2 block text-sm font-medium">
+                <Label htmlFor="bean-url" className="mb-2 block">
                   Or import from a link
-                </label>
+                </Label>
                 <p className="text-muted-foreground mb-2 text-sm">
                   Paste the roaster&apos;s product page and we&apos;ll read the details from there
                   instead.
                 </p>
                 <div className="flex gap-2">
-                  <input
+                  <Input
                     id="bean-url"
                     type="url"
                     inputMode="url"
                     placeholder="https://roaster.example/coffee"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    className="border-input bg-background focus-visible:ring-ring h-10 min-w-0 flex-1 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                    className="flex-1"
                   />
                   <Button type="submit" variant="outline" disabled={url.trim() === ''}>
                     Import

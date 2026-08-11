@@ -4,7 +4,9 @@ import { Coffee, Plus } from 'lucide-react';
 
 import { db } from '@/services/db';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { RoastScale } from '@/components/ui/roast-scale';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export function HomePage() {
@@ -25,22 +27,18 @@ export function HomePage() {
   // Empty
   if (beans.length === 0) {
     return (
-      <Card className="mx-auto max-w-xl text-center">
-        <CardHeader>
-          <Coffee className="text-primary mx-auto size-12" aria-hidden="true" />
-          <CardTitle>Welcome to your coffee log</CardTitle>
-          <CardDescription>
-            Snap a photo of your first bag and we&apos;ll fill in the details.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <EmptyState
+        icon={<Coffee />}
+        title="Welcome to your coffee log"
+        description="Snap a photo of a bag and we'll read the roaster, origin and tasting notes off the label for you."
+        action={
           <Button asChild size="lg">
             <Link to="/add">
               <Plus aria-hidden="true" /> Add your first coffee
             </Link>
           </Button>
-        </CardContent>
-      </Card>
+        }
+      />
     );
   }
 
@@ -53,10 +51,11 @@ export function HomePage() {
           {beans.map((b) => (
             <li key={b.id}>
               <Link to={`/beans/${b.id}`} className="block">
-                <Card className="transition hover:shadow-md">
+                <Card className="h-full transition hover:shadow-md">
                   <CardHeader>
                     <CardTitle className="text-lg">{b.name}</CardTitle>
                     <CardDescription>{b.roaster}</CardDescription>
+                    <RoastScale level={b.roastLevel} compact className="pt-1" />
                   </CardHeader>
                 </Card>
               </Link>
