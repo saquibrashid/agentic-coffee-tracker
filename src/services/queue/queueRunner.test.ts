@@ -7,11 +7,17 @@ import type { CoffeeBean, PendingAiTask } from '@/types';
 const mocks = vi.hoisted(() => ({
   autoEnrichBean: vi.fn(),
   isTerminalEnrichFailure: vi.fn(),
+  extractBeanFromPhoto: vi.fn(),
 }));
 
 vi.mock('@/services/enrich/autoEnrich', () => mocks);
 
-const { autoEnrichBean, isTerminalEnrichFailure } = mocks;
+vi.mock('@/services/ai/pipeline', () => ({
+  extractBeanFromPhoto: mocks.extractBeanFromPhoto,
+  PipelineUnavailableError: class PipelineUnavailableError extends Error {},
+}));
+
+const { autoEnrichBean, isTerminalEnrichFailure, extractBeanFromPhoto } = mocks;
 
 const { runQueueNow } = await import('./queueRunner');
 
@@ -46,10 +52,58 @@ function task(overrides: Partial<PendingAiTask> = {}): PendingAiTask {
 beforeEach(async () => {
   autoEnrichBean.mockReset();
   isTerminalEnrichFailure.mockReset();
+  extractBeanFromPhoto.mockReset();
   isTerminalEnrichFailure.mockReturnValue(false);
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
-  await Promise.all([db.beans.clear(), db.pendingAiTasks.clear()]);
+  await Promise.all([db.beans.clear(), db.pendingAiTasks.clear(), db.photos.clear()]);
+});
+
+describe('queue runner: ocr roast level', () => {
+  const parsed = {
+    roaster: null,
+    name: 'French Roast',
+    origins: [],
+    process: null,
+    roastLevel: null,
+    tastingNotes: [],
+    roastDate: null,
+    varietals: [],
+    elevationMeters: null,
+    roasterDescription: null,
+    confidence: 0.8,
+  };
+
+  async function runOcr(existing: Partial<CoffeeBean>, parsedOverrides = {}) {
+    await db.beans.add(bean(existing));
+    await db.photos.add({ id: 'p1', kind: 'bag', blob: new Blob(['x']) } as never);
+    await db.pendingAiTasks.add(task({ type: 'ocr', payload: { photoId: 'p1' } }));
+    extractBeanFromPhoto.mockResolvedValue({
+      parsed: { ...parsed, ...parsedOverrides },
+      rawText: 'FRENCH ROAST',
+      model: 'gpt-4o',
+    });
+    await runQueueNow();
+    return db.beans.get('b1');
+  }
+
+  it('fills a missing roast level from the scanned name', async () => {
+    expect((await runOcr({ roastLevel: 'unknown' }))?.roastLevel).toBe('dark');
+  });
+
+  it('never lets an inferred roast displace one the user chose', async () => {
+    // A guess from a product name is weaker evidence than a level the user
+    // picked, so it must lose -- even though the scan says "French Roast".
+    expect((await runOcr({ roastLevel: 'light' }))?.roastLevel).toBe('light');
+  });
+
+  it('still lets a roast the model actually read replace an existing one', async () => {
+    // This one was read off the bag, so it is at least as good as what is on
+    // the record and the pre-existing "model wins" rule stands.
+    expect((await runOcr({ roastLevel: 'light' }, { roastLevel: 'medium-dark' }))?.roastLevel).toBe(
+      'medium-dark',
+    );
+  });
 });
 
 describe('queue runner: web-enrich', () => {

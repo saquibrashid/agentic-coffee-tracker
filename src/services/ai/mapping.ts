@@ -1,5 +1,6 @@
 /** Maps the LLM contract (`ParsedBean`) onto the local `CoffeeBean` record. */
 import type { ParsedBean } from '@/services/ai';
+import { inferRoastLevel } from '@/services/enrich/inferRoast';
 import type { CoffeeBean, Origin } from '@/types';
 
 function toOrigins(parsed: ParsedBean): Origin[] | undefined {
@@ -28,6 +29,13 @@ function toElevation(parsed: ParsedBean): CoffeeBean['elevationMeters'] {
 /**
  * Only fields the model actually resolved are returned, so a sparse parse never
  * blanks out data the user already entered.
+ *
+ * The one derived value is the roast level. The parse prompt is told not to
+ * guess, so a roaster who writes the roast into a sentence or a product name
+ * rather than a labelled field yields `null` here. Inferring at this boundary
+ * rather than at each caller means every path that turns a parse into a bean --
+ * adding by link, adding by photo, the background OCR queue, and the enrichment
+ * review -- gets it, and a path added later gets it without remembering to.
  */
 export function parsedBeanToUpdate(parsed: ParsedBean): Partial<CoffeeBean> {
   const update: Partial<CoffeeBean> = {};
@@ -40,6 +48,14 @@ export function parsedBeanToUpdate(parsed: ParsedBean): Partial<CoffeeBean> {
 
   if (parsed.process) update.process = parsed.process;
   if (parsed.roastLevel) update.roastLevel = parsed.roastLevel;
+  else {
+    const inferred = inferRoastLevel({
+      name: parsed.name ?? undefined,
+      roasterDescription: parsed.roasterDescription ?? undefined,
+      tastingNotes: parsed.tastingNotes,
+    });
+    if (inferred) update.roastLevel = inferred.level;
+  }
   if (parsed.varietals.length > 0) update.varietals = parsed.varietals;
   if (parsed.tastingNotes.length > 0) update.tastingNotes = parsed.tastingNotes;
   if (parsed.roasterDescription) update.roasterDescription = parsed.roasterDescription;

@@ -17,6 +17,7 @@ import { parsedBeanToUpdate } from '@/services/ai/mapping';
 import { ApiError } from '@/services/ai';
 import type { CoffeeBean } from '@/types';
 import { EmptyPageError, enrichFromUrl, findCandidates } from './index';
+import { inferRoastLevel } from './inferRoast';
 import { attachPhotoFromUrl, beanNeedsPhoto } from './photo';
 
 /**
@@ -128,6 +129,33 @@ export interface AutoEnrichResult {
 }
 
 /**
+ * Adds a roast level read out of prose, when neither the coffee nor the parse
+ * supplies one.
+ *
+ * Most roasters state the roast in a sentence rather than a labelled field, so
+ * the model — instructed not to guess — returns null and the coffee stays
+ * `unknown`. That is not merely cosmetic: `preferences/compute.ts` and
+ * `predict/predict.ts` both skip `unknown`, so the coffee never contributes to
+ * the profile behind recommendations.
+ *
+ * Runs against the page's text and the coffee's own, since a name like
+ * "French Roast" already carries the answer for a row that was bulk-imported
+ * with nothing else. `fillMissingFields` still applies afterwards, so this can
+ * only ever fill a gap and never overwrite what the user typed.
+ */
+function withInferredRoast(bean: CoffeeBean, update: Partial<CoffeeBean>): Partial<CoffeeBean> {
+  if (update.roastLevel && update.roastLevel !== 'unknown') return update;
+
+  const inferred = inferRoastLevel({
+    name: update.name ?? bean.name,
+    roasterDescription: update.roasterDescription ?? bean.roasterDescription,
+    tastingNotes: update.tastingNotes ?? bean.tastingNotes,
+  });
+
+  return inferred ? { ...update, roastLevel: inferred.level } : update;
+}
+
+/**
  * Looks the coffee up on the web and returns only the gaps it could close, or
  * `null` when there was nothing to fill or nothing new was found.
  */
@@ -139,7 +167,8 @@ export async function autoEnrichBean(bean: CoffeeBean): Promise<AutoEnrichResult
   if (!best) throw new NoCandidatesError(bean.roaster, bean.name);
 
   const page = await enrichFromUrl(best.url);
-  const filled = fillMissingFields(bean, parsedBeanToUpdate(page.parsed));
+  const update = withInferredRoast(bean, parsedBeanToUpdate(page.parsed));
+  const filled = fillMissingFields(bean, update);
   const fields = Object.keys(filled) as EnrichableField[];
 
   // Attempted only when the coffee has no picture of its own, so a user photo

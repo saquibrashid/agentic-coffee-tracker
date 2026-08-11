@@ -64,6 +64,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Roast level inferred from text.** Most roasters never publish a labelled
+  roast level, and a ratings export has no roast column at all, so imported
+  coffees landed as `unknown` — contributing nothing to the preference profile.
+  A deterministic pass now reads the roast out of explicit roast vocabulary
+  ("French roast", "blonde", "full city") in the coffee name, roaster
+  description, and tasting notes. It applies everywhere a coffee is created or
+  looked up: adding by link, adding by photo, the background OCR queue, the
+  enrichment review, CSV import, and an offline backfill over beans already in
+  the library.
+  It reads only explicit roast terms, never flavour words: "dark chocolate" and
+  "light body" describe the cup, not the roast, and guessing from them would
+  quietly poison recommendations. Negations ("not your typical dark roast") are
+  skipped, and a roast the user set by hand is never overwritten.
+
 - **Content Security Policy.** `SECURITY.md` and `specs/architecture.md` both
   described a policy that no code emitted; the app shipped with no CSP at all.
   It is now generated at build time and written into

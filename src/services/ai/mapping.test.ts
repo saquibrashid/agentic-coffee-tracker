@@ -21,6 +21,57 @@ describe('parsedBeanToUpdate', () => {
     expect(parsedBeanToUpdate(empty)).toEqual({ confidence: 0 });
   });
 
+  describe('roast level inference', () => {
+    it('derives the roast from the name when the model resolved none', () => {
+      // The parse prompt says "do not guess", so a product name that states the
+      // roast still comes back as null.
+      const update = parsedBeanToUpdate({ ...empty, name: 'French Roast' });
+
+      expect(update.roastLevel).toBe('dark');
+    });
+
+    it('derives the roast from the roaster description', () => {
+      const update = parsedBeanToUpdate({
+        ...empty,
+        name: 'Southpaw',
+        roasterDescription: 'Taken to a full city, just shy of second crack.',
+      });
+
+      expect(update.roastLevel).toBe('medium-dark');
+    });
+
+    it('prefers what the model resolved over anything inferable', () => {
+      const update = parsedBeanToUpdate({
+        ...empty,
+        name: 'French Roast',
+        roastLevel: 'light',
+      });
+
+      expect(update.roastLevel).toBe('light');
+    });
+
+    it('leaves the roast unset rather than reading it out of flavour words', () => {
+      const update = parsedBeanToUpdate({
+        ...empty,
+        name: 'Geometry',
+        tastingNotes: ['dark chocolate', 'light caramel'],
+        roasterDescription: 'A syrupy body with a dark, jammy finish.',
+      });
+
+      expect(update.roastLevel).toBeUndefined();
+    });
+
+    it('respects a negated mention', () => {
+      const update = parsedBeanToUpdate({
+        ...empty,
+        name: 'Southpaw',
+        roasterDescription: 'None of the bitterness of a French roast.',
+      });
+
+      expect(update.roastLevel).toBeUndefined();
+    });
+  });
+
   it('maps resolved scalars and lists', () => {
     const update = parsedBeanToUpdate({
       ...empty,
