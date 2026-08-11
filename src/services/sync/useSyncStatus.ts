@@ -1,21 +1,22 @@
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
 
-import { getSyncEngine } from './index';
+import { getSyncStatus, subscribeSyncStatus } from './status';
 import type { SyncStatus } from './types';
 
 /**
  * Subscribes the component tree to sync status.
  *
- * Live in v1 even though `NoopSyncEngine` never publishes: running the real
- * subscribe/unsubscribe lifecycle now means the wiring is exercised by every
- * mount and unmount from day one, instead of being tried for the first time on
- * the day a live engine is switched on.
+ * Reads the shared store rather than the engine, and that indirection is
+ * load-bearing: this hook renders in the app shell on first paint, so importing
+ * `getSyncEngine()` here would put the entire Cosmos-facing engine into the
+ * entry chunk and defeat the dynamic import in `App.tsx` (#137).
+ *
+ * `useSyncExternalStore` rather than `useState` + `useEffect` because the
+ * engine now arrives asynchronously: a publish landing between the initial
+ * render and the subscribe effect would be dropped by the manual pairing, and
+ * the indicator would then sit on a stale status until the next publish — which
+ * for a healthy idle engine is five minutes away.
  */
 export function useSyncStatus(): SyncStatus {
-  const engine = getSyncEngine();
-  const [status, setStatus] = useState<SyncStatus>(() => engine.status());
-
-  useEffect(() => engine.subscribe(setStatus), [engine]);
-
-  return status;
+  return useSyncExternalStore(subscribeSyncStatus, getSyncStatus, getSyncStatus);
 }

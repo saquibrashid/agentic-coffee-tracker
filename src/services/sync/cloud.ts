@@ -39,6 +39,7 @@ import {
   setLastSyncedAt,
 } from './state';
 import type { DeleteCloudDataResult, SyncEngine, SyncStatus } from './types';
+import { getSyncStatus, publishSyncStatus, subscribeSyncStatus } from './status';
 /** `specs/sync.md` -> Backoff. Same schedule the AI queue already uses. */
 const BASE_BACKOFF_MS = 60_000;
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
@@ -66,9 +67,6 @@ const VISIBILITY_MIN_GAP_MS = 60_000;
 type StatusPatch = Omit<Partial<SyncStatus>, 'lastError'> & { lastError?: string | undefined };
 
 export class CloudSyncEngine implements SyncEngine {
-  #status: SyncStatus = { state: 'idle', lastSyncedAt: null, pendingCount: 0 };
-  #subscribers = new Set<(status: SyncStatus) => void>();
-
   /** Consecutive failures, for backoff. Reset by any success. */
   #attempts = 0;
   /** Epoch ms before which a cycle is pointless. */
@@ -92,13 +90,23 @@ export class CloudSyncEngine implements SyncEngine {
   #lastTriggeredAt = 0;
   #unsubscribeOutbox: (() => void) | undefined;
 
+  /**
+   * Moves the shared store off `disabled` the moment a live engine exists.
+   *
+   * Without this the status indicator and the settings panel would read
+   * "disabled" — the store's pre-engine default — between construction and the
+   * first publish, which in a build where sync genuinely works is a lie.
+   */
+  constructor() {
+    publishSyncStatus({ state: 'idle', lastSyncedAt: null, pendingCount: 0 });
+  }
+
   status(): SyncStatus {
-    return this.#status;
+    return getSyncStatus();
   }
 
   subscribe(fn: (status: SyncStatus) => void): () => void {
-    this.#subscribers.add(fn);
-    return () => this.#subscribers.delete(fn);
+    return subscribeSyncStatus(fn);
   }
 
   /**
@@ -489,13 +497,14 @@ export class CloudSyncEngine implements SyncEngine {
   }
 
   async #publish(patch: StatusPatch): Promise<void> {
+    const previous = getSyncStatus();
     const [pending, lastSyncedAt] = await Promise.all([
       pendingCount(),
       patch.lastSyncedAt === undefined ? getLastSyncedAt() : Promise.resolve(patch.lastSyncedAt),
     ]);
 
     const next: SyncStatus = {
-      state: patch.state ?? this.#status.state,
+      state: patch.state ?? previous.state,
       pendingCount: pending,
       lastSyncedAt,
     };
@@ -503,15 +512,14 @@ export class CloudSyncEngine implements SyncEngine {
     // An explicit `lastError: undefined` clears the message, so a stale error
     // cannot outlive the failure that produced it; omitting the key entirely
     // carries the previous one forward.
-    const error = 'lastError' in patch ? patch.lastError : this.#status.lastError;
+    const error = 'lastError' in patch ? patch.lastError : previous.lastError;
     if (error !== undefined) next.lastError = error;
 
     if (this.#photoQuota) {
       next.photoQuota = { ...this.#photoQuota, exceeded: this.#quotaBlocked };
     }
 
-    this.#status = next;
-    for (const fn of this.#subscribers) fn(next);
+    publishSyncStatus(next);
   }
 
   /** Clears a halt after the user acts — re-authenticating, or pressing Sync now. */
