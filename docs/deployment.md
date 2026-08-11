@@ -198,19 +198,28 @@ Signing in proves who someone is. It does not entitle them to storage in your su
 
 **Sync is closed until you configure it.** With no allowlist the endpoints return 403 to every account, including yours. That is deliberate: treating "unconfigured" as "unrestricted" would open the deployment the moment a parameter went missing.
 
-To grant yourself access, either:
+To grant yourself access:
 
-- **Before ever signing in** — set your Microsoft sign-in address. Sign-in names
-  are matched as well as ids, which is what makes bootstrapping possible at all,
-  since the id does not exist until the first sign-in:
+1. **Sign in to the deployed site.** You will be signed in but refused, and the
+   refusal names the exact value you need: `This deployment is restricted to
+approved accounts. Add "<id>" to SYNC_ALLOWLIST to grant access.` (You can
+   also read it from `/.auth/me` as `userId`.)
 
-  ```bash
-  gh variable set SYNC_ALLOWLIST --body "you@example.com"
-  ```
+2. **Set that id and redeploy:**
 
-- **Or, for the stable identifier** — sign in to the deployed site, open
-  `/.auth/me`, copy the `userId`, and set that instead. Preferred long term: the
-  id survives an address change.
+   ```bash
+   gh variable set SYNC_ALLOWLIST --body "78e79d0a04914b5faee2cce05a7bfd6e"
+   gh workflow run deploy.yml --ref main
+   ```
+
+Sign-in names are matched as well as ids, so a colleague can be pre-approved by
+address before they have ever signed in. **Do not rely on this for your own
+bootstrap.** It only works if the provider actually reports an address in
+`userDetails`, and the `aad` provider does not for a personal Microsoft account
+— it reports an opaque identifier, so an allowlist containing only the account's
+email address 403s the very person who owns the deployment. The id path always
+works, and the id is the durable identifier anyway: it survives an address
+change.
 
 Either way the value is baked into the Function App as an app setting at deploy
 time, so **re-run the Deploy workflow afterwards** — setting the variable alone
@@ -220,10 +229,10 @@ Until then the app shows the reason inline: `This deployment is restricted to ap
 
 Two variables control the policy:
 
-| Variable           | Values                                 | Effect                                                                                                   |
-| ------------------ | -------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `SYNC_ACCESS_MODE` | `owner` (default), `allowlist`, `open` | `owner`/`allowlist` admit only listed accounts; `open` admits any sign-in                                |
-| `SYNC_ALLOWLIST`   | comma-separated ids or sign-in names   | Empty denies everyone. Sign-in names are accepted so you can pre-approve someone who has never signed in |
+| Variable           | Values                                 | Effect                                                                                                                                              |
+| ------------------ | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SYNC_ACCESS_MODE` | `owner` (default), `allowlist`, `open` | `owner`/`allowlist` admit only listed accounts; `open` admits any sign-in                                                                           |
+| `SYNC_ALLOWLIST`   | comma-separated ids or sign-in names   | Empty denies everyone. Sign-in names are accepted for pre-approving others, but `aad` does not report one for personal Microsoft accounts — use ids |
 
 `owner` and `allowlist` enforce identically — they differ only in stated intent, so widening from one person to a group is a one-word change with a legible meaning. An unrecognised mode falls back to membership, never to `open`: a typo must not be what publishes your library.
 
