@@ -12,7 +12,9 @@
     "vite.config.ts",
     "playwright.config.ts",
     "playwright.sync.config.ts",
+    "playwright.csp.config.ts",
     "vitest.config.ts",
-    "eslint.config.js"
+    "eslint.config.js",
+    "build-config/**/*.ts"
   ]
 }

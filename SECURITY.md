@@ -32,7 +32,7 @@ Out of scope:
 - All Azure keys live server-side only (Functions + Key Vault references).
 - Image EXIF is stripped before forwarding to upstream AI services.
 - BFF logs no request bodies — only timing, status, and model name.
-- CSP locks `connect-src` to the same origin and the BFF host.
+- CSP locks `connect-src` to the same origin plus the photo blob endpoint, and allows inline script only by sha256 hash — never `'unsafe-inline'`. The policy is generated at build time and enforced by a CI check that runs a production build under it (`pnpm test:e2e:csp`).
 - Images fetched during enrichment are identified by magic number, not `Content-Type`, and SVG is refused because it is active content.
 - User data lives client-side in IndexedDB, and stays there entirely while signed out. Signing in replicates it to a per-user partition in Cosmos DB; see "Cloud sync" below.
 

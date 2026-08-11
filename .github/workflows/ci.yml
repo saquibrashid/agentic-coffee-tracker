@@ -116,6 +116,15 @@ jobs:
         if: steps.scaffold.outputs.ready == 'true'
         run: pnpm test:e2e:sync
 
+      # Runs a production build under the exact policy it ships with. The suite
+      # above uses the dev server, which necessarily serves a laxer policy — a
+      # browser ignores 'unsafe-inline' once a hash is present, so dev cannot
+      # stand in for production here. A wrong CSP breaks features silently, so
+      # this is a required check.
+      - name: Playwright e2e (content security policy)
+        if: steps.scaffold.outputs.ready == 'true'
+        run: pnpm test:e2e:csp
+
       - name: Upload Playwright report
         if: always() && steps.scaffold.outputs.ready == 'true'
         uses: actions/upload-artifact@v7
