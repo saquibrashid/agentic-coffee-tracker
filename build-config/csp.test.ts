@@ -126,6 +126,15 @@ describe('inlineScriptHashes', () => {
     expect(inlineScriptHashes(html)).toEqual([]);
   });
 
+  it('still hashes an inline script that has a src-suffixed attribute', () => {
+    // `\bsrc=` would skip this one, because `-` to `s` is a word boundary — and
+    // a skipped script is one the policy blocks in production while the build
+    // reports success. The match therefore requires whitespace before `src`.
+    const html = '<script data-src="ignored">var a = 1;</script>';
+
+    expect(inlineScriptHashes(html)).toEqual([hashInlineScript('var a = 1;')]);
+  });
+
   it('ignores an empty script rather than emitting a hash for nothing', () => {
     expect(inlineScriptHashes('<script>\n  \n</script>')).toEqual([]);
   });

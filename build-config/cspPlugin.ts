@@ -15,7 +15,16 @@ import { buildCsp, hashInlineScript } from './csp';
  * taken from the HTML this build actually produced.
  */
 
-const INLINE_SCRIPT = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
+/**
+ * Matches inline `<script>` elements, i.e. those with no `src`.
+ *
+ * The `src` test requires preceding whitespace rather than a word boundary.
+ * `\bsrc=` looks equivalent but is not: `-` to `s` *is* a word boundary, so
+ * `<script data-src="…">` would satisfy the negative lookahead, and its inline
+ * body would be skipped — producing a policy that blocks a script the page
+ * needs, with a build that reported success.
+ */
+const INLINE_SCRIPT = /<script(?![^>]*\ssrc\s*=)[^>]*>([\s\S]*?)<\/script>/gi;
 
 /** Digests of every inline `<script>` body in the emitted HTML. */
 export function inlineScriptHashes(html: string): string[] {
