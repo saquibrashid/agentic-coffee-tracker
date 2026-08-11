@@ -7,6 +7,7 @@ import {
 import { errorResponse, json, readJson } from '../lib/http.js';
 import { safeFetch, UnsafeUrlError } from '../lib/safeFetch.js';
 import { callResponses, getOpenAiConfig, parseJsonOutput } from '../lib/openai.js';
+import { buildQueryLadder, rankHits, type RankableHit } from '../lib/productSearch.js';
 
 interface SearchRequest {
   roaster?: unknown;
@@ -113,7 +114,7 @@ export async function searchShopify(
   domain: string,
   query: string,
   max: number,
-): Promise<SearchHit[]> {
+): Promise<RankableHit[]> {
   const params = new URLSearchParams({
     q: query,
     'resources[type]': 'product',
@@ -142,9 +143,37 @@ export async function searchShopify(
         url: absolute.toString(),
         title: p.vendor ? `${p.title} — ${p.vendor}` : p.title,
         snippet: stripHtml(p.body ?? '').slice(0, 300),
+        // Kept apart from the display title: the vendor suffix is the roaster's
+        // name, which would match every product on the store equally and so
+        // flatten the scoring it is not meant to take part in.
+        productTitle: p.title,
       },
     ];
   });
+}
+
+/**
+ * Works down the query ladder until a store returns something that genuinely
+ * matches, rather than stopping at the first query that returns *anything*.
+ *
+ * The distinction is the point: a store search will happily answer a loose
+ * query with coffees that share one word, and treating that as success would
+ * end the search on a result the ranker is about to throw away.
+ */
+async function searchStore(
+  domain: string,
+  name: string,
+  max: number,
+  ctx: InvocationContext,
+): Promise<RankableHit[]> {
+  for (const query of buildQueryLadder(name)) {
+    const ranked = rankHits(name, await searchShopify(domain, query, max));
+    if (ranked.length > 0) {
+      if (query !== name) ctx.log('matched on a relaxed query', { name, query });
+      return ranked;
+    }
+  }
+  return [];
 }
 
 function mockResults(roaster: string, name: string): SearchHit[] {
@@ -183,12 +212,12 @@ app.http('search', {
       }
 
       const domains = await guessRoasterDomains(body.roaster, ctx);
-      const hits: SearchHit[] = [];
+      const hits: RankableHit[] = [];
 
       for (const domain of domains) {
         if (hits.length >= max) break;
         try {
-          hits.push(...(await searchShopify(domain, body.name, max)));
+          hits.push(...(await searchStore(domain, body.name, max, ctx)));
         } catch (err) {
           // One unreachable or non-Shopify store must not fail the whole search.
           if (!(err instanceof UnsafeUrlError)) ctx.warn('store search failed', { domain });
@@ -196,7 +225,13 @@ app.http('search', {
       }
 
       const seen = new Set<string>();
-      const results = hits.filter((h) => (seen.has(h.url) ? false : seen.add(h.url))).slice(0, max);
+      const deduped = hits.filter((h) => (seen.has(h.url) ? false : seen.add(h.url)));
+
+      // Re-ranked across stores, since each store was only ever ranked against
+      // its own results and the better match may have come from the second one.
+      const results = rankHits(body.name, deduped)
+        .slice(0, max)
+        .map(({ url, title, snippet }) => ({ url, title, snippet }));
 
       return json(200, { results, provider: 'roaster-site' });
     } catch (err) {
