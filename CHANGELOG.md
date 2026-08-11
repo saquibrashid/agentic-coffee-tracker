@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Sync phase 8, part two — the two-device test** (`specs/sync.md` → Testing):
+  an end-to-end test driving two independent browser contexts — separate
+  IndexedDB, separate Web Locks namespace, separate engine instance — against
+  one shared account, covering propagation, conflicting edits converging on
+  both sides, deletes, an older edit arriving last and losing, and a change made
+  offline converging once the device reconnects. It runs in CI as a required
+  check. Two client-only rules are now pinned by tests rather than by argument:
+  a `507` from a full partition is terminal, not a transient error to retry
+  forever, and cross-account isolation holds against a forged principal header.
 - **Sync phase 8, part one — limits** (`specs/sync.md` → Delivery phases): a
   per-user request budget on every `/api/sync/*` endpoint and a 20,000-record
   ceiling per account, closing the "no bound on record storage" gap

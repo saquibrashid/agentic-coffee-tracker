@@ -108,6 +108,14 @@ jobs:
         if: steps.scaffold.outputs.ready == 'true'
         run: pnpm test:e2e
 
+      # Separate config, separate dev server: the two-device sync test needs
+      # VITE_AUTH_ENABLED set, which would change the conditions every test
+      # above runs under. `specs/sync.md` -> Testing calls this the test that
+      # actually proves the feature, so it is a required check, not optional.
+      - name: Playwright e2e (two-device sync)
+        if: steps.scaffold.outputs.ready == 'true'
+        run: pnpm test:e2e:sync
+
       - name: Upload Playwright report
         if: always() && steps.scaffold.outputs.ready == 'true'
         uses: actions/upload-artifact@v7

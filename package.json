@@ -20,6 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "test:e2e:sync": "playwright test --config playwright.sync.config.ts",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },

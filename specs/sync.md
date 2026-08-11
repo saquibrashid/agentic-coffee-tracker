@@ -530,6 +530,15 @@ Neither service has an idle floor, so an unused deployment bills essentially not
 
 The two-context E2E test is the one that actually proves the feature. Prioritise it over breadth of unit coverage.
 
+It lives in `e2e/two-device.sync.spec.ts` and runs under its own Playwright config (`playwright.sync.config.ts`) on its own dev server, because sync is gated behind `VITE_AUTH_ENABLED` and turning that on for the shared server would change the conditions every other e2e test runs under.
+
+Two browser contexts are two devices in the way that matters: separate IndexedDB, separate Web Locks namespace, separate engine instance, one shared backend. The backend is a fake — an in-process `FakeSyncService` the contexts both route to — because the claim under test is that the _client_ converges, not that Cosmos works. Its two load-bearing rules, monotonic server-assigned `seq` and strictly-greater LWW, mirror `api/src/lib/syncBatch.ts`, which is separately unit-tested.
+
+Two things about that harness are worth knowing before extending it:
+
+- `context.setOffline(true)` does **not** make an intercepted route fail. Playwright fulfils a `context.route` handler without touching the network, so a device the test believes is offline will still push successfully. Simulating offline needs the route itself to `abort('internetdisconnected')`; `setOffline` is still used alongside it, because that is what moves `navigator.onLine`, which the engine reads to tell "offline" from "error".
+- **A page load is a sync trigger.** `start()` runs a cycle immediately, so anything queued before a `goto` is already gone by the time the page renders.
+
 ---
 
 ## Delivery phases
@@ -547,6 +556,8 @@ Each phase is independently mergeable and leaves `main` shippable.
 | 6     | Photo upload/download SAS, lazy backfill, quota                                                               | Photos converge across devices; quota enforced              |
 | 7     | Settings → Sync UI, global indicator, `needs-upgrade` state, cloud data deletion                              | Full UX per `ux-states.md`                                  |
 | 8     | Hardening: security tests, rate limits, `SECURITY.md` and privacy notice rewrite, docs                        | Privacy documentation matches reality                       |
+
+Phase 8 shipped in two parts. The limits — a per-user request budget, a 20,000-record ceiling, the shared `resolveSyncCaller` gate, and the `SECURITY.md` rewrite including a plain-language "What is stored, and where" table — came first. The two-device E2E followed, along with the isolation tests that pin cross-user separation.
 
 Phase 8 is not optional polish. `SECURITY.md` currently states that all user data lives client-side and nothing is persisted server-side. That sentence becomes false the moment Phase 5 ships, so the documentation change is part of the feature, not a follow-up.
 

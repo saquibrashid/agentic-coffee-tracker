@@ -4,6 +4,10 @@ const isCI = !!process.env.CI;
 
 export default defineConfig({
   testDir: './e2e',
+  // The two-device sync test runs under `playwright.sync.config.ts`: it needs a
+  // dev server with VITE_AUTH_ENABLED set, which would change the conditions
+  // every test here runs under.
+  testIgnore: /.*\.sync\.spec\.ts/,
   fullyParallel: true,
   forbidOnly: isCI,
   retries: isCI ? 2 : 0,
