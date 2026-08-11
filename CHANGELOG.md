@@ -30,6 +30,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`SYNC_RECORD_QUOTA` is now actually configurable.** The API read the
+  variable and `SECURITY.md` documented it as the way to raise the record
+  ceiling, but nothing in `infra/` or `deploy.yml` ever set it, so the 20,000
+  default was effectively hard-coded. Wired through the same path as
+  `SYNC_ALLOWLIST` — repository variable → azd parameter → app setting — and
+  documented alongside the 500 MB photo cap. Declared as a string rather than
+  an `int` so an unparseable value falls back to the default, which is what the
+  API already does, instead of failing the deploy.
+- **Dropped `@radix-ui/react-dialog`**, which was declared but never imported —
+  `confirm-dialog.tsx` uses the native `<dialog>` element. Also removed the
+  accordion keyframes left behind by shadcn scaffolding: they animate to
+  `--radix-accordion-content-height`, a variable only the Radix accordion sets,
+  and that primitive is not installed.
+
 - **Vite 8**: replaces Rollup with Rolldown and esbuild with Oxc. The object
   form of `build.rollupOptions.output.manualChunks` is gone; chunking now goes
   through `rolldownOptions.output.codeSplitting.groups` with

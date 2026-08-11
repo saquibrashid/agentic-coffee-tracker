@@ -33,6 +33,10 @@ jobs:
       # repository variable. See docs/deployment.md.
       SYNC_ACCESS_MODE: ${{ vars.SYNC_ACCESS_MODE || 'owner' }}
       SYNC_ALLOWLIST: ${{ vars.SYNC_ALLOWLIST }}
+      # Optional ceiling on records per user. Unset uses the API's 20,000
+      # default; the empty string here would too, but naming it means raising
+      # the cap is a repository-variable change rather than a code change.
+      SYNC_RECORD_QUOTA: ${{ vars.SYNC_RECORD_QUOTA || '20000' }}
       AZURE_VISION_ENDPOINT: ${{ vars.AZURE_VISION_ENDPOINT }}
       AZURE_OPENAI_ENDPOINT: ${{ vars.AZURE_OPENAI_ENDPOINT }}
       AZURE_OPENAI_DEPLOYMENT: ${{ vars.AZURE_OPENAI_DEPLOYMENT }}
