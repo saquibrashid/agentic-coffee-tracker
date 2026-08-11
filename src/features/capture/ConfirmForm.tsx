@@ -7,6 +7,9 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { db } from '@/services/db';
 import { enqueueDelete, enqueueUpsert } from '@/services/sync/outbox';
 import type { CoffeeBean, Process, RoastLevel } from '@/types';
@@ -53,9 +56,6 @@ function splitList(value: string): string[] {
     .map((s) => s.trim())
     .filter(Boolean);
 }
-
-const inputClass =
-  'w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring';
 
 export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFormProps) {
   const navigate = useNavigate();
@@ -134,12 +134,11 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="roaster" className="mb-1 block text-sm font-medium">
+          <Label htmlFor="roaster" className="mb-1 block">
             Roaster <span aria-hidden="true">*</span>
-          </label>
-          <input
+          </Label>
+          <Input
             id="roaster"
-            className={inputClass}
             required
             value={form.roaster}
             onChange={(e) => set('roaster', e.target.value)}
@@ -147,12 +146,11 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
         </div>
 
         <div>
-          <label htmlFor="name" className="mb-1 block text-sm font-medium">
+          <Label htmlFor="name" className="mb-1 block">
             Coffee name <span aria-hidden="true">*</span>
-          </label>
-          <input
+          </Label>
+          <Input
             id="name"
-            className={inputClass}
             required
             value={form.name}
             onChange={(e) => set('name', e.target.value)}
@@ -160,12 +158,11 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
         </div>
 
         <div>
-          <label htmlFor="roastLevel" className="mb-1 block text-sm font-medium">
+          <Label htmlFor="roastLevel" className="mb-1 block">
             Roast level
-          </label>
-          <select
+          </Label>
+          <Select
             id="roastLevel"
-            className={inputClass}
             value={form.roastLevel}
             onChange={(e) => set('roastLevel', e.target.value as RoastLevel)}
           >
@@ -174,16 +171,15 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
                 {level}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         <div>
-          <label htmlFor="process" className="mb-1 block text-sm font-medium">
+          <Label htmlFor="process" className="mb-1 block">
             Process
-          </label>
-          <select
+          </Label>
+          <Select
             id="process"
-            className={inputClass}
             value={form.process}
             onChange={(e) => set('process', e.target.value as Process)}
           >
@@ -192,16 +188,15 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
                 {p}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         <div>
-          <label htmlFor="origin" className="mb-1 block text-sm font-medium">
+          <Label htmlFor="origin" className="mb-1 block">
             Origin countries
-          </label>
-          <input
+          </Label>
+          <Input
             id="origin"
-            className={inputClass}
             placeholder="Ethiopia, Colombia"
             aria-describedby="origin-hint"
             value={form.origin}
@@ -213,13 +208,12 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
         </div>
 
         <div>
-          <label htmlFor="roastDate" className="mb-1 block text-sm font-medium">
+          <Label htmlFor="roastDate" className="mb-1 block">
             Roast date
-          </label>
-          <input
+          </Label>
+          <Input
             id="roastDate"
             type="date"
-            className={inputClass}
             value={form.roastDate}
             onChange={(e) => set('roastDate', e.target.value)}
           />
@@ -227,12 +221,11 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
       </div>
 
       <div>
-        <label htmlFor="tastingNotes" className="mb-1 block text-sm font-medium">
+        <Label htmlFor="tastingNotes" className="mb-1 block">
           Tasting notes
-        </label>
-        <input
+        </Label>
+        <Input
           id="tastingNotes"
-          className={inputClass}
           placeholder="chocolate, citrus, floral"
           aria-describedby="notes-hint"
           value={form.tastingNotes}

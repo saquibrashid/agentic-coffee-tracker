@@ -90,6 +90,16 @@ const TEXT_PAIRS: Array<[string, string]> = [
   ['secondary-foreground', 'secondary'],
   ['accent-foreground', 'accent'],
   ['destructive-foreground', 'destructive'],
+  /*
+   * `--destructive` is used *as text* — `text-destructive` on error messages
+   * and the "Danger zone" heading — not only as a button fill. That was missed
+   * the first time round, and the gap surfaced only when CardTitle shrank from
+   * 24px to 18px and the pairing dropped out of the large-text exemption.
+   * Asserting it here means the palette, not the font size, is what has to be
+   * safe.
+   */
+  ['destructive', 'background'],
+  ['destructive', 'card'],
 ];
 
 describe.each(['\\:root', '\\.dark'])('%s palette', (selector) => {

@@ -16,6 +16,9 @@ import { Sparkles, ThumbsDown, ThumbsUp, HelpCircle } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSchemaError } from '@/services/ai';
 import { extractBeanFromPhoto, PipelineUnavailableError } from '@/services/ai/pipeline';
@@ -316,18 +319,18 @@ export function PredictPage() {
           </div>
 
           <form onSubmit={(e) => void handleLink(e)} className="border-t pt-4">
-            <label htmlFor="predict-url" className="mb-2 block text-sm font-medium">
+            <Label htmlFor="predict-url" className="mb-2 block">
               Or a link to the coffee
-            </label>
+            </Label>
             <div className="flex gap-2">
-              <input
+              <Input
                 id="predict-url"
                 type="url"
                 inputMode="url"
                 placeholder="https://roaster.example/coffee"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                className="border-input bg-background focus-visible:ring-ring h-10 min-w-0 flex-1 rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+                className="flex-1"
               />
               <Button type="submit" variant="outline" disabled={busy !== null || !url.trim()}>
                 {busy === 'link' ? 'Reading…' : 'Read'}
@@ -365,74 +368,69 @@ export function PredictPage() {
           <form onSubmit={handlePredict} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="predict-roaster" className="mb-1 block text-sm font-medium">
+                <Label htmlFor="predict-roaster" className="mb-1 block">
                   Roaster
-                </label>
-                <input
+                </Label>
+                <Input
                   id="predict-roaster"
                   value={form.roaster}
                   onChange={(e) => update({ roaster: e.target.value })}
-                  className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                 />
               </div>
               <div>
-                <label htmlFor="predict-origin" className="mb-1 block text-sm font-medium">
+                <Label htmlFor="predict-origin" className="mb-1 block">
                   Origin country
-                </label>
-                <input
+                </Label>
+                <Input
                   id="predict-origin"
                   placeholder="Ethiopia, Colombia"
                   value={form.origin}
                   onChange={(e) => update({ origin: e.target.value })}
-                  className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                 />
               </div>
               <div>
-                <label htmlFor="predict-process" className="mb-1 block text-sm font-medium">
+                <Label htmlFor="predict-process" className="mb-1 block">
                   Process
-                </label>
-                <select
+                </Label>
+                <Select
                   id="predict-process"
                   value={form.process}
                   onChange={(e) => update({ process: e.target.value as Process | '' })}
-                  className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                 >
                   {PROCESS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
               <div>
-                <label htmlFor="predict-roast" className="mb-1 block text-sm font-medium">
+                <Label htmlFor="predict-roast" className="mb-1 block">
                   Roast level
-                </label>
-                <select
+                </Label>
+                <Select
                   id="predict-roast"
                   value={form.roastLevel}
                   onChange={(e) => update({ roastLevel: e.target.value as RoastLevel | '' })}
-                  className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
                 >
                   {ROAST_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             </div>
 
             <div>
-              <label htmlFor="predict-notes" className="mb-1 block text-sm font-medium">
+              <Label htmlFor="predict-notes" className="mb-1 block">
                 Tasting notes
-              </label>
-              <input
+              </Label>
+              <Input
                 id="predict-notes"
                 placeholder="blueberry, cocoa, jasmine"
                 value={form.tastingNotes}
                 onChange={(e) => update({ tastingNotes: e.target.value })}
-                className="border-input bg-background h-10 w-full rounded-md border px-3 text-sm"
               />
             </div>
 

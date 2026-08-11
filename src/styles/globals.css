@@ -4,6 +4,27 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/*
+ * Self-hosted, latin-subset, variable. Not a webfont service: a third-party
+ * request is an extra connection on the critical path and a privacy leak on
+ * every page view, and `docs/` enforces Lighthouse budgets that would notice.
+ *
+ * `swap` rather than `block`: headings render immediately in Georgia and
+ * re-render when Fraunces lands. A blocking font would trade a visible
+ * fallback for invisible text, which is the worse failure.
+ */
+@font-face {
+  font-family: 'Fraunces Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url('@fontsource-variable/fraunces/files/fraunces-latin-wght-normal.woff2')
+    format('woff2-variations');
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+2074, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 @utility container {
   margin-inline: auto;
   padding-inline: 1rem;
@@ -15,7 +36,50 @@
   }
 }
 
+/*
+ * Metadata labels — origin, process, altitude, roast date.
+ *
+ * Letterspaced uppercase at a small size is the single most recognisable move
+ * in speciality-coffee packaging, and it does real work here: it marks a
+ * string as a field name so it stops competing with the value beside it.
+ *
+ * Uppercased in CSS rather than in the string, so screen readers and
+ * copy-paste still get the original casing.
+ */
+@utility text-meta {
+  font-size: var(--text-2xs);
+  line-height: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
 @theme {
+  /*
+   * Type.
+   *
+   * Body stays on the system stack: it costs nothing, it is already the
+   * typeface the reader's OS optimised for small sizes, and the identity of a
+   * page comes from its headings. Fraunces carries that identity — a warm
+   * "wonky" serif drawn for exactly the packaging this app is quoting.
+   *
+   * Only the latin weight axis is loaded (35 KB woff2). The italic and wonk
+   * files are deliberately not requested; synthesised italics are acceptable
+   * for the handful of places headings are italicised, and a second 45 KB file
+   * is not.
+   */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
+
+  /*
+   * A real scale rather than ad-hoc sizes. Ratio is ~1.2 at the small end and
+   * opens up towards the display sizes, which is what gives a page hierarchy
+   * without needing rules or boxes to separate sections.
+   */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+  --text-2xs--letter-spacing: 0.08em;
+
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
@@ -152,7 +216,10 @@
     --accent: 26 32% 27%;
     --accent-foreground: 30 30% 95%;
 
-    --destructive: 0 70% 62%;
+    /* Used as text (`text-destructive`) as well as a button fill, so it is
+       held to 4.5:1 against both --background and --card, not to the 3:1 a
+       fill would need. That is what sets the lightness here. */
+    --destructive: 0 70% 68%;
     --destructive-foreground: 25 30% 10%;
 
     --border: 24 20% 28%; /* must stay visible against a lighter background */
@@ -168,13 +235,83 @@
   html,
   body {
     @apply bg-background text-foreground h-full antialiased;
-    font-family:
-      ui-sans-serif,
-      system-ui,
-      -apple-system,
-      'Segoe UI',
-      Roboto,
-      sans-serif;
+    font-family: var(--font-sans);
+  }
+
+  /*
+   * Kraft grain.
+   *
+   * A tiling image would be the obvious way to do this and the wrong one: an
+   * asset that has to download to make the page look finished, counted against
+   * the Lighthouse budget, for something the user should never consciously
+   * notice. Two layered repeating gradients at very low opacity produce the
+   * same speckle for zero bytes.
+   *
+   * Deliberately not a brown gradient. The failure mode this is avoiding is a
+   * page that announces "coffee" with a colour wash; this only ever adds
+   * texture at the threshold of perception, so surfaces stop reading as flat
+   * digital rectangles without the page looking tinted.
+   */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.5;
+    background-image:
+      repeating-linear-gradient(
+        22deg,
+        hsl(25 40% 30% / 0.022) 0px,
+        hsl(25 40% 30% / 0.022) 1px,
+        transparent 1px,
+        transparent 4px
+      ),
+      repeating-linear-gradient(
+        -63deg,
+        hsl(25 40% 30% / 0.018) 0px,
+        hsl(25 40% 30% / 0.018) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+  }
+
+  /* Dark surfaces need the grain to be light, or it disappears entirely. */
+  .dark body::before {
+    background-image:
+      repeating-linear-gradient(
+        22deg,
+        hsl(30 40% 80% / 0.02) 0px,
+        hsl(30 40% 80% / 0.02) 1px,
+        transparent 1px,
+        transparent 4px
+      ),
+      repeating-linear-gradient(
+        -63deg,
+        hsl(30 40% 80% / 0.016) 0px,
+        hsl(30 40% 80% / 0.016) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+  }
+
+  /*
+   * Headings take the display face globally rather than at each call site.
+   * Every heading in the app is already a real h1–h6, so this needs no markup
+   * churn and cannot drift out of sync.
+   *
+   * `text-wrap: balance` stops a two-word heading breaking after the first
+   * word on a phone, which is where most of the "unfinished" impression in
+   * long bean names came from.
+   */
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-optical-sizing: auto;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
   }
 
   /* Always-visible focus ring */

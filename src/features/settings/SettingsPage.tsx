@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/services/db';
 import { exportCsv, exportJson, exportJsonWithPhotos } from '@/services/export/exporter';
@@ -182,17 +184,17 @@ function DangerZone() {
             left alone and will sync back — use <strong>Delete cloud data</strong> above first if
             you want it gone everywhere.
           </p>
-          <label htmlFor="reset-confirm" className="block text-sm font-medium">
+          <Label htmlFor="reset-confirm" className="block">
             Type <code>{RESET_CONFIRMATION_PHRASE}</code> to confirm
-          </label>
-          <input
+          </Label>
+          <Input
             id="reset-confirm"
             type="text"
             autoComplete="off"
             value={confirmation}
             onChange={(e) => setConfirmation(e.target.value)}
             disabled={busy}
-            className="border-input bg-background focus-visible:ring-ring h-10 w-full max-w-xs rounded-md border px-3 text-sm focus-visible:ring-2 focus-visible:outline-hidden"
+            className="max-w-xs"
           />
           <div>
             <Button

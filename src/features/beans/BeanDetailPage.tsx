@@ -7,6 +7,9 @@ import { db } from '@/services/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { RoastScale } from '@/components/ui/roast-scale';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
@@ -91,12 +94,46 @@ export function BeanDetailPage() {
         <div className="space-y-4">
           <div>
             <h3 className="text-sm font-medium">Attributes</h3>
-            <p className="text-muted-foreground text-sm">Roast: {bean.roastLevel || '—'}</p>
-            <p className="text-muted-foreground text-sm">
-              Origins: {(bean.origins ?? []).map((o) => o.country).join(', ') || '—'}
-            </p>
+            {/*
+              A description list rather than sentences: these are field/value
+              pairs, and marking them as such is what lets a screen reader
+              announce "Roast, medium-dark" instead of running the labels and
+              values together into one paragraph.
+            */}
+            <dl className="mt-2 grid gap-x-6 gap-y-3 sm:grid-cols-2">
+              <div>
+                <dt className="text-meta text-muted-foreground">Roast</dt>
+                <dd className="mt-0.5 text-sm">
+                  {bean.roastLevel !== undefined && bean.roastLevel !== 'unknown' ? (
+                    <RoastScale level={bean.roastLevel} />
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-meta text-muted-foreground">Origin</dt>
+                <dd className="mt-0.5 text-sm">
+                  {(bean.origins ?? []).map((o) => o.country).join(', ') || (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </dd>
+              </div>
+              {bean.process !== undefined && bean.process !== 'unknown' && (
+                <div>
+                  <dt className="text-meta text-muted-foreground">Process</dt>
+                  <dd className="mt-0.5 text-sm">{bean.process}</dd>
+                </div>
+              )}
+              {bean.roastDate !== undefined && (
+                <div>
+                  <dt className="text-meta text-muted-foreground">Roasted</dt>
+                  <dd className="mt-0.5 text-sm">{bean.roastDate}</dd>
+                </div>
+              )}
+            </dl>
             {bean.sourceUrl && (
-              <p className="text-muted-foreground text-xs break-all">
+              <p className="text-muted-foreground mt-3 text-xs break-all">
                 Source:{' '}
                 <a href={bean.sourceUrl} target="_blank" rel="noreferrer" className="underline">
                   {bean.sourceUrl}
@@ -280,22 +317,16 @@ function EditRatingForm({
       }}
     >
       <div className="flex gap-2">
-        <select
-          value={score}
-          onChange={(e) => setScore(Number(e.target.value))}
-          className="rounded border p-2"
-          aria-label="Score"
-        >
+        <Select value={score} onChange={(e) => setScore(Number(e.target.value))} aria-label="Score">
           {SCORE_OPTIONS.map((n) => (
             <option key={n} value={n}>
               {formatScore(n)}
             </option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           value={brewType}
           onChange={(e) => setBrewType(e.target.value as BrewType)}
-          className="rounded border p-2"
           aria-label="Brew type"
         >
           {BREW_TYPE_OPTIONS.map(({ value, label }) => (
@@ -303,12 +334,11 @@ function EditRatingForm({
               {label}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
-      <textarea
+      <Textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
-        className="w-full rounded border p-2"
         aria-label="Tasting notes"
         placeholder="Tasting notes (optional)"
       />
@@ -363,22 +393,16 @@ function AddRatingForm({ beanId }: { beanId: string }) {
   return (
     <div className="mt-2 space-y-2">
       <div className="flex gap-2">
-        <select
-          value={score}
-          onChange={(e) => setScore(Number(e.target.value))}
-          className="rounded border p-2"
-          aria-label="Score"
-        >
+        <Select value={score} onChange={(e) => setScore(Number(e.target.value))} aria-label="Score">
           {SCORE_OPTIONS.map((n) => (
             <option key={n} value={n}>
               {formatScore(n)}
             </option>
           ))}
-        </select>
-        <select
+        </Select>
+        <Select
           value={brewType}
           onChange={(e) => setBrewType(e.target.value as BrewType)}
-          className="rounded border p-2"
           aria-label="Brew type"
         >
           {BREW_TYPE_OPTIONS.map(({ value, label }) => (
@@ -386,12 +410,11 @@ function AddRatingForm({ beanId }: { beanId: string }) {
               {label}
             </option>
           ))}
-        </select>
+        </Select>
       </div>
-      <textarea
+      <Textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
-        className="w-full rounded border p-2"
         aria-label="Tasting notes"
         placeholder="Tasting notes (optional)"
       />

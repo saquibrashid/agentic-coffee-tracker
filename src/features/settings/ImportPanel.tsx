@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { refreshPreferences } from '@/services/preferences/compute';
 import {
@@ -169,14 +170,14 @@ export function ImportPanel() {
           <label htmlFor="import-file" className="sr-only">
             Choose a CSV or JSON file to import
           </label>
-          <input
+          <Input
             id="import-file"
             ref={inputRef}
             type="file"
             accept=".csv,.json,.txt,text/csv,application/json"
             disabled={busy}
             onChange={(e) => void handleFile(e)}
-            className="file:border-input file:bg-background text-sm file:mr-3 file:rounded-md file:border file:px-3 file:py-1.5 file:text-sm"
+            className="max-w-sm py-2"
           />
           <Button variant="outline" onClick={downloadTemplate}>
             Download CSV template

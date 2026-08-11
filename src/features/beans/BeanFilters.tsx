@@ -13,7 +13,12 @@
 import { useId } from 'react';
 import { ChevronDown, Search, SlidersHorizontal } from 'lucide-react';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { CheckboxField } from '@/components/ui/checkbox-field';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select } from '@/components/ui/select';
 import {
   FRESHNESS_OPTIONS,
   PROCESSES,
@@ -27,9 +32,6 @@ import {
   type LibraryFilters,
 } from '@/services/beans/library';
 import type { Process, RoastLevel } from '@/types';
-
-const controlClass =
-  'h-11 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring';
 
 export interface BeanFiltersProps {
   filters: LibraryFilters;
@@ -58,33 +60,32 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
       onSubmit={(e) => e.preventDefault()}
     >
       <div>
-        <label htmlFor={searchId} className="mb-1 block text-sm font-medium">
+        <Label htmlFor={searchId} className="mb-1 block">
           Search
-        </label>
+        </Label>
         <div className="relative">
           <Search
             className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
             aria-hidden="true"
           />
-          <input
+          <Input
             id={searchId}
             type="search"
             value={filters.search}
             onChange={(e) => onChange('search', e.target.value)}
             placeholder="Name, roaster, origin or tasting note"
-            className={`${controlClass} w-full pr-3 pl-9`}
+            className="pr-3 pl-9"
           />
         </div>
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
         <div>
-          <label htmlFor="filter-sort" className="mb-1 block text-sm font-medium">
+          <Label htmlFor="filter-sort" className="mb-1 block">
             Sort by
-          </label>
-          <select
+          </Label>
+          <Select
             id="filter-sort"
-            className={controlClass}
             value={filters.sort}
             onChange={(e) => onChange('sort', e.target.value as BeanSortKey)}
           >
@@ -93,7 +94,7 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
                 {option.label}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {activeCount > 0 && (
@@ -113,11 +114,7 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-medium [&::-webkit-details-marker]:hidden">
           <SlidersHorizontal className="size-4" aria-hidden="true" />
           Filters
-          {activeCount > 0 && (
-            <span className="bg-primary text-primary-foreground rounded-full px-2 py-0.5 text-xs font-semibold">
-              {activeCount}
-            </span>
-          )}
+          {activeCount > 0 && <Badge>{activeCount}</Badge>}
           <ChevronDown
             className="ml-auto size-4 transition-transform group-open:rotate-180"
             aria-hidden="true"
@@ -127,12 +124,11 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
         <div className="border-border space-y-4 border-t p-3">
           <div className="flex flex-wrap gap-3">
             <div>
-              <label htmlFor="filter-roast" className="mb-1 block text-sm font-medium">
+              <Label htmlFor="filter-roast" className="mb-1 block">
                 Roast
-              </label>
-              <select
+              </Label>
+              <Select
                 id="filter-roast"
-                className={controlClass}
                 value={filters.roastLevel}
                 onChange={(e) => onChange('roastLevel', e.target.value as RoastLevel | 'all')}
               >
@@ -142,16 +138,15 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
                     {level}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div>
-              <label htmlFor="filter-process" className="mb-1 block text-sm font-medium">
+              <Label htmlFor="filter-process" className="mb-1 block">
                 Process
-              </label>
-              <select
+              </Label>
+              <Select
                 id="filter-process"
-                className={controlClass}
                 value={filters.process}
                 onChange={(e) => onChange('process', e.target.value as Process | 'all')}
               >
@@ -161,16 +156,15 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
                     {process}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div>
-              <label htmlFor="filter-rating" className="mb-1 block text-sm font-medium">
+              <Label htmlFor="filter-rating" className="mb-1 block">
                 Minimum rating
-              </label>
-              <select
+              </Label>
+              <Select
                 id="filter-rating"
-                className={controlClass}
                 value={filters.minRating ?? 'any'}
                 onChange={(e) =>
                   onChange('minRating', e.target.value === 'any' ? null : Number(e.target.value))
@@ -182,16 +176,15 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             <div>
-              <label htmlFor="filter-freshness" className="mb-1 block text-sm font-medium">
+              <Label htmlFor="filter-freshness" className="mb-1 block">
                 Freshness
-              </label>
-              <select
+              </Label>
+              <Select
                 id="filter-freshness"
-                className={controlClass}
                 value={filters.roastedWithinDays ?? 'any'}
                 onChange={(e) =>
                   onChange(
@@ -206,7 +199,7 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           </div>
 
@@ -241,24 +234,16 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
           />
 
           <div className="flex flex-wrap gap-4">
-            <label className="flex min-h-11 items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="size-4"
-                checked={filters.needsReviewOnly}
-                onChange={(e) => onChange('needsReviewOnly', e.target.checked)}
-              />
-              Needs review only
-            </label>
-            <label className="flex min-h-11 items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                className="size-4"
-                checked={filters.includeArchived}
-                onChange={(e) => onChange('includeArchived', e.target.checked)}
-              />
-              Include archived
-            </label>
+            <CheckboxField
+              label="Needs review only"
+              checked={filters.needsReviewOnly}
+              onChange={(e) => onChange('needsReviewOnly', e.target.checked)}
+            />
+            <CheckboxField
+              label="Include archived"
+              checked={filters.includeArchived}
+              onChange={(e) => onChange('includeArchived', e.target.checked)}
+            />
           </div>
         </div>
       </details>
@@ -310,7 +295,7 @@ function FacetGroup({
                   : 'border-input hover:bg-accent hover:text-accent-foreground'
               }`}
             >
-              <input
+              <Input
                 type="checkbox"
                 className="sr-only"
                 checked={active}

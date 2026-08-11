@@ -218,8 +218,18 @@ src/
   components/
     ui/                  # shadcn/ui generated primitives — owned, edited freely
       button.tsx
-      dialog.tsx
-      ...
+      card.tsx
+      badge.tsx
+      control.ts         # the class string every text control shares
+      input.tsx
+      select.tsx         # native <select>: the OS picker beats a listbox on a phone
+      textarea.tsx
+      label.tsx
+      checkbox-field.tsx # checkbox + label as one 44px row
+      empty-state.tsx
+      roast-scale.tsx
+      confirm-dialog.tsx
+      skeleton.tsx
     [feature-specific components live under features/<feature>/components/]
   styles/
     globals.css          # Tailwind directives + CSS variables (theme tokens)
@@ -263,6 +273,48 @@ exists, which WCAG 1.4.11 holds to 3:1. They were previously identical, which
 left every text field outlined at 1.25:1 — present in the markup, invisible on
 screen.
 
+`--destructive` is asserted against `--background` and `--card` at the full
+4.5:1 body-text ratio, not the 3:1 a button fill would need, because it is also
+used directly as text (`text-destructive`). That gap was invisible until
+`CardTitle` shrank from 24px to 18px and the "Danger zone" heading dropped out
+of the large-text exemption.
+
+### Typography
+
+- **Body** stays on the system sans stack. It costs nothing to load, and it is
+  already the face the reader's OS tuned for small sizes.
+- **Headings** use **Fraunces** — a warm variable serif, self-hosted from
+  `@fontsource-variable/fraunces`, latin subset, weight axis only (~35 KB
+  woff2). Applied at the element level (`h1`–`h4`) rather than per call site, so
+  a new page cannot forget it.
+- `font-display: swap`, so a slow font never means invisible headings. The
+  fallback is Georgia rather than the body sans: a serif dropping to a serif is
+  a far smaller visual jump.
+- Not loaded from a font CDN. That is an extra connection on the critical path
+  and discloses the reader's IP to a third party on every page view.
+- `text-meta` (in `globals.css`) is the letterspaced uppercase treatment for
+  field names — origin, process, roast date. Uppercased in CSS, so screen
+  readers and copy-paste still get the original casing.
+- Assertions live in `src/styles/typography.test.ts`.
+
+### Texture
+
+A faint kraft grain is drawn on `body::before` with two layered repeating
+gradients — no image asset, so it costs nothing against the Lighthouse budget,
+and it is re-tinted for dark mode because a dark grain on a dark page is
+invisible. Deliberately not a brown gradient wash: the intent is that surfaces
+stop reading as flat rectangles, not that the page announces "coffee".
+
+### Roast scale
+
+`components/ui/roast-scale.tsx` renders roast level as five swatches running
+light to dark. The swatch values are **literal hex, not theme tokens**: a roast
+level means the same thing in both themes, so recolouring it per theme would be
+recolouring the data. The ring around each swatch _is_ theme-derived, because a
+near-black dark-roast swatch has no edge against a dark card. Colour is never
+the only channel — the level is written alongside, or moved into the accessible
+name in the compact form (WCAG 1.4.1).
+
 ### Dark mode
 
 - Class strategy (`darkMode: 'class'`).
@@ -297,6 +349,13 @@ screen.
 
 ### Rules
 
+0. **Form controls come from `components/ui`, never hand-styled at the call
+   site.** There were nine copies of the same class string across the app and
+   they had already drifted — some carried a focus ring, some did not, and every
+   one of them was `h-10` against the 44px minimum touch target in
+   `specs/ux-states.md`. `control.ts` holds the shared string; `input.tsx`,
+   `select.tsx` and `textarea.tsx` consume it. A control that needs to differ
+   passes `className`, which merges rather than replaces.
 1. **No runtime CSS-in-JS** (no styled-components / Emotion). Build-time only.
 2. **No second component library.** Don't mix MUI/Chakra/Ant alongside shadcn.
 3. **No second icon library.** lucide-react only.

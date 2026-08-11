@@ -7,11 +7,14 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Coffee, Plus, Trash2, X } from 'lucide-react';
+import { Coffee, Plus, SearchX, Trash2, X } from 'lucide-react';
 
 import { db } from '@/services/db';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState } from '@/components/ui/empty-state';
+import { RoastScale } from '@/components/ui/roast-scale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
@@ -111,20 +114,18 @@ export function BeansLibraryPage() {
   // different call to action.
   if (beans.length === 0) {
     return (
-      <Card className="mx-auto max-w-xl text-center">
-        <CardHeader>
-          <Coffee className="text-primary mx-auto size-12" aria-hidden="true" />
-          <CardTitle>No coffees yet</CardTitle>
-          <CardDescription>Your library fills up as you log coffees.</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <EmptyState
+        icon={<Coffee />}
+        title="Your library is empty"
+        description="Every coffee you log lands here, with its roaster, origin and how you rated it."
+        action={
           <Button asChild size="lg">
             <Link to="/add">
               <Plus aria-hidden="true" /> Add your first coffee
             </Link>
           </Button>
-        </CardContent>
-      </Card>
+        }
+      />
     );
   }
 
@@ -197,19 +198,16 @@ export function BeansLibraryPage() {
       <BeanFilters filters={filters} facets={facets} onChange={set} onReset={resetFilters} />
 
       {visible.length === 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">No beans match your filters</CardTitle>
-            <CardDescription>
-              Try a different search term, or clear the filters to see all {beans.length} beans.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        <EmptyState
+          icon={<SearchX />}
+          title="No beans match your filters"
+          description={`All ${beans.length} of your coffees are still here — the current filters just hide them.`}
+          action={
             <Button variant="outline" onClick={resetFilters}>
               Clear filters
             </Button>
-          </CardContent>
-        </Card>
+          }
+        />
       ) : (
         <ul aria-label="Beans" className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {visible.map((summary) => (
@@ -286,13 +284,24 @@ function BeanRow({
         <div className="min-w-0 flex-1">
           <CardTitle className="truncate text-base">{bean.name}</CardTitle>
           <CardDescription className="truncate">{bean.roaster}</CardDescription>
+          <RoastScale level={bean.roastLevel} compact className="mt-1.5" />
           <p className="text-muted-foreground mt-1 text-xs">
             {averageScore === null
               ? 'Not rated yet'
               : `${averageScore.toFixed(1)} ★ · ${ratingCount} ${ratingCount === 1 ? 'rating' : 'ratings'}`}
-            {bean.needsReview && ' · needs review'}
-            {bean.isArchived && ' · archived'}
           </p>
+          {/*
+            Status was appended to the rating line as " · needs review", where
+            it read as more of the same sentence. As badges these are scannable
+            down a column of twenty cards, which is the only way they are ever
+            actually read.
+          */}
+          {(bean.needsReview || bean.isArchived) && (
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {bean.needsReview && <Badge variant="secondary">Needs review</Badge>}
+              {bean.isArchived && <Badge variant="muted">Archived</Badge>}
+            </div>
+          )}
         </div>
       </CardHeader>
     </Card>

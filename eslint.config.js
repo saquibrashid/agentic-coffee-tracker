@@ -44,6 +44,13 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      /*
+       * TypeScript checks props already, and far more strictly than runtime
+       * propTypes ever did. The rule only ever fires here as a false positive
+       * on components whose props come from a type alias rather than an
+       * interface, which is a distinction with no meaning to a consumer.
+       */
+      'react/prop-types': 'off',
       '@typescript-eslint/consistent-type-imports': 'error',
       '@typescript-eslint/no-unused-vars': [
         'error',
