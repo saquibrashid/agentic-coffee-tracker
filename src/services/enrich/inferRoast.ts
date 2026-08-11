@@ -61,14 +61,19 @@ const MODIFIERS: ReadonlyArray<readonly [string, RoastLevel]> = [
 ];
 
 /**
- * `espresso` is absent on purpose.
+ * Bare `espresso` is absent on purpose.
  *
- * The ratings importer maps an explicit `roast: espresso` column to
- * medium-dark, which is defensible when someone typed it into a roast field.
- * Inferring it from prose is not: "Espresso Blend" and "Espresso Roast" are
- * product names, and a large part of specialty roasting deliberately serves
- * espresso light. Reading a roast level out of an intended *brew method* would
+ * A coffee described as "great as espresso", or one whose page says "we built
+ * it for espresso, but it works across brew methods", is stating an intended
+ * *brew method*, not a roast degree — and a large part of specialty roasting
+ * deliberately serves espresso light. Reading a roast out of that would
  * mislabel exactly the coffees whose roast the user cares most about.
+ *
+ * The compound forms in `STANDALONE` are different: "Espresso Blend" and
+ * "Espresso Roast" are how a roaster *names a product*, and the ratings
+ * importer already maps an explicit `roast: espresso` column to medium-dark.
+ * Treating the two differently left the app contradicting itself — the same
+ * word resolving one way from a spreadsheet column and another from a bag.
  */
 
 /**
@@ -113,16 +118,22 @@ const AFTER = new RegExp(
 /**
  * Phrases specific enough to name a roast on their own.
  *
- * Restricted to the traditional degree names, which have no other meaning in a
- * coffee listing. Bare `city` is excluded — it is a word that turns up in
- * roaster names and addresses ("Kansas City", "Queen City Collective") — as are
- * the bare modifiers `light`, `medium` and `dark`, which is the whole reason
+ * Mostly the traditional degree names, which have no other meaning in a coffee
+ * listing. Bare `city` is excluded — it is a word that turns up in roaster
+ * names and addresses ("Kansas City", "Queen City Collective") — as are the
+ * bare modifiers `light`, `medium` and `dark`, which is the whole reason
  * "dark chocolate" and "light body" do not produce a match.
+ *
+ * `espresso blend` and `espresso roast` are the two compound forms a roaster
+ * uses to *name a product*, as opposed to the bare word, which usually just
+ * names a brew method. They resolve to medium-dark to match the roast column
+ * the ratings importer already accepts.
  */
 const STANDALONE: ReadonlyArray<readonly [RegExp, RoastLevel]> = [
   [/\bfull\s+city\s+plus\b/, 'medium-dark'],
   [/\bfull\s+city\b/, 'medium-dark'],
   [/\bcity\s+plus\b/, 'medium'],
+  [/\bespresso\s+(?:blend|roast)\b/, 'medium-dark'],
 ];
 
 function levelFor(modifier: string): RoastLevel | undefined {

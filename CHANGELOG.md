@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Adding one coffee now looks it up on the web, like a bulk import already
+  did.** A CSV import has always queued a `web-enrich` task for rows with gaps
+  in them; adding a single coffee never did — so scanning a bag was the _worse_
+  path for metadata, because a bag only carries what the roaster chose to print
+  on it. Roast level and process were the visible casualties, sitting at
+  "unknown" for coffees whose own product page states them plainly. The lookup
+  is queued when the coffee is saved rather than when it is captured: by then
+  the user has said which gaps are real, a discarded draft costs nothing, and
+  the task is durable so it still runs after being offline.
+- **Discarding a draft no longer throws.** `pendingAiTasks.beanId` was never
+  indexed, and Dexie rejects `where()` on an unindexed keypath outright, so
+  discarding raised a `SchemaError` _after_ the coffee had already been deleted
+  — leaving the user on a form for a record that no longer existed. Added as
+  Dexie **v4** (additive; no data is rewritten).
+- **"Espresso Blend" and "Espresso Roast" now infer a medium-dark roast.** The
+  ratings importer already mapped an explicit `roast: espresso` column to
+  medium-dark, while text inference refused the word entirely — the same word
+  resolving one way from a spreadsheet and another from a bag. Only the compound
+  product-name forms count; a bare "great as espresso" still infers nothing,
+  because it names a brew method and specialty roasters routinely serve espresso
+  light. A stated roast ("Light Roast Espresso Blend") still wins outright.
+
 - **The sync engine's lazy import now actually defers anything** (#137). The
   entry chunk imported the status hook, the status hook imported
   `getSyncEngine()`, and so the whole Cosmos-facing engine — the Dexie outbox,

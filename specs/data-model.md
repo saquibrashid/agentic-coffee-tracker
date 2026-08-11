@@ -370,7 +370,7 @@ Photo blobs are **not** included in JSON export by default. A separate "Export w
 | `photos`         | `id`     | `kind`                                              |
 | `ocrResults`     | `id`     | `photoId`                                           |
 | `preferences`    | `id`     | —                                                   |
-| `pendingAiTasks` | `id`     | `type`, `nextAttemptAt`                             |
+| `pendingAiTasks` | `id`     | `type`, `nextAttemptAt`, `beanId`                   |
 | `meta`           | `key`    | — (key-value: schemaVersion, lastSummaryAt, etc.)   |
 
 See `architecture.md` for the migration strategy.

@@ -69,11 +69,34 @@ describe('inferRoastFromText', () => {
       expect(inferRoastFromText('Queen City Collective')).toBeNull();
     });
 
-    it('ignores espresso, which names a brew method and not a roast', () => {
-      // Specialty roasters routinely serve espresso light, so reading a roast
-      // level out of this would mislabel exactly the coffees it guessed on.
-      expect(inferRoastFromText('Espresso Roast')).toBeNull();
-      expect(inferRoastFromText('Our espresso blend')).toBeNull();
+    it('reads the product-name forms of espresso as medium-dark', () => {
+      // "Espresso Blend" and "Espresso Roast" are how a roaster names a
+      // product. The ratings importer already maps an explicit
+      // `roast: espresso` column to medium-dark, and having the same word
+      // resolve one way from a spreadsheet and another from a bag left the app
+      // contradicting itself.
+      expect(inferRoastFromText('Espresso Roast')).toMatchObject({ level: 'medium-dark' });
+      expect(inferRoastFromText('Leviathan Espresso Blend')).toMatchObject({
+        level: 'medium-dark',
+      });
+    });
+
+    it('ignores a bare espresso mention, which names a brew method', () => {
+      // Specialty roasters routinely serve espresso light, so a coffee that
+      // merely says it works as espresso has not stated its roast.
+      expect(inferRoastFromText('Great as espresso or filter')).toBeNull();
+      expect(
+        inferRoastFromText('We built it for espresso, but it works across brew methods.'),
+      ).toBeNull();
+      expect(inferRoastFromText('Dialing in on commercial espresso gear')).toBeNull();
+    });
+
+    it('lets a stated roast beat the espresso product name', () => {
+      expect(inferRoastFromText('Light Roast Espresso Blend')).toMatchObject({ level: 'light' });
+    });
+
+    it('respects a negated espresso blend', () => {
+      expect(inferRoastFromText('Not your typical espresso blend')).toBeNull();
     });
 
     /** Ordinary roaster copy that names a roast the coffee explicitly is not. */
@@ -173,5 +196,28 @@ describe('inferRoastLevel', () => {
   it('returns null when nothing is provided', () => {
     expect(inferRoastLevel({})).toBeNull();
     expect(inferRoastLevel({ name: '', tastingNotes: [] })).toBeNull();
+  });
+
+  it('handles a real page that names no roast level', () => {
+    // Anchorhead's Leviathan page states no roast degree anywhere. Its only
+    // roast-adjacent words are flavour terms, so the product name is the sole
+    // available signal — and "dark chocolate finish" must not be read as dark.
+    expect(
+      inferRoastLevel({
+        name: 'Leviathan Espresso Blend',
+        roasterDescription:
+          'A syrupy, low-acidity blend with a dark chocolate finish and a heavy body.',
+        tastingNotes: ['Plum', 'Chocolate', 'Brown Sugar'],
+      })?.level,
+    ).toBe('medium-dark');
+
+    expect(
+      inferRoastLevel({
+        name: 'Leviathan',
+        roasterDescription:
+          'A syrupy, low-acidity blend with a dark chocolate finish and a heavy body.',
+        tastingNotes: ['Plum', 'Chocolate', 'Brown Sugar'],
+      }),
+    ).toBeNull();
   });
 });

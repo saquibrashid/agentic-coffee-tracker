@@ -72,6 +72,16 @@ export class CoffeeDB extends Dexie {
     this.version(3).stores({
       outbox: 'id, [type+recordId], queuedAt',
     });
+
+    // v4 indexes pendingAiTasks.beanId. The confirm form looks tasks up by the
+    // coffee they belong to — to drop them when a draft is discarded, and to
+    // avoid stacking a second web lookup on a coffee that already has one
+    // queued. Dexie rejects `where()` on an unindexed keypath outright, so
+    // discarding a draft was throwing a SchemaError after the coffee had
+    // already been deleted, leaving the user on a dead form.
+    this.version(4).stores({
+      pendingAiTasks: 'id, type, nextAttemptAt, beanId',
+    });
   }
 }
 

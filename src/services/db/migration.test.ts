@@ -87,6 +87,29 @@ describe('v2 rating-scale migration', () => {
     const db = await openUpgraded('migrate-fresh');
 
     expect(await db.ratings.count()).toBe(0);
-    expect(db.verno).toBe(3);
+    expect(db.verno).toBe(4);
+  });
+});
+
+describe('v4 pendingAiTasks.beanId index', () => {
+  it('can query tasks by bean on a database upgraded from v1', async () => {
+    // Dexie throws SchemaError on `where()` against an unindexed keypath, so
+    // this is the difference between discarding a draft working and it failing
+    // after the coffee has already been deleted.
+    await seedV1('migrate-tasks', [3]);
+
+    const db = await openUpgraded('migrate-tasks');
+    await db.pendingAiTasks.add({
+      id: 't1',
+      schemaVersion: 1,
+      type: 'web-enrich',
+      payload: {},
+      beanId: 'b1',
+      attempts: 0,
+      createdAt: '2026-01-02T00:00:00.000Z',
+    });
+
+    expect(await db.pendingAiTasks.where('beanId').equals('b1').count()).toBe(1);
+    expect(await db.pendingAiTasks.where('beanId').equals('b2').count()).toBe(0);
   });
 });

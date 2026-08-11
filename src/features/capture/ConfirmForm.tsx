@@ -12,8 +12,43 @@ import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { db } from '@/services/db';
 import { enqueueDelete, enqueueUpsert } from '@/services/sync/outbox';
+import { beanNeedsEnrichment } from '@/services/enrich/autoEnrich';
 import type { CoffeeBean, Process, RoastLevel } from '@/types';
 import { PROCESSES, ROAST_LEVELS } from '@/services/beans/library';
+import { ulid } from 'ulid';
+
+/**
+ * Queues a web lookup for a coffee the user has just saved with gaps in it.
+ *
+ * A bag photograph only ever yields what the bag prints, and most roasters do
+ * not print a roast level or a process at all — so the confirm form has been
+ * showing "unknown" for fields the roaster's own product page states plainly.
+ * A bulk CSV import has always queued this lookup; adding one coffee never did,
+ * which made adding a single coffee the *worse* path for metadata.
+ *
+ * Queued at save rather than at capture on purpose. By this point the user has
+ * told us exactly which gaps are real -- anything they typed in is no longer
+ * missing -- and a draft that gets discarded never costs a lookup. The task is
+ * durable and retried by the queue runner, so this works offline too.
+ */
+async function queueEnrichmentIfIncomplete(beanId: string): Promise<void> {
+  const saved = await db.beans.get(beanId);
+  if (!saved || !beanNeedsEnrichment(saved)) return;
+
+  // Re-saving the same draft must not stack up duplicate lookups.
+  const queued = await db.pendingAiTasks.where('beanId').equals(beanId).toArray();
+  if (queued.some((entry) => entry.type === 'web-enrich')) return;
+
+  await db.pendingAiTasks.add({
+    id: ulid(),
+    schemaVersion: 1,
+    type: 'web-enrich',
+    payload: { reason: 'single-add' },
+    beanId,
+    attempts: 0,
+    createdAt: new Date().toISOString(),
+  });
+}
 
 export interface ConfirmFormProps {
   bean: CoffeeBean;
@@ -93,6 +128,7 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
         draft.updatedAt = new Date().toISOString();
       });
       await enqueueUpsert('bean', bean.id);
+      await queueEnrichmentIfIncomplete(bean.id);
       void navigate(`/beans/${bean.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save this coffee.');
