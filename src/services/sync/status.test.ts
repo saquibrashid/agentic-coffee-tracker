@@ -84,7 +84,7 @@ describe('entry-chunk isolation', () => {
     query: '?raw',
     import: 'default',
     eager: true,
-  }) as Record<string, string>;
+  });
 
   function localImports(file: string): string[] {
     const source = sources[`./${file}`];
