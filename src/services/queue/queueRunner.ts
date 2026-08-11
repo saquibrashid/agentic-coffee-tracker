@@ -61,6 +61,18 @@ async function processTask(task: PendingAiTask): Promise<void> {
         updatedAt: new Date().toISOString(),
         ...(result.parsed ? parsedBeanToUpdate(result.parsed) : {}),
       };
+      // Unlike the other mapped fields this one may be inferred rather than
+      // read off the bag, and a guess from a name is weaker evidence than a
+      // level the user picked. Only a roast the model actually resolved is
+      // allowed to replace an existing one.
+      if (
+        bean.roastLevel &&
+        bean.roastLevel !== 'unknown' &&
+        !result.parsed?.roastLevel &&
+        update.roastLevel
+      ) {
+        delete update.roastLevel;
+      }
       if (result.model) update.llmModel = result.model;
       await db.beans.update(task.beanId, update);
       await enqueueUpsert('bean', task.beanId);

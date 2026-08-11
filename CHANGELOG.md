@@ -55,8 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   coffees landed as `unknown` — contributing nothing to the preference profile.
   A deterministic pass now reads the roast out of explicit roast vocabulary
   ("French roast", "blonde", "full city") in the coffee name, roaster
-  description, and tasting notes, and applies it during CSV import, during
-  auto-enrichment, and as an offline backfill over beans already in the library.
+  description, and tasting notes. It applies everywhere a coffee is created or
+  looked up: adding by link, adding by photo, the background OCR queue, the
+  enrichment review, CSV import, and an offline backfill over beans already in
+  the library.
   It reads only explicit roast terms, never flavour words: "dark chocolate" and
   "light body" describe the cup, not the roast, and guessing from them would
   quietly poison recommendations. Negations ("not your typical dark roast") are
