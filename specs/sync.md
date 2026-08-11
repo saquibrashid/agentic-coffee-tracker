@@ -498,13 +498,13 @@ Follow the existing optional-dependency pattern from `architecture.md` → Secre
 
 ### CSP
 
-`connect-src` must gain the blob endpoint:
+`connect-src` gains the blob endpoint:
 
 ```text
-connect-src 'self' https://<bff-host> https://<storage-account>.blob.core.windows.net
+connect-src 'self' https://<storage-account>.blob.core.windows.net
 ```
 
-> **Not yet actionable.** No `Content-Security-Policy` header is emitted anywhere today — `public/staticwebapp.config.json` sets only `cache-control`, so this requirement has no implementation to modify. Tracked in [#113](https://github.com/saquibrashid/agentic-coffee-tracker/issues/113); apply this line when the policy first ships, and no earlier than phase 4, when the storage account name is actually known.
+Shipped. The account name carries a per-environment token, so the policy is generated at build time from the `AZURE_PHOTO_STORAGE_ACCOUNT_NAME` infrastructure output rather than written out as a literal — see `build-config/csp.ts`. A deployment without a linked backend omits the entry entirely, because photos never leave the device there.
 
 ### Estimated cost
 

@@ -488,7 +488,7 @@ Storage quotas: request `navigator.storage.persist()` after the first save; surf
 - **User data is local while signed out.** Signing in replicates records to Cosmos DB per user; see `specs/sync.md` and `SECURITY.md`. No analytics, no third-party SDKs.
 - BFF logs request metadata only (timing, status, model name) — never OCR text, parsed JSON, or photos.
 - BFF strips EXIF from incoming images before forwarding.
-- CSP: default-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://<bff-host>.
+- CSP: generated at build time by `build-config/csp.ts` and written into `staticwebapp.config.json`. `script-src` is `'self'` plus the sha256 of the inline theme script — no `'unsafe-inline'`; `img-src` allows `data:` and `blob:` for thumbnails and IndexedDB photos; `connect-src` is `'self'` plus the photo blob endpoint (and the BFF origin, when it is a separate one). Verified by `pnpm test:e2e:csp`, which runs a production build under the real header.
 - Settings → **Reset** wipes IndexedDB, Cache Storage, and unregisters the service worker.
 - Settings → **Export then delete** option encouraged before reset.
 - Privacy notice page lists: where photos go (Azure Vision/OpenAI for processing only), what sync stores when signed in, and how to delete.

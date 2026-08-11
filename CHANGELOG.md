@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Content Security Policy.** `SECURITY.md` and `specs/architecture.md` both
+  described a policy that no code emitted; the app shipped with no CSP at all.
+  It is now generated at build time and written into
+  `staticwebapp.config.json`, because two of its values cannot be hard-coded:
+  the sha256 of the inline anti-FOUC theme script (which changes whenever that
+  script is edited) and the photo storage account name (per-environment). No
+  `'unsafe-inline'` for scripts or styles. Verified by `pnpm test:e2e:csp`,
+  which serves a production build under the real header and fails on any
+  violation — now a required CI check.
+
 - **Analytics chart test** (`e2e/analytics.spec.ts`): the app's only recharts
   surface had no test that rendered it with data — every route that reached
   `/analytics` did so with an empty store, where a healthy chart and a broken

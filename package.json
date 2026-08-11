@@ -22,7 +22,8 @@
     "test:e2e": "playwright test",
     "test:e2e:sync": "playwright test --config playwright.sync.config.ts",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:e2e:csp": "playwright test --config playwright.csp.config.ts"
   },
   "dependencies": {
     "@fontsource-variable/fraunces": "^5.3.0",

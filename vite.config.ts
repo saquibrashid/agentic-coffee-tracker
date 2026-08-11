@@ -2,6 +2,50 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'node:path';
+import { readFileSync } from 'node:fs';
+
+import { buildCsp } from './build-config/csp';
+import { cspPlugin } from './build-config/cspPlugin';
+
+// Supplied by `azd` from the infrastructure outputs of the same names. Absent
+// on a local build, which is correct: without a linked backend the browser
+// never talks to Blob Storage, so the policy should not say it may.
+const photoStorageAccount = process.env.AZURE_PHOTO_STORAGE_ACCOUNT_NAME;
+const apiBaseUrl = process.env.VITE_API_BASE_URL;
+
+/**
+ * The dev and preview servers send the policy too, so that a mistake in it
+ * shows up in the e2e suite rather than in production.
+ *
+ * Static Web Apps serves the real header from `staticwebapp.config.json`, which
+ * exists only in a deployed build — without this, every local run would be
+ * exercising an app that has no CSP at all, and the first evidence of a broken
+ * policy would be a user hitting it. `preview` is the honest one: a production
+ * bundle under the production policy. `dev` is necessarily laxer.
+ */
+const devCsp = buildCsp({ scriptHashes: [], dev: true, photoStorageAccount, apiBaseUrl });
+
+/**
+ * The header the last build actually emitted, replayed by `vite preview`.
+ *
+ * Read back out of the built artifact rather than recomputed, so the e2e suite
+ * that runs against preview is testing the bytes that ship — including the
+ * script hash — and not a second opinion that could agree with the source while
+ * both disagree with `dist/`.
+ */
+function builtCsp(): string | undefined {
+  try {
+    const config = JSON.parse(
+      readFileSync(path.resolve(__dirname, 'dist/staticwebapp.config.json'), 'utf8'),
+    ) as { globalHeaders?: Record<string, string> };
+    return config.globalHeaders?.['content-security-policy'];
+  } catch {
+    // No build yet. `vite preview` will fail on its own, and more clearly.
+    return undefined;
+  }
+}
+
+const previewCsp = builtCsp();
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -12,12 +56,17 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    headers: { 'content-security-policy': devCsp },
     proxy: {
       '/api': {
         target: 'http://localhost:7071',
         changeOrigin: true,
       },
     },
+  },
+  preview: {
+    port: 4173,
+    ...(previewCsp ? { headers: { 'content-security-policy': previewCsp } } : {}),
   },
   build: {
     // recharts is the largest single dependency and is only pulled in by the
@@ -57,6 +106,7 @@ export default defineConfig({
     },
   },
   plugins: [
+    cspPlugin({ photoStorageAccount, apiBaseUrl }),
     react(),
     VitePWA({
       registerType: 'autoUpdate',
