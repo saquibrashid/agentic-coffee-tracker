@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The sync engine's lazy import now actually defers anything** (#137). The
+  entry chunk imported the status hook, the status hook imported
+  `getSyncEngine()`, and so the whole Cosmos-facing engine — the Dexie outbox,
+  the API client, the photo uploader — shipped in the initial bundle despite
+  `App.tsx` importing it dynamically. Rollup never warned; Rolldown does. Sync
+  status now lives in its own store that both the shell and the engine import,
+  leaving the engine behind the dynamic import: **entry chunk 154.24 → 138.53
+  kB (51.20 → 45.96 kB gzip)**, and a test asserts the module graph so the
+  regression cannot return unnoticed.
+
 - **Signed-out visitors no longer trigger `POST /api/sync/pull -> 401`.** The
   sync engine started on page load and only checked whether auth was
   _available_ in the build, not whether anyone was actually signed in. The 401

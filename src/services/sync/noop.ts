@@ -8,26 +8,34 @@
  * correct in v1, where the honest answer to "what is syncing?" is "nothing".
  */
 import type { DeleteCloudDataResult, SyncEngine, SyncStatus } from './types';
-
-const DISABLED: SyncStatus = Object.freeze({
-  state: 'disabled',
-  lastSyncedAt: null,
-  pendingCount: 0,
-});
+import { DISABLED_STATUS, getSyncStatus, publishSyncStatus, subscribeSyncStatus } from './status';
 
 export class NoopSyncEngine implements SyncEngine {
+  /**
+   * Asserts `disabled` on the shared store.
+   *
+   * A no-op for a fresh page, where the store already starts there — but not
+   * after a re-selection (a sign-out, or `resetSyncEngineForTests`) has left an
+   * earlier live engine's `idle` behind. The store is what the UI reads, so it
+   * has to be corrected here rather than only in `status()`.
+   */
+  constructor() {
+    publishSyncStatus(DISABLED_STATUS);
+  }
+
   status(): SyncStatus {
-    return DISABLED;
+    return getSyncStatus();
   }
 
   /**
    * Accepts subscribers and never calls them: a disabled engine has no state
-   * changes to report. Returning a real unsubscribe function keeps effect
-   * cleanup identical to the live engine, so the wiring is exercised in v1
-   * rather than first being tried the day sync is switched on.
+   * changes to report, and nothing else publishes while it is the selected
+   * engine. Returning a real unsubscribe function keeps effect cleanup
+   * identical to the live engine, so the wiring is exercised in v1 rather than
+   * being tried for the first time the day sync is switched on.
    */
-  subscribe(_fn: (status: SyncStatus) => void): () => void {
-    return () => {};
+  subscribe(fn: (status: SyncStatus) => void): () => void {
+    return subscribeSyncStatus(fn);
   }
 
   sync(): Promise<void> {
