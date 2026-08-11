@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/services/db';
+import { beanNeedsEnrichment } from '@/services/enrich/autoEnrich';
 import { exportCsv, exportJson, exportJsonWithPhotos } from '@/services/export/exporter';
 import { ImportPanel } from './ImportPanel';
 import { AccountPanel } from './AccountPanel';
@@ -83,6 +84,8 @@ export function SettingsPage() {
 
       <ImportPanel />
 
+      <RelookupPanel />
+
       <Card>
         <CardHeader>
           <CardTitle>Pending AI operations ({pending.length})</CardTitle>
@@ -125,6 +128,60 @@ export function SettingsPage() {
 
       <DangerZone />
     </div>
+  );
+}
+
+function RelookupPanel() {
+  const incomplete =
+    useLiveQuery(async () => {
+      const beans = await db.beans.toArray();
+      return beans.filter((bean) => !bean.isArchived && beanNeedsEnrichment(bean)).length;
+    }, []) ?? 0;
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleRelookup() {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const { relookupIncompleteBeans } = await import('@/services/enrich/relookup');
+      const result = await relookupIncompleteBeans();
+      const mod = await import('@/services/queue/queueRunner');
+      await mod.runQueueNow();
+
+      setStatus(
+        result.queued === 0
+          ? 'Nothing new to look up — every incomplete coffee is already queued.'
+          : `Queued ${result.queued} ${result.queued === 1 ? 'lookup' : 'lookups'}. They run in the background, a few at a time.`,
+      );
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : 'Could not queue the lookups.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Fill in missing details</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-muted-foreground text-sm">
+          {incomplete === 0
+            ? 'Every coffee has its details filled in.'
+            : `${incomplete} ${incomplete === 1 ? 'coffee is' : 'coffees are'} missing a roast level, process, origin, tasting notes or photo. Searching the roaster's store again can fill them in.`}
+        </p>
+        <p className="text-muted-foreground text-xs">
+          Worth retrying if you imported coffees with shortened names — a lookup that found nothing
+          before is not tried again on its own.
+        </p>
+        <Button disabled={busy || incomplete === 0} onClick={() => void handleRelookup()}>
+          {busy ? 'Queueing…' : 'Look up missing details'}
+        </Button>
+        {status && <p className="text-sm">{status}</p>}
+      </CardContent>
+    </Card>
   );
 }
 

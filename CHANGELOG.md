@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Coffees with shortened names can now be found on the roaster's store.** A
+  store's product search requires _every_ word of the query to match, so one
+  abbreviation sank the whole lookup: "Holler Mtn." returned nothing from
+  Stumptown, while "Holler Mountain" — and even bare "Holler" — return the
+  coffee. Since a ratings spreadsheet is full of abbreviations, a large share of
+  an import could not be enriched at all. The search now works down a ladder of
+  progressively looser queries: the name as written, then with abbreviations
+  expanded, then without packaging words ("whole bean", "ground"), then dropping
+  trailing words. Because a looser query also drags in coffees that merely share
+  a word, every result is scored back against the name the user actually wrote —
+  so "Holler Mountain" wins, "Ground Holler Mountain" ranks below it, and an
+  unrelated "Homestead" is discarded rather than silently applied.
+
 - **Adding one coffee now looks it up on the web, like a bulk import already
   did.** A CSV import has always queued a `web-enrich` task for rows with gaps
   in them; adding a single coffee never did — so scanning a bag was the _worse_
@@ -85,6 +98,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diff.
 
 ### Added
+
+- **"Look up missing details" in Settings.** A lookup that finds no product page
+  is deliberately dropped rather than retried forever, which left every coffee
+  that failed under the old, stricter search stranded — nothing would ever try
+  it again. This queues a fresh lookup for every coffee still missing a roast
+  level, process, origin, notes or photo, skipping ones already queued, so an
+  import that was written off can be picked up in one press instead of one
+  coffee at a time.
 
 - **Take a photo inside the app.** Adding a coffee now offers a live camera
   preview with a shutter button, instead of handing off to the OS file picker.
