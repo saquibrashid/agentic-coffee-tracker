@@ -64,6 +64,13 @@ function Shell() {
     void import('@/services/queue/queueRunner').then((m) => m.startQueueRunner());
   }, []);
 
+  // Backfill roast levels that are inferable from text we already hold. Offline
+  // and cheap, so it runs ahead of (and independently of) the network-bound
+  // enrichment queue rather than making the user wait on a lookup per bean.
+  useEffect(() => {
+    void import('@/services/enrich/backfillRoast').then((m) => m.backfillRoastLevels());
+  }, []);
+
   // Sync starts on app open, per specs/sync.md -> Triggers. Lazy for the same
   // reason as the queue runner: neither is needed for first paint, and the
   // Cosmos-facing engine pulls in code a signed-out user never runs.

@@ -238,6 +238,64 @@ describe('autoEnrichBean', () => {
     expect(result?.filled).toContain('roastLevel');
   });
 
+  it('infers the roast level when the page states it only in prose', () => {
+    // The parse is instructed not to guess, so a roaster who writes the roast
+    // into a sentence rather than a labelled field returns null here.
+    findCandidates.mockResolvedValue([
+      { url: 'https://onyx.example/sw', title: 'Southern Weather', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed({
+        roastLevel: null,
+        roasterDescription: 'Taken to a full city, just shy of second crack.',
+      }),
+      rawText: 'raw',
+      sourceUrl: 'https://onyx.example/sw',
+      model: 'gpt-4o',
+    });
+
+    return expect(
+      autoEnrichBean(bean({ roastLevel: 'unknown' })).then((r) => r?.update.roastLevel),
+    ).resolves.toBe('medium-dark');
+  });
+
+  it('never lets an inferred roast displace one the user already set', async () => {
+    findCandidates.mockResolvedValue([
+      { url: 'https://onyx.example/sw', title: 'Southern Weather', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed({ roastLevel: null, roasterDescription: 'A classic French roast.' }),
+      rawText: 'raw',
+      sourceUrl: 'https://onyx.example/sw',
+      model: 'gpt-4o',
+    });
+
+    const result = await autoEnrichBean(bean({ roastLevel: 'light' }));
+
+    expect(result?.update.roastLevel).toBeUndefined();
+    expect(result?.filled).not.toContain('roastLevel');
+  });
+
+  it('leaves the roast unset when the page names no roast at all', async () => {
+    findCandidates.mockResolvedValue([
+      { url: 'https://onyx.example/sw', title: 'Southern Weather', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed({
+        roastLevel: null,
+        roasterDescription: 'Dark chocolate and a light, syrupy body.',
+        tastingNotes: ['dark chocolate'],
+      }),
+      rawText: 'raw',
+      sourceUrl: 'https://onyx.example/sw',
+      model: 'gpt-4o',
+    });
+
+    const result = await autoEnrichBean(bean({ roastLevel: 'unknown' }));
+
+    expect(result?.update.roastLevel).toBeUndefined();
+  });
+
   it('throws a terminal error when nothing was found', async () => {
     findCandidates.mockResolvedValue([]);
 

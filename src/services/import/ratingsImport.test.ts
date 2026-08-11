@@ -212,6 +212,46 @@ describe('planCsvImport', () => {
     expect(created?.tastingNotes).toEqual(['chocolate', 'citrus']);
   });
 
+  it('infers the roast level from the coffee name when there is no roast column', () => {
+    // The case that motivated this: a ratings spreadsheet almost never has a
+    // roast column, so without inference the whole import lands as `unknown`
+    // and contributes nothing to the preference profile.
+    const csv = [
+      'roaster,coffee,score',
+      'Peet\u2019s,French Roast,8',
+      'Starbucks,Blonde Roast,6',
+      'Onyx,Southpaw,7',
+    ].join('\n');
+
+    const plan = planCsvImport(csv, EMPTY);
+    const byName = new Map(plan.newBeans.map((b) => [b.name, b]));
+
+    expect(byName.get('French Roast')?.roastLevel).toBe('dark');
+    expect(byName.get('Blonde Roast')?.roastLevel).toBe('light');
+    // No roast vocabulary in the name, so it stays honestly unset rather than
+    // being guessed at.
+    expect(byName.get('Southpaw')?.roastLevel).toBeUndefined();
+  });
+
+  it('lets an explicit roast column beat the name', () => {
+    const csv = ['roaster,coffee,score,roast', 'Onyx,French Roast Blend,8,light'].join('\n');
+
+    const plan = planCsvImport(csv, EMPTY);
+
+    expect(plan.newBeans[0]?.roastLevel).toBe('light');
+  });
+
+  it('does not read a roast level out of flavour words in the notes', () => {
+    const csv = [
+      'roaster,coffee,score,tasting notes',
+      'Onyx,Geometry,8,"dark chocolate; light caramel"',
+    ].join('\n');
+
+    const plan = planCsvImport(csv, EMPTY);
+
+    expect(plan.newBeans[0]?.roastLevel).toBeUndefined();
+  });
+
   it('falls back to "other" for an unknown brew and says so', () => {
     const csv = [HEADER, 'Onyx,Geometry,9,turkish,2025-03-14,'].join('\n');
 

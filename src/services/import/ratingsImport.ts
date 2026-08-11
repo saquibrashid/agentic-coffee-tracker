@@ -1,6 +1,7 @@
 import { ulid } from 'ulid';
 import { db } from '@/services/db';
 import { beanNeedsEnrichment } from '@/services/enrich/autoEnrich';
+import { inferRoastLevel } from '@/services/enrich/inferRoast';
 import { DEFAULT_BREW_TYPE } from '@/services/ratings/brewTypes';
 import {
   LEGACY_MAX_SCORE,
@@ -416,7 +417,14 @@ export function planCsvImport(text: string, existing: ExistingData): ImportPlan 
       // it already has rather than being overwritten by a thinner spreadsheet row.
       const origins = parseOrigins(cell(row, 'origin'));
       const tastingNotes = splitList(cell(row, 'tastingNotes'));
-      const roastLevel = ROAST_SYNONYMS[normaliseHeader(cell(row, 'roastLevel'))];
+      // An explicit roast column wins. Failing that, the coffee's own name
+      // often states it outright ("French Roast", "Blonde Roast") — and a
+      // spreadsheet of ratings usually carries no roast column at all, so
+      // without this the whole import lands as `unknown` and contributes
+      // nothing to the preference profile it was imported to build.
+      const roastLevel =
+        ROAST_SYNONYMS[normaliseHeader(cell(row, 'roastLevel'))] ??
+        inferRoastLevel({ name, tastingNotes })?.level;
       const process = PROCESS_SYNONYMS[normaliseHeader(cell(row, 'process'))];
 
       bean = {
