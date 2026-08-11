@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Vite 8**: replaces Rollup with Rolldown and esbuild with Oxc. The object
+  form of `build.rollupOptions.output.manualChunks` is gone; chunking now goes
+  through `rolldownOptions.output.codeSplitting.groups` with
+  `includeDependenciesRecursively` to preserve the "package plus its private
+  dependency subtree" grouping the object form did implicitly. Output is
+  slightly smaller overall and build time drops from ~9.6s to ~1.4s.
 - **Dependency batch**: recharts 2 → 3, tailwind-merge 2 → 3, globals 15 → 17,
   `@radix-ui/react-slot` 1.2 → 1.3, prettier 3.8 → 3.9, typescript-eslint
   8.65 → 8.66, plus `@axe-core/playwright` and `@testing-library/user-event`.
