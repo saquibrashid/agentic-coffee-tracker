@@ -85,8 +85,7 @@ function isNullableString(value: unknown): value is string | null {
 }
 
 export type RecommendationValidation =
-  | { valid: true; value: RecommendationSet }
-  | { valid: false; errors: string[] };
+  { valid: true; value: RecommendationSet } | { valid: false; errors: string[] };
 
 export function validateRecommendations(input: unknown): RecommendationValidation {
   const errors: string[] = [];
