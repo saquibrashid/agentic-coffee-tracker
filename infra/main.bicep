@@ -36,6 +36,9 @@ param syncAccessMode string = 'owner'
 @description('Comma-separated user ids or sign-in names permitted to sync. An empty list denies everyone, including the owner: treating unconfigured as unrestricted would open the deployment the moment this parameter went missing. Sign in and visit /.auth/me to find your userId.')
 param syncAllowlist string = ''
 
+@description('Ceiling on live sync records in one user partition, as a positive integer. Bounds a runaway client that would otherwise write documents indefinitely. A value the API cannot parse falls back to its 20,000 default rather than failing the deploy, so a typo cannot lock anyone out of their own data.')
+param syncRecordQuota string = '20000'
+
 @allowed(['Free', 'Standard'])
 @description('Static Web App SKU. Standard adds linked backends (same-origin /api) but is not free.')
 param staticWebAppSkuName string = 'Free'
@@ -64,6 +67,7 @@ module resources 'resources.bicep' = {
     scrapeAllowlist: scrapeAllowlist
     syncAccessMode: syncAccessMode
     syncAllowlist: syncAllowlist
+    syncRecordQuota: syncRecordQuota
     staticWebAppSkuName: staticWebAppSkuName
   }
 }

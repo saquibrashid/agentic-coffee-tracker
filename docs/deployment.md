@@ -243,7 +243,24 @@ gh variable set SYNC_ACCESS_MODE --body "allowlist"
 gh variable set SYNC_ALLOWLIST --body "id-one,id-two,colleague@example.com"
 ```
 
-Before choosing `open`, note what is not built yet: there is no per-user storage quota and no in-app way to delete another account's data, so a public deployment currently has no bound on what it will store.
+Before choosing `open`, note what is not built yet: there is no in-app way to delete another account's data, so a public deployment relies entirely on the per-user quotas below.
+
+### Per-user quotas
+
+Two ceilings bound what one account can store. Both are per user, and both are enforced server-side.
+
+| Variable            | Default | Bounds                                                              |
+| ------------------- | ------- | ------------------------------------------------------------------- |
+| `SYNC_RECORD_QUOTA` | `20000` | Live sync records (beans, ratings, photo metadata) in one partition |
+| —                   | 500 MB  | Photo bytes. Not configurable                                       |
+
+20,000 records is far beyond a plausible human library — a bean a day for fifty years, with ratings, is under 40,000 — while still being a _number_, which is the only property that matters against a runaway client writing in a loop.
+
+```bash
+gh variable set SYNC_RECORD_QUOTA --body "50000"
+```
+
+A value the API cannot parse as a positive integer falls back to 20,000 rather than failing the deploy, so a typo cannot lock you out of your own data. Raising the ceiling takes effect on the next deploy; it is read per request, not cached.
 
 ## Monitoring
 

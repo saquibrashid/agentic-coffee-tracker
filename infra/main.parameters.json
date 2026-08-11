@@ -31,6 +31,9 @@
     },
     "syncAllowlist": {
       "value": "${SYNC_ALLOWLIST=}"
+    },
+    "syncRecordQuota": {
+      "value": "${SYNC_RECORD_QUOTA=20000}"
     }
   }
 }
