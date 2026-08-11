@@ -20,13 +20,7 @@ This document defines all persistent data structures, the LLM output contract, a
 export type RoastLevel = 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark' | 'unknown';
 
 export type Process =
-  | 'washed'
-  | 'natural'
-  | 'honey'
-  | 'anaerobic'
-  | 'wet-hulled'
-  | 'other'
-  | 'unknown';
+  'washed' | 'natural' | 'honey' | 'anaerobic' | 'wet-hulled' | 'other' | 'unknown';
 
 export type BrewType =
   | 'espresso'
@@ -357,15 +351,9 @@ doseGrams, yieldGrams, ratio, location, cafeName, createdAt
   "exportedAt": "2026-06-09T13:48:00.000Z",
   "schemaVersion": 1,
   "appVersion": "0.1.0",
-  "beans": [
-    /* CoffeeBean[] */
-  ],
-  "ratings": [
-    /* Rating[] */
-  ],
-  "preferences": {
-    /* UserPreferences */
-  }
+  "beans": [/* CoffeeBean[] */],
+  "ratings": [/* Rating[] */],
+  "preferences": {/* UserPreferences */}
 }
 ```
 

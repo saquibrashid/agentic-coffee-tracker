@@ -24,8 +24,7 @@ import { consume } from './rateLimit.js';
  * rather than an exception so the handler cannot forget to stop.
  */
 export type SyncCaller =
-  | { ok: true; principal: Principal }
-  | { ok: false; response: HttpResponseInit };
+  { ok: true; principal: Principal } | { ok: false; response: HttpResponseInit };
 
 export function resolveSyncCaller(req: HttpRequest, ctx: InvocationContext): SyncCaller {
   let principal: Principal;

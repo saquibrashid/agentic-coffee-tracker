@@ -119,8 +119,7 @@ export const PARSED_BEAN_SCHEMA = {
 };
 
 export type ValidationResult =
-  | { valid: true; value: ParsedBean }
-  | { valid: false; errors: string[] };
+  { valid: true; value: ParsedBean } | { valid: false; errors: string[] };
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

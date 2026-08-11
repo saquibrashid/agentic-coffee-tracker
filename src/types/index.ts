@@ -6,13 +6,7 @@
 export type RoastLevel = 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark' | 'unknown';
 
 export type Process =
-  | 'washed'
-  | 'natural'
-  | 'honey'
-  | 'anaerobic'
-  | 'wet-hulled'
-  | 'other'
-  | 'unknown';
+  'washed' | 'natural' | 'honey' | 'anaerobic' | 'wet-hulled' | 'other' | 'unknown';
 
 export type BrewType =
   | 'espresso'

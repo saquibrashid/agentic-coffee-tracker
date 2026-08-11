@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Dependency batch**: recharts 2 → 3, tailwind-merge 2 → 3, globals 15 → 17,
+  `@radix-ui/react-slot` 1.2 → 1.3, prettier 3.8 → 3.9, typescript-eslint
+  8.65 → 8.66, plus `@axe-core/playwright` and `@testing-library/user-event`.
+  The three majors were checked against their migration guides rather than
+  trusted to a green build: recharts 3 removes `activeIndex`, `alwaysShow`,
+  `blendStroke` and friends (none used here — the app draws one default
+  `BarChart`); tailwind-merge 3 requires Tailwind v4, which was already in
+  place, and leaves plain `twMerge` untouched; globals 17 moves the
+  AudioWorklet names out of `globals.browser`, which this config does not use.
+  Prettier 3.9 reformats short unions onto one line, which is the bulk of the
+  diff.
+
 ### Added
+
+- **Analytics chart test** (`e2e/analytics.spec.ts`): the app's only recharts
+  surface had no test that rendered it with data — every route that reached
+  `/analytics` did so with an empty store, where a healthy chart and a broken
+  one both draw nothing. The test now seeds ratings and asserts three bars
+  exist with a non-zero measured height, which is what a charting library
+  major version can actually break.
 
 - **Sync phase 8, part two — the two-device test** (`specs/sync.md` → Testing):
   an end-to-end test driving two independent browser contexts — separate
