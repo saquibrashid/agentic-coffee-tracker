@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Signed-out visitors no longer trigger `POST /api/sync/pull -> 401`.** The
+  sync engine started on page load and only checked whether auth was
+  _available_ in the build, not whether anyone was actually signed in. The 401
+  that followed is classified as terminal — correctly, for a real session
+  expiry — so the engine halted and the app showed a permanent sync error to a
+  visitor who had never signed in, and who would then have to reload after
+  signing in before sync did anything. Each cycle now checks for a current user
+  first and stays idle when there is none.
+
 ### Changed
 
 - **Vite 8**: replaces Rollup with Rolldown and esbuild with Oxc. The object

@@ -378,3 +378,37 @@ test.describe('two devices, one account', () => {
     await expectBean(deviceA, 'Written offline');
   });
 });
+
+test.describe('a visitor who has not signed in', () => {
+  test('never calls the sync API', async ({ browser }) => {
+    // Auth being *available* is not the same as anyone being signed in, and the
+    // engine used to conflate the two: it started on page load, called an
+    // endpoint that requires a principal, and turned the inevitable 401 into a
+    // permanent error state for someone who never asked to sync.
+    const service = new FakeSyncService();
+    reachable = true;
+    const context = await browser.newContext();
+
+    await context.route('**/.auth/me', async (route) => {
+      await route.fulfill({ json: { clientPrincipal: null } });
+    });
+    // Deliberately still routed. If the engine calls anyway the request is
+    // recorded and the test fails on the assertion rather than on a 404 from
+    // the dev server, which would be a much vaguer signal.
+    await context.route('**/api/sync/**', async (route) => {
+      service.calls.push(route.request().url());
+      await route.fulfill({ status: 401, json: { error: 'unauthorized' } });
+    });
+
+    const page = await context.newPage();
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+
+    // The page-load cycle has had its chance by now; give the engine a further
+    // beat so a late trigger cannot slip past the assertion.
+    await page.waitForTimeout(1_000);
+
+    expect(service.calls).toEqual([]);
+    await context.close();
+  });
+});

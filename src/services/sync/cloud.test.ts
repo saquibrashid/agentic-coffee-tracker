@@ -25,8 +25,13 @@ vi.mock('./api', async () => {
 
 vi.mock('@/services/preferences/compute', () => ({ refreshPreferences: vi.fn() }));
 
+// Signed in by default, because that is the precondition for almost every test
+// in this file. `signedInUser` is a mutable seam so the signed-out path — where
+// the engine must not reach the network at all — can be exercised too.
+let signedInUser: { userId: string } | null = { userId: 'user-a' };
+
 vi.mock('@/services/auth', () => ({
-  getAuthProvider: () => ({ getUser: () => Promise.resolve({ userId: 'user-a' }) }),
+  getAuthProvider: () => ({ getUser: () => Promise.resolve(signedInUser) }),
 }));
 
 vi.mock('./photos', async () => {
@@ -84,6 +89,7 @@ let engine: CloudSyncEngine;
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  signedInUser = { userId: 'user-a' };
   await Promise.all([db.beans.clear(), db.ratings.clear(), db.photos.clear(), db.outbox.clear()]);
   await db.meta.clear();
   pull.mockResolvedValue(emptyPull());
@@ -99,6 +105,50 @@ afterEach(() => {
   // Restores the navigator.onLine spy: leaving it in place makes every later
   // test think the browser is offline, and the engine correctly refuses to sync.
   vi.restoreAllMocks();
+});
+
+describe('when nobody is signed in', () => {
+  beforeEach(() => {
+    signedInUser = null;
+  });
+
+  it('does not call the sync API at all', async () => {
+    // The engine exists for every visitor on a deployment that has auth
+    // available, including one who has never signed in. Reaching the network
+    // there is not just wasteful, it is a guaranteed 401.
+    await engine.sync();
+
+    expect(pull).not.toHaveBeenCalled();
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it('stays idle instead of surfacing an error', async () => {
+    await engine.sync();
+
+    expect(engine.status().state).toBe('idle');
+    expect(engine.status().lastError).toBeUndefined();
+  });
+
+  it('does not halt, so signing in starts syncing without a reload', async () => {
+    // A 401 is terminal by design, so had the signed-out cycle been allowed to
+    // reach the server the engine would have halted and stayed halted for the
+    // life of the tab — the user would sign in and nothing would happen.
+    await engine.sync();
+
+    signedInUser = { userId: 'user-a' };
+    await engine.sync();
+
+    expect(pull).toHaveBeenCalled();
+    expect(engine.status().state).toBe('idle');
+  });
+
+  it('skips again on the next cycle rather than caching the first answer', async () => {
+    // Sign-in state changes underneath a live tab, in both directions.
+    await engine.sync();
+    await engine.sync();
+
+    expect(pull).not.toHaveBeenCalled();
+  });
 });
 
 describe('the sync cycle', () => {
@@ -546,7 +596,7 @@ describe('triggers and coalescing', () => {
     engine.start();
     await vi.advanceTimersByTimeAsync(0);
 
-    expect(pull).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(pull).toHaveBeenCalledTimes(1));
   });
 });
 

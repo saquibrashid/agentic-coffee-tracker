@@ -232,6 +232,27 @@ export class CloudSyncEngine implements SyncEngine {
       return;
     }
 
+    // Signed out is a supported way to run the app, not a degraded one, so it
+    // must cost nothing and look like nothing.
+    //
+    // `isSyncSupported()` cannot cover this. It asks whether auth is
+    // *available* in this build, which on the Standard SKU is true for every
+    // visitor — including one who has never signed in. Without this check the
+    // engine starts on page load, calls an endpoint that requires a principal,
+    // and `#handleFailure` correctly classifies the resulting 401 as terminal:
+    // the engine halts and the app shows a permanent error to someone who
+    // never asked to sync. That is the "401s on a timer" the comment on
+    // `isSyncSupported()` warns about but is not positioned to prevent.
+    //
+    // Checked per cycle rather than cached, because sign-in state changes
+    // underneath a long-lived tab — a session expires, or another tab signs
+    // out. `/.auth/me` is served by the platform and is cheap next to the sync
+    // round trip it is gating.
+    if (!(await getAuthProvider().getUser())) {
+      await this.#publish({ state: 'idle', lastError: undefined });
+      return;
+    }
+
     this.#lastTriggeredAt = Date.now();
 
     // One sync across all open tabs, not one per tab. Same pattern the AI queue
