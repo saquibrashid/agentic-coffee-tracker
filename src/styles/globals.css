@@ -178,31 +178,50 @@
      * on OLED than true black would. The warmth is worth it for an app whose
      * whole subject is roasted coffee.
      */
-    --background: 24 30% 13%;
+    --background: 24 30% 12%;
     --foreground: 30 30% 95%;
 
-    --card: 24 28% 17%; /* lifts off the background without a border */
+    /*
+     * Eight points of lightness above the page, where it used to be four.
+     *
+     * Light mode separates a card from the page with three cues at once: the
+     * card is pure white where the page is tinted, it carries a border, and
+     * its shadow lands on a light surface. Dark mode gets none of that free —
+     * a shadow is invisible against a dark page, and both surfaces share a
+     * hue — so the lightness step has to do the whole job by itself. At the
+     * old four points the cards dissolved into the background.
+     *
+     * Raising it is not free: --destructive is used as text on cards, and had
+     * to be lightened below to stay at 4.5:1 against this.
+     */
+    --card: 24 28% 20%;
     --card-foreground: 30 30% 95%;
 
     --primary: 28 70% 60%; /* warm crema */
     --primary-foreground: 25 30% 10%;
 
-    --secondary: 24 24% 23%;
+    /* The rest of the surface ramp moves up with the card. Left where they
+       were, --muted and --secondary would have landed at or below it, and a
+       muted badge on a card would have been a rectangle of the same colour. */
+    --secondary: 24 24% 26%;
     --secondary-foreground: 30 30% 95%;
 
-    --muted: 24 22% 21%;
+    --muted: 24 22% 25%;
     --muted-foreground: 30 25% 72%;
 
-    --accent: 26 32% 27%;
+    --accent: 26 32% 30%;
     --accent-foreground: 30 30% 95%;
 
     /* Used as text (`text-destructive`) as well as a button fill, so it is
        held to 4.5:1 against both --background and --card, not to the 3:1 a
-       fill would need. That is what sets the lightness here. */
-    --destructive: 0 70% 68%;
+       fill would need. That is what sets the lightness here — and why it rose
+       when --card did. */
+    --destructive: 0 70% 72%;
     --destructive-foreground: 25 30% 10%;
 
-    --border: 24 20% 28%; /* must stay visible against a lighter background */
+    /* Carries the card's edge on its own: the drop shadow that defines a card
+       in light mode contributes nothing against a dark page. */
+    --border: 24 20% 34%;
     --input: 26 22% 50%;
     --ring: 28 70% 60%;
   }
