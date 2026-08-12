@@ -5,17 +5,22 @@
  * fields as an opt-in diff. Nothing is written without an explicit choice, and
  * enrichment failing must never get in the way of manual editing.
  */
-import { useState, type FormEvent } from 'react';
-import { Globe, Loader2 } from 'lucide-react';
+import { useRef, useState, type FormEvent } from 'react';
+import { FileText, Globe, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { db } from '@/services/db';
 import { enqueueUpsert } from '@/services/sync/outbox';
 import { isSchemaError } from '@/services/ai';
 import {
   EmptyPageError,
+  EmptyTextError,
+  UnreadableDetailsError,
+  enrichFromPdf,
+  enrichFromText,
   enrichFromUrl,
   findCandidates,
   type EnrichCandidate,
@@ -41,7 +46,8 @@ import {
 import { normaliseEnrichUrl } from '@/services/enrich/url';
 import type { CoffeeBean } from '@/types';
 
-type Phase = 'idle' | 'searching' | 'candidates' | 'fetching' | 'review' | 'saving' | 'done';
+type Phase =
+  'idle' | 'searching' | 'candidates' | 'fetching' | 'reading' | 'review' | 'saving' | 'done';
 
 /** How the found image compares to what the coffee already has. */
 type PhotoOffer =
@@ -60,6 +66,9 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
   const [photoOffer, setPhotoOffer] = useState<PhotoOffer>({ kind: 'none' });
   const [usePhoto, setUsePhoto] = useState(false);
   const [manualUrl, setManualUrl] = useState('');
+  const [pastedText, setPastedText] = useState('');
+  const [showPaste, setShowPaste] = useState(false);
+  const pdfInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
 
   const photoOffered = photoOffer.kind !== 'none';
@@ -69,6 +78,8 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
     // Enrichment is additive: a failure returns the user to where they were
     // rather than blocking the page they came to use.
     if (err instanceof EmptyPageError) setError(err.message);
+    else if (err instanceof EmptyTextError || err instanceof UnreadableDetailsError)
+      setError(err.message);
     else if (isSchemaError(err)) setError('We could not make sense of that page.');
     else setError(err instanceof Error ? err.message : fallback);
   }
@@ -110,11 +121,25 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
     return { kind: 'upgrade', staged, current, ratio };
   }
 
-  async function choose(url: string, onFailure: Phase = 'candidates') {
+  /**
+   * The single way into the review step, whatever produced the details.
+   *
+   * A scraped page, pasted text and a PDF differ only in how the words were
+   * obtained; once they exist, the parse, the diff and the choosing are
+   * identical. Routing all three through here is what keeps that true — a
+   * second review UI for "details without a page" would be the same screen with
+   * its own bugs.
+   */
+  async function enterReview(
+    load: () => Promise<EnrichedPage>,
+    working: Phase,
+    onFailure: Phase,
+    failureMessage: string,
+  ) {
     setError(null);
-    setPhase('fetching');
+    setPhase(working);
     try {
-      const enriched = await enrichFromUrl(url);
+      const enriched = await load();
       const next = buildProposals(bean, enriched.parsed);
       const offer = await buildPhotoOffer(enriched.imageUrl);
       setPage(enriched);
@@ -127,9 +152,13 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
       setUsePhoto(offer.kind !== 'none');
       setPhase('review');
     } catch (err) {
-      fail(err, 'Could not read that page.');
+      fail(err, failureMessage);
       setPhase(onFailure);
     }
+  }
+
+  async function choose(url: string, onFailure: Phase = 'candidates') {
+    await enterReview(() => enrichFromUrl(url), 'fetching', onFailure, 'Could not read that page.');
   }
 
   /**
@@ -151,6 +180,40 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
     void choose(url, phase);
   }
 
+  /**
+   * The last resort, for a coffee with no page anywhere.
+   *
+   * Pasting the address still assumes a page exists to point at. Some coffees
+   * have none — a roaster with no storefront, a subscription insert, a card in
+   * the box — and for those the details are only ever going to arrive as text
+   * the user gathered themselves. Parsing never needed a web page, so this is
+   * the same machinery with the fetching step removed.
+   */
+  function submitPastedText(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const text = pastedText;
+    void enterReview(
+      () => enrichFromText(text),
+      'reading',
+      phase,
+      'Could not make sense of those details.',
+    );
+  }
+
+  function submitPdf(file: File | undefined) {
+    if (!file) return;
+    const before = phase;
+    void enterReview(
+      () => enrichFromPdf(file),
+      'reading',
+      before,
+      'Could not read that PDF.',
+    ).finally(() => {
+      // Cleared so picking the same file again still fires a change event.
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+    });
+  }
+
   function toggle(field: EnrichableField) {
     setSelected((prev) => {
       const next = new Set(prev);
@@ -162,7 +225,11 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
 
   async function applySelected() {
     if (!page) return;
-    const update = applyProposals(page.parsed, selected, { sourceUrl: page.sourceUrl });
+    const update = applyProposals(page.parsed, selected, {
+      // Omitted rather than blanked when there is no page: pasted details should
+      // not erase the address a coffee was previously enriched from.
+      ...(page.sourceUrl ? { sourceUrl: page.sourceUrl } : {}),
+    });
 
     // Stored last, and never allowed to fail the whole apply: the fields the
     // user picked are the point, and a photo that will not save should not
@@ -204,6 +271,8 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
     setPhotoOffer({ kind: 'none' });
     setUsePhoto(false);
     setManualUrl('');
+    setPastedText('');
+    setShowPaste(false);
     setError(null);
   }
 
@@ -229,6 +298,65 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
     </form>
   );
 
+  const noPageForm = (
+    <div className="space-y-2 border-t pt-3">
+      {showPaste ? (
+        <form className="space-y-2" onSubmit={submitPastedText}>
+          <Label htmlFor={`enrich-text-${bean.id}`} className="text-xs">
+            Paste anything describing this coffee
+          </Label>
+          <Textarea
+            id={`enrich-text-${bean.id}`}
+            rows={5}
+            placeholder="Origin, process, roast level, tasting notes — however it is written."
+            value={pastedText}
+            onChange={(event) => setPastedText(event.target.value)}
+          />
+          <div className="flex gap-2">
+            <Button type="submit" variant="outline" size="sm" disabled={pastedText.trim() === ''}>
+              Read details
+            </Button>
+            <Button type="button" variant="ghost" size="sm" onClick={() => setShowPaste(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <p className="text-muted-foreground text-xs">
+            No page for this coffee anywhere? Use what you have.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="ghost" size="sm" onClick={() => setShowPaste(true)}>
+              <FileText aria-hidden="true" /> Paste details
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => pdfInputRef.current?.click()}
+            >
+              <FileText aria-hidden="true" /> Upload a PDF
+            </Button>
+          </div>
+        </>
+      )}
+      {/*
+        Driven by the button so it reads as one of the pair rather than a stray
+        file control, but still labelled and reachable in its own right.
+      */}
+      <input
+        ref={pdfInputRef}
+        id={`enrich-pdf-${bean.id}`}
+        aria-label="Upload a PDF"
+        type="file"
+        accept="application/pdf,.pdf"
+        className="sr-only"
+        onChange={(event) => submitPdf(event.target.files?.[0])}
+      />
+    </div>
+  );
+
   return (
     <section className="rounded border p-3">
       <h3 className="text-sm font-medium">Web enrichment</h3>
@@ -249,14 +377,19 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
             <Globe aria-hidden="true" /> Find details on the web
           </Button>
           {manualUrlForm}
+          {noPageForm}
         </div>
       )}
 
-      {(phase === 'searching' || phase === 'fetching' || phase === 'saving') && (
+      {(phase === 'searching' ||
+        phase === 'fetching' ||
+        phase === 'reading' ||
+        phase === 'saving') && (
         <p role="status" className="text-muted-foreground mt-2 flex items-center gap-2 text-sm">
           <Loader2 className="size-4 animate-spin" aria-hidden="true" />
           {phase === 'searching' && 'Searching…'}
           {phase === 'fetching' && 'Reading that page…'}
+          {phase === 'reading' && 'Reading those details…'}
           {phase === 'saving' && 'Saving the photo…'}
         </p>
       )}
@@ -291,6 +424,7 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
             Cancel
           </Button>
           {manualUrlForm}
+          {noPageForm}
         </div>
       )}
 
@@ -400,7 +534,9 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
                   Cancel
                 </Button>
               </div>
-              <p className="text-muted-foreground text-xs break-all">Source: {page.sourceUrl}</p>
+              <p className="text-muted-foreground text-xs break-all">
+                {page.sourceUrl ? `Source: ${page.sourceUrl}` : 'From the details you supplied.'}
+              </p>
             </>
           )}
         </div>

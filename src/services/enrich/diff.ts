@@ -123,7 +123,12 @@ export function defaultSelection(proposals: FieldProposal[]): Set<EnrichableFiel
 }
 
 export interface ApplyOptions {
-  sourceUrl: string;
+  /**
+   * Where the details came from, when that is a place. Details typed or pasted
+   * in have no address, and inventing one — or blanking whatever the coffee was
+   * previously stamped with — would both be lies about provenance.
+   */
+  sourceUrl?: string;
   now?: string;
 }
 
@@ -149,7 +154,7 @@ export function applyProposals(
 
   if (Object.keys(result).length === 0) return {};
 
-  result.sourceUrl = options.sourceUrl;
+  if (options.sourceUrl) result.sourceUrl = options.sourceUrl;
   result.needsReview = true;
   result.updatedAt = options.now ?? new Date().toISOString();
   return result;

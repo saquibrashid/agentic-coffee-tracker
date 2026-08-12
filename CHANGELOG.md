@@ -128,6 +128,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Give a coffee its details from text or a PDF, when it has no page at all.**
+  Pasting a product address still assumes there is a page to point at. Some
+  coffees have none — a roaster with no storefront, a subscription insert, a
+  card in the box — and no improvement to the search could ever reach them. The
+  enrichment panel now also takes text pasted straight in, or a PDF, and offers
+  the same review-and-choose list as a scraped page: nothing is written without
+  being ticked. A PDF written by software is read directly; one that is a scan
+  or a phone photo has no text in it at all and is quietly rendered and sent
+  through the same reader used for a bag photo. Details supplied this way leave
+  the coffee's recorded source alone rather than blanking it, since there is no
+  address to claim. The PDF reader is fetched only when a PDF is actually
+  opened, so it costs nothing to anyone who never uses it.
+
 - **Add your own photo to a coffee you already have.** A coffee only got a
   picture if enrichment found its page, so an import full of coffees that were
   never matched had no pictures and no way to get any — while the bags were
