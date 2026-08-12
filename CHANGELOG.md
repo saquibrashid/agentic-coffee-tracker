@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Signing in and out no longer shows a 404.** The app is a single-page app, so
+  its offline service worker answers navigations with the app itself and lets
+  the router take over — correct for every route the app owns, and wrong for
+  `/.auth/…`, which is not an app route at all but an endpoint Azure serves.
+  Signing in navigates to `/.auth/login/aad` expecting a redirect to Microsoft;
+  the service worker was answering with the app shell instead, so the router was
+  handed an address it has no page for and showed an error while the sign-in
+  endpoint was never reached. Sign-out failed identically, which was worse:
+  someone who cannot sign out cannot hand over their device. Only `/api` had
+  been excluded. Both are now left to the platform, with a test that keeps the
+  list honest.
+
 - **Coffees on storefronts that render in the browser no longer enrich to
   blank.** Scraping assumed the words were in the HTML. A storefront built as a
   single-page app sends a shell of script tags instead and assembles itself once
