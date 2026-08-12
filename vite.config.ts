@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 
 import { buildCsp } from './build-config/csp';
 import { cspPlugin } from './build-config/cspPlugin';
+import { NAVIGATION_FALLBACK_DENYLIST } from './build-config/serviceWorker';
 
 // Supplied by `azd` from the infrastructure outputs of the same names. Absent
 // on a local build, which is correct: without a linked backend the browser
@@ -151,7 +152,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        navigateFallbackDenylist: [/^\/api/],
+        navigateFallbackDenylist: NAVIGATION_FALLBACK_DENYLIST,
         // The PDF reader and its worker are ~1.6MB together and are only
         // reached by someone who actually uploads a PDF. Precaching them would
         // make every install — including the first visit, on whatever
