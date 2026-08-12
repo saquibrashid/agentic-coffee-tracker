@@ -115,7 +115,12 @@ describe('PhotoPanel', () => {
     await waitFor(async () => {
       expect((await db.beans.get('bean-1'))!.photoId).not.toBe(firstPhotoId);
     });
-    await expect(db.photos.get(firstPhotoId)).resolves.toBeUndefined();
+    // Waited for rather than asserted outright: the release deliberately
+    // happens *after* the bean is repointed, so it is not done yet at the
+    // moment the new photo id appears.
+    await waitFor(async () => {
+      expect(await db.photos.get(firstPhotoId)).toBeUndefined();
+    });
     expect(await db.photos.count()).toBe(1);
   });
 
