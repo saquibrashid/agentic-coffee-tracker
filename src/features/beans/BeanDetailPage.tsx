@@ -5,6 +5,7 @@ import { ulid } from 'ulid';
 import { ArrowLeft, Camera, Check, CircleAlert, Globe, Pencil, Plus, Trash2 } from 'lucide-react';
 import { db } from '@/services/db';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -28,7 +29,7 @@ import { BREW_TYPE_OPTIONS, DEFAULT_BREW_TYPE, brewLabel } from '@/services/rati
 import { EnrichPanel } from './EnrichPanel';
 import { PhotoPanel } from './PhotoPanel';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
-import type { BrewType, CoffeeBean, Rating } from '@/types';
+import type { BrewType, CoffeeBean, Money, Rating } from '@/types';
 
 const SCORE_OPTIONS = SCORE_CHOICES;
 
@@ -129,8 +130,63 @@ function hasNoAttributes(bean: CoffeeBean): boolean {
     !roastKnown &&
     !processKnown &&
     (bean.origins ?? []).length === 0 &&
+    (bean.varietals ?? []).length === 0 &&
+    (bean.tastingNotes ?? []).length === 0 &&
+    bean.roasterDescription === undefined &&
+    bean.elevationMeters === undefined &&
+    bean.bagSizeGrams === undefined &&
+    bean.pricePaid === undefined &&
+    bean.purchaseDate === undefined &&
     bean.roastDate === undefined
   );
+}
+
+/** Country plus whichever narrowing detail the roaster gave, e.g.
+ * "Colombia (Huila)". Farm and producer stay out: they are long, and a blend
+ * would run several of them into an unreadable line. */
+function formatOrigins(origins: NonNullable<CoffeeBean['origins']>): string {
+  return origins
+    .map((o) => {
+      const place = o.region ? `${o.country} (${o.region})` : o.country;
+      return o.percentage !== undefined ? `${place} ${o.percentage}%` : place;
+    })
+    .join(', ');
+}
+
+/** A bare date like `2026-06-01`, read as calendar text rather than an instant.
+ * Parsing it as a Date would apply the local timezone and can show the day
+ * before. */
+function formatDay(iso: string): string {
+  const [y, m, d] = iso.slice(0, 10).split('-').map(Number);
+  if (!y || !m || !d) return iso;
+  return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
+}
+
+/** "1,800–2,000 m", or whichever end the roaster actually stated. */
+function formatElevation(elevation: NonNullable<CoffeeBean['elevationMeters']>): string | null {
+  const { min, max } = elevation;
+  const n = (v: number) => v.toLocaleString();
+  if (min !== undefined && max !== undefined) {
+    return min === max ? `${n(min)} m` : `${n(min)}–${n(max)} m`;
+  }
+  if (min !== undefined) return `${n(min)} m and up`;
+  if (max !== undefined) return `up to ${n(max)} m`;
+  return null;
+}
+
+function formatMoney(money: Money): string {
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: money.currency }).format(
+      money.amount,
+    );
+  } catch {
+    // An unrecognised currency code must not blank the whole page.
+    return `${money.amount} ${money.currency}`;
+  }
 }
 
 /**
@@ -294,23 +350,65 @@ export function BeanDetailPage() {
 
               Two columns on a phone as well as on a desktop. These values are
               a few words each, so one per row left most of the line empty and
-              made four short facts as tall as a paragraph.
+              made four short facts as tall as a paragraph. Wider screens take
+              more columns rather than stretching two across the whole line,
+              which stranded each label a third of a screen from its value.
             */
-            <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
               <Attribute label="Roast">
                 {bean.roastLevel !== undefined && bean.roastLevel !== 'unknown' && (
                   <RoastScale level={bean.roastLevel} className="flex-wrap gap-y-1" />
                 )}
               </Attribute>
               <Attribute label="Origin">
-                {(bean.origins ?? []).length > 0 &&
-                  (bean.origins ?? []).map((o) => o.country).join(', ')}
+                {(bean.origins ?? []).length > 0 && formatOrigins(bean.origins ?? [])}
               </Attribute>
               <Attribute label="Process">
                 {bean.process !== undefined && bean.process !== 'unknown' && bean.process}
               </Attribute>
-              <Attribute label="Roasted">{bean.roastDate}</Attribute>
+              <Attribute label="Varietals">
+                {(bean.varietals ?? []).length > 0 && (bean.varietals ?? []).join(', ')}
+              </Attribute>
+              <Attribute label="Elevation">
+                {bean.elevationMeters !== undefined && formatElevation(bean.elevationMeters)}
+              </Attribute>
+              <Attribute label="Roasted">{bean.roastDate && formatDay(bean.roastDate)}</Attribute>
+              <Attribute label="Purchased">
+                {bean.purchaseDate && formatDay(bean.purchaseDate)}
+              </Attribute>
+              <Attribute label="Bag size">
+                {bean.bagSizeGrams !== undefined && `${bean.bagSizeGrams} g`}
+              </Attribute>
+              <Attribute label="Price paid">
+                {bean.pricePaid !== undefined && formatMoney(bean.pricePaid)}
+              </Attribute>
             </dl>
+          )}
+          {/*
+            Notes and the roaster's blurb sit outside the two-column grid: one
+            is a set of short chips that reads better as a row, the other is
+            prose that a half-width column would turn into a ladder. Both were
+            stored, enriched and synced but never shown here — tasting notes
+            even drive the recommendations, so a coffee's own page was the one
+            place they were invisible.
+          */}
+          {(bean.tastingNotes ?? []).length > 0 && (
+            <div className="mt-4">
+              <p className="text-meta text-muted-foreground">Tasting notes</p>
+              <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                {(bean.tastingNotes ?? []).map((note) => (
+                  <li key={note}>
+                    <Badge variant="secondary">{note}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {bean.roasterDescription && (
+            <div className="mt-4">
+              <p className="text-meta text-muted-foreground">From the roaster</p>
+              <p className="mt-1 text-sm leading-relaxed">{bean.roasterDescription}</p>
+            </div>
           )}
           {bean.sourceUrl && (
             <p className="text-muted-foreground mt-4 text-xs">

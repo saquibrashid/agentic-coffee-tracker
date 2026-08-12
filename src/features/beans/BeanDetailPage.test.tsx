@@ -194,6 +194,52 @@ describe('BeanDetailPage', () => {
     });
   });
 
+  /*
+   * Everything the record can hold used to reach this page and stop: only
+   * roast, origin, process and roast date were rendered, so tasting notes,
+   * varietals, elevation, purchase date, bag size, price and the roaster's
+   * own description were stored, enriched and synced but never shown.
+   */
+  it('shows every detail the coffee actually holds', async () => {
+    await db.beans.clear();
+    await db.beans.add({
+      ...bean,
+      origins: [{ country: 'Colombia', region: 'Huila' }],
+      process: 'washed',
+      varietals: ['Caturra', 'Colombia'],
+      elevationMeters: { min: 1800, max: 2000 },
+      tastingNotes: ['Dark chocolate', 'Walnut', 'Raisin'],
+      roasterDescription: 'A syrupy cup with a long finish.',
+      roastDate: '2026-06-01',
+      purchaseDate: '2026-06-04',
+      bagSizeGrams: 300,
+      pricePaid: { amount: 21.5, currency: 'USD' },
+    });
+    renderPage();
+
+    expect(await screen.findByText('Colombia (Huila)')).toBeInTheDocument();
+    expect(screen.getByText('Caturra, Colombia')).toBeInTheDocument();
+    expect(screen.getByText('1,800–2,000 m')).toBeInTheDocument();
+    expect(screen.getByText('Dark chocolate')).toBeInTheDocument();
+    expect(screen.getByText('A syrupy cup with a long finish.')).toBeInTheDocument();
+    expect(screen.getByText('300 g')).toBeInTheDocument();
+    expect(screen.getByText('$21.50')).toBeInTheDocument();
+    // A bare date is calendar text; parsing it as an instant shows the day
+    // before for anyone west of UTC.
+    expect(screen.getByText('Jun 1, 2026')).toBeInTheDocument();
+    expect(screen.getByText('Jun 4, 2026')).toBeInTheDocument();
+  });
+
+  it('still leaves out the fields the coffee has nothing for', async () => {
+    await db.beans.clear();
+    await db.beans.add({ ...bean, tastingNotes: ['Cocoa'] });
+    renderPage();
+
+    expect(await screen.findByText('Cocoa')).toBeInTheDocument();
+    expect(screen.queryByText('Price paid')).not.toBeInTheDocument();
+    expect(screen.queryByText('Elevation')).not.toBeInTheDocument();
+  });
+
   it('offers a way back, which used to mean going Home', async () => {
     renderPage();
     // Opened directly — there is no history to go back through, so the link has
