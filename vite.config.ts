@@ -100,6 +100,13 @@ export default defineConfig({
               test: /node_modules[\\/](?:dexie|dexie-react-hooks)(?:[\\/]|$)/,
               includeDependenciesRecursively: true,
             },
+            {
+              // Named explicitly so the service worker can recognise it by
+              // filename and keep it out of the precache — see `globIgnores`.
+              name: 'pdf',
+              test: /node_modules[\\/]pdfjs-dist(?:[\\/]|$)/,
+              includeDependenciesRecursively: true,
+            },
           ],
         },
       },
@@ -133,7 +140,25 @@ export default defineConfig({
       },
       workbox: {
         navigateFallbackDenylist: [/^\/api/],
+        // The PDF reader and its worker are ~1.6MB together and are only
+        // reached by someone who actually uploads a PDF. Precaching them would
+        // make every install — including the first visit, on whatever
+        // connection — pay for a feature most people never open. They are
+        // cached on first use instead, which also means the second PDF works
+        // offline.
+        globIgnores: ['**/pdf-*.js', '**/pdf.worker*.mjs'],
         runtimeCaching: [
+          {
+            urlPattern: /\/assets\/(?:pdf-[^/]*\.js|pdf\.worker[^/]*\.mjs)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'pdf-reader',
+              // Content-hashed filenames, so an entry is only ever replaced by
+              // a differently named one; the cap stops old builds accumulating.
+              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 90 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /^https:\/\/fonts\.(?:googleapis|gstatic)\.com\/.*/i,
             handler: 'CacheFirst',

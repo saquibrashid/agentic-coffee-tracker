@@ -17,11 +17,15 @@ import type { CoffeeBean } from '@/types';
  */
 
 const enrichFromUrl = vi.hoisted(() => vi.fn());
+const enrichFromText = vi.hoisted(() => vi.fn());
+const enrichFromPdf = vi.hoisted(() => vi.fn());
 const findCandidates = vi.hoisted(() => vi.fn());
 
 vi.mock('@/services/enrich', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   enrichFromUrl,
+  enrichFromText,
+  enrichFromPdf,
   findCandidates,
 }));
 
@@ -48,6 +52,21 @@ const bean: CoffeeBean = {
   updatedAt: '2026-01-01T00:00:00.000Z',
 };
 
+/** A parse with every list present, as the API contract guarantees. */
+const emptyParse = {
+  roaster: null,
+  name: null,
+  origins: [],
+  process: null,
+  roastLevel: null,
+  tastingNotes: [],
+  roastDate: null,
+  varietals: [],
+  elevationMeters: null,
+  roasterDescription: null,
+  confidence: 0.9,
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   findCandidates.mockResolvedValue([]);
@@ -55,6 +74,20 @@ beforeEach(() => {
     parsed: { roastLevel: 'medium' },
     rawText: 'After Hours decaf',
     sourceUrl: 'https://www.highwirecoffee.com/products/after-hours-decaf-310g-bag',
+    model: 'test',
+  });
+  enrichFromText.mockResolvedValue({
+    parsed: {
+      ...emptyParse,
+      roastLevel: 'medium',
+      tastingNotes: ['cocoa', 'citrus'],
+    },
+    rawText: 'After Hours decaf',
+    model: 'test',
+  });
+  enrichFromPdf.mockResolvedValue({
+    parsed: { ...emptyParse, roastLevel: 'dark' },
+    rawText: 'After Hours decaf',
     model: 'test',
   });
 });
@@ -109,6 +142,63 @@ describe('EnrichPanel manual URL', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/no readable text/i);
     // Not stranded in a phase it never came from.
+    expect(screen.getByRole('button', { name: /find details on the web/i })).toBeInTheDocument();
+  });
+});
+
+/**
+ * The paste/PDF route exists for coffees with no page at all — the ones a
+ * better search could never reach. Its whole value is that it lands in the same
+ * review step as a scraped page, so that is what these assert.
+ */
+describe('EnrichPanel details without a page', () => {
+  async function openPaste(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /paste details/i }));
+    return screen.getByLabelText(/paste anything describing this coffee/i);
+  }
+
+  it('parses pasted details and reviews them like a page', async () => {
+    const user = userEvent.setup();
+    render(<EnrichPanel bean={bean} />);
+
+    await user.type(await openPaste(user), 'Washed Ethiopia, medium roast, citrus and cocoa.');
+    await user.click(screen.getByRole('button', { name: /read details/i }));
+
+    await waitFor(() => expect(enrichFromText).toHaveBeenCalled());
+    expect(await screen.findByLabelText(/proposed changes/i)).toBeInTheDocument();
+    expect(enrichFromUrl).not.toHaveBeenCalled();
+  });
+
+  it('says the details came from the user, not from a made-up address', async () => {
+    const user = userEvent.setup();
+    render(<EnrichPanel bean={bean} />);
+
+    await user.type(await openPaste(user), 'Washed Ethiopia, medium roast, citrus and cocoa.');
+    await user.click(screen.getByRole('button', { name: /read details/i }));
+
+    expect(await screen.findByText(/from the details you supplied/i)).toBeInTheDocument();
+  });
+
+  it('reads an uploaded PDF into the same review', async () => {
+    const user = userEvent.setup();
+    render(<EnrichPanel bean={bean} />);
+
+    const file = new File(['%PDF-1.7'], 'coffee.pdf', { type: 'application/pdf' });
+    await user.upload(screen.getByLabelText(/upload a pdf/i), file);
+
+    await waitFor(() => expect(enrichFromPdf).toHaveBeenCalled());
+    expect(await screen.findByLabelText(/proposed changes/i)).toBeInTheDocument();
+  });
+
+  it('returns to where it started when a PDF cannot be read', async () => {
+    enrichFromPdf.mockRejectedValue(new Error('That file could not be read as a PDF.'));
+    const user = userEvent.setup();
+    render(<EnrichPanel bean={bean} />);
+
+    const file = new File(['not-a-pdf'], 'coffee.pdf', { type: 'application/pdf' });
+    await user.upload(screen.getByLabelText(/upload a pdf/i), file);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not be read as a pdf/i);
     expect(screen.getByRole('button', { name: /find details on the web/i })).toBeInTheDocument();
   });
 });
