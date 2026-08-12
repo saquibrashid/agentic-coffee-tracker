@@ -1,10 +1,13 @@
 /**
- * Thin client for the Azure OpenAI **v1 Responses API**.
+ * Thin client for the Azure OpenAI **v1 API**.
  *
  * `POST {endpoint}/openai/v1/responses` is the current surface and needs no
  * dated `api-version`, unlike the older `/openai/deployments/{d}/chat/completions`
  * route it replaces. Strict structured outputs are supported here via
  * `text.format`, which the schema-validated endpoints depend on.
+ *
+ * `POST {endpoint}/openai/v1/images/edits` on the same resource serves the
+ * image model, which is a separate deployment — see `getOpenAiImageConfig`.
  *
  * Auth is the `api-key` header. The keys are injected as Key Vault references,
  * so they never sit in the deployed configuration in plaintext.
@@ -23,6 +26,100 @@ export function getOpenAiConfig(): OpenAiConfig | null {
   const deployment = process.env['AZURE_OPENAI_DEPLOYMENT'];
   if (!endpoint || !key || !deployment) return null;
   return { endpoint: endpoint.replace(/\/$/, ''), key, deployment };
+}
+
+/**
+ * The image model is a *second* deployment, not the chat one under another name.
+ *
+ * `AZURE_OPENAI_DEPLOYMENT` points at a text model, which cannot serve
+ * `/images/edits` at all, so image generation gets its own variable rather than
+ * reusing that one. Endpoint and key are shared, because both deployments live
+ * on the same Azure OpenAI resource; only the deployment differs.
+ *
+ * Returns null when image generation is not configured, which puts the caller
+ * in mock mode exactly as the text path does.
+ */
+export function getOpenAiImageConfig(): OpenAiConfig | null {
+  const endpoint = process.env['AZURE_OPENAI_ENDPOINT'];
+  const key = process.env['AZURE_OPENAI_KEY'];
+  const deployment = process.env['AZURE_OPENAI_IMAGE_DEPLOYMENT'];
+  if (!endpoint || !key || !deployment) return null;
+  return { endpoint: endpoint.replace(/\/$/, ''), key, deployment };
+}
+
+export interface ImageEditRequest {
+  /** The reference image the model must reproduce the packaging from. */
+  image: Buffer;
+  imageContentType: string;
+  prompt: string;
+  /** Square by default: the app's photos are stored square-cropped on cards. */
+  size?: '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+  quality?: 'low' | 'medium' | 'high' | 'auto';
+  timeoutMs?: number;
+}
+
+export interface ImageEditResult {
+  /** Raw bytes of the generated image. */
+  bytes: Buffer;
+  contentType: string;
+  model: string;
+}
+
+/**
+ * Edits an image with the deployed image model.
+ *
+ * `multipart/form-data` rather than JSON, because that is what `/images/edits`
+ * accepts — the reference image is an uploaded file, not a base64 field.
+ * `response_format` is deliberately *not* sent: the gpt-image family rejects it
+ * and returns base64 regardless, so asking is both useless and an error.
+ *
+ * Generation is slow by the standards of the other endpoints — tens of seconds
+ * is normal — so the default timeout is far longer than the 30s the text calls
+ * use. A ceiling still exists, because a request that never returns would hold
+ * a Function invocation open until the host kills it.
+ */
+export async function callImageEdit(
+  config: OpenAiConfig,
+  request: ImageEditRequest,
+): Promise<ImageEditResult> {
+  const form = new FormData();
+  form.append('model', config.deployment);
+  form.append('prompt', request.prompt);
+  form.append('size', request.size ?? '1024x1024');
+  form.append('quality', request.quality ?? 'high');
+  form.append(
+    'image',
+    new Blob([new Uint8Array(request.image)], { type: request.imageContentType }),
+    'reference.png',
+  );
+
+  const res = await fetch(`${config.endpoint}/openai/v1/images/edits`, {
+    method: 'POST',
+    // No Content-Type header: fetch derives it from the FormData, including the
+    // multipart boundary, which cannot be written by hand.
+    headers: { 'api-key': config.key },
+    signal: AbortSignal.timeout(request.timeoutMs ?? 120_000),
+    body: form,
+  });
+
+  if (!res.ok) throw new OpenAiError(res.status, await res.text());
+
+  const data = (await res.json()) as {
+    data?: { b64_json?: string; url?: string }[];
+    output_format?: string;
+  };
+  const b64 = data.data?.[0]?.b64_json;
+  // A URL instead of bytes would be useless here: the app's CSP allows images
+  // from `self`, `data:` and `blob:` only, so a temporary model-hosted URL could
+  // never be displayed. Treat it as a failure rather than pass it on.
+  if (!b64) throw new OpenAiError(502, 'Image response carried no image data.');
+
+  const format = data.output_format === 'jpeg' ? 'jpeg' : (data.output_format ?? 'png');
+  return {
+    bytes: Buffer.from(b64, 'base64'),
+    contentType: `image/${format}`,
+    model: config.deployment,
+  };
 }
 
 /** `text.format` values we use. `json_schema` is the strict, validated one. */

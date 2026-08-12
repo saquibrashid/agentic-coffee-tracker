@@ -82,6 +82,16 @@ export class CoffeeDB extends Dexie {
     this.version(4).stores({
       pendingAiTasks: 'id, type, nextAttemptAt, beanId',
     });
+
+    // v5 indexes photos.sourcePhotoId, which a studio shot carries to point at
+    // the photo it was generated from (specs/data-model.md). The index is what
+    // lets the reverse question be asked cheaply — "does this original already
+    // have a studio shot?" — which the bulk re-shoot needs once per coffee to
+    // avoid paying for the same image twice. Purely additive: existing photos
+    // have no such field and are simply absent from the index.
+    this.version(5).stores({
+      photos: 'id, kind, sourcePhotoId',
+    });
   }
 }
 

@@ -278,3 +278,42 @@ describe('releasePhotoIfOrphaned', () => {
     await expect(releasePhotoIfOrphaned(undefined)).resolves.toBe(false);
   });
 });
+
+describe('releasePhotoIfOrphaned: studio shots', () => {
+  it('keeps an original that a studio shot still points at', async () => {
+    // No bean references it any more, but the generated photo showing in its
+    // place has to have something to revert to -- and it is the only real
+    // picture of the bag.
+    await db.photos.bulkAdd([
+      storedPhoto('original'),
+      { ...storedPhoto('studio'), kind: 'bag-studio', sourcePhotoId: 'original' },
+    ]);
+    await db.beans.add(beanWithPhoto('b1', 'studio'));
+
+    await expect(releasePhotoIfOrphaned('original')).resolves.toBe(false);
+    await expect(db.photos.get('original')).resolves.toBeDefined();
+  });
+
+  it('takes the original with it when the studio shot goes', async () => {
+    await db.photos.bulkAdd([
+      storedPhoto('original'),
+      { ...storedPhoto('studio'), kind: 'bag-studio', sourcePhotoId: 'original' },
+    ]);
+
+    await expect(releasePhotoIfOrphaned('studio')).resolves.toBe(true);
+    // Nothing else was ever going to: the original stopped belonging to a bean
+    // the moment the studio shot replaced it.
+    await expect(db.photos.get('original')).resolves.toBeUndefined();
+  });
+
+  it('leaves an original that a surviving bean still owns', async () => {
+    await db.photos.bulkAdd([
+      storedPhoto('original'),
+      { ...storedPhoto('studio'), kind: 'bag-studio', sourcePhotoId: 'original' },
+    ]);
+    await db.beans.add(beanWithPhoto('other', 'original'));
+
+    await expect(releasePhotoIfOrphaned('studio')).resolves.toBe(true);
+    await expect(db.photos.get('original')).resolves.toBeDefined();
+  });
+});

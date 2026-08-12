@@ -11,9 +11,14 @@
  * enrichment panel exists to stop an unattended lookup trampling the user's own
  * picture with a storefront render; when the user is the one choosing, that
  * question has already been answered.
+ *
+ * The studio re-shoot is the exception that proves the rule. It is the one
+ * source of a picture that nobody chose by looking at it, so it is the one that
+ * is staged and previewed side by side before it is applied — and the original
+ * photograph is kept either way, so the whole thing is undoable.
  */
-import { useRef, useState } from 'react';
-import { Camera, ImagePlus, Loader2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Camera, ImagePlus, Loader2, Sparkles, Undo2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { CameraCapture } from '@/features/capture/CameraCapture';
@@ -24,9 +29,16 @@ import {
   setBeanPhoto,
   type StagedPhoto,
 } from '@/services/enrich/photo';
+import {
+  applyStudioPhoto,
+  canRevertStudioPhoto,
+  prepareStudioPhoto,
+  revertStudioPhoto,
+  type StudioPhotoCandidate,
+} from '@/services/enrich/studioPhoto';
 import type { CoffeeBean } from '@/types';
 
-type Phase = 'idle' | 'reading' | 'saving';
+type Phase = 'idle' | 'reading' | 'saving' | 'reshooting';
 
 export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
   const [phase, setPhase] = useState<Phase>('idle');
@@ -37,8 +49,22 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
   // Asked once: the answer cannot change during a visit, and it decides whether
   // the camera button exists at all.
   const [cameraAvailable] = useState(() => isCameraSupported());
+  const [candidate, setCandidate] = useState<StudioPhotoCandidate | null>(null);
+  const [revertable, setRevertable] = useState(false);
 
   const hasPhoto = Boolean(bean.thumbnailDataUrl ?? bean.photoId);
+
+  // Whether there is an original to go back to is a question about stored
+  // photos, not about the bean, so it cannot be read off the props.
+  useEffect(() => {
+    let live = true;
+    void canRevertStudioPhoto(bean).then((value) => {
+      if (live) setRevertable(value);
+    });
+    return () => {
+      live = false;
+    };
+  }, [bean]);
 
   async function store(staged: StagedPhoto) {
     setPhase('saving');
@@ -47,6 +73,57 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
     // without anything here having to hold it.
     setJustSaved(true);
     setPhase('idle');
+  }
+
+  /**
+   * Generates the studio shot but does not apply it.
+   *
+   * Staging first is the whole interaction: a re-shoot is a matter of taste and
+   * the model can get the packaging subtly wrong, so the two pictures are put
+   * next to each other and the user decides. Nothing is written until they do.
+   */
+  async function handleReshoot() {
+    setError(null);
+    setJustSaved(false);
+    setCandidate(null);
+    setPhase('reshooting');
+    try {
+      setCandidate(await prepareStudioPhoto(bean));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not re-shoot that photo.');
+    } finally {
+      setPhase('idle');
+    }
+  }
+
+  async function acceptCandidate() {
+    if (!candidate) return;
+    setError(null);
+    setPhase('saving');
+    try {
+      await applyStudioPhoto(bean, candidate);
+      setCandidate(null);
+      setRevertable(true);
+      setJustSaved(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not save that photo.');
+    } finally {
+      setPhase('idle');
+    }
+  }
+
+  async function handleRevert() {
+    setError(null);
+    setJustSaved(false);
+    setPhase('saving');
+    try {
+      await revertStudioPhoto(bean);
+      setRevertable(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not put the original back.');
+    } finally {
+      setPhase('idle');
+    }
   }
 
   async function handleFile(file: File | undefined) {
@@ -120,7 +197,11 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
           {busy && (
             <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
               <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              {phase === 'reading' ? 'Preparing your photo…' : 'Saving…'}
+              {phase === 'reading'
+                ? 'Preparing your photo…'
+                : phase === 'reshooting'
+                  ? 'Re-shooting the bag — this takes a minute…'
+                  : 'Saving…'}
             </p>
           )}
 
@@ -128,6 +209,52 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
             <p role="status" className="text-sm">
               Photo saved.
             </p>
+          )}
+
+          {/* Side by side, both from images already in hand, so what is shown is
+              exactly what would be stored. The generated one is never applied
+              from here without this step. */}
+          {candidate && !busy && (
+            <div className="space-y-2 rounded border p-2">
+              <div className="flex items-end gap-3">
+                {bean.thumbnailDataUrl && (
+                  <figure className="m-0">
+                    <img
+                      src={bean.thumbnailDataUrl}
+                      alt="What this coffee shows now"
+                      className="size-20 rounded object-cover"
+                    />
+                    <figcaption className="text-muted-foreground mt-1 text-xs">Yours</figcaption>
+                  </figure>
+                )}
+                <figure className="m-0">
+                  <img
+                    src={candidate.staged.thumbnailDataUrl}
+                    alt="Studio shot generated from what you took"
+                    className="size-20 rounded object-cover"
+                  />
+                  <figcaption className="text-muted-foreground mt-1 text-xs">Studio shot</figcaption>
+                </figure>
+              </div>
+              <p className="text-muted-foreground text-xs">
+                {candidate.provider === 'mock-image'
+                  ? 'No image model is configured, so this is your own photo handed straight back.'
+                  : 'Drawn by a model from your photo, so the label may not be exact. Your original is kept, and this is only decoration — details are never read off it.'}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" size="sm" onClick={() => void acceptCandidate()}>
+                  Use the studio shot
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCandidate(null)}
+                >
+                  Keep mine
+                </Button>
+              </div>
+            </div>
           )}
 
           <div className="flex flex-wrap gap-2">
@@ -155,6 +282,28 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
               <ImagePlus aria-hidden="true" />{' '}
               {hasPhoto ? 'Choose a different photo' : 'Choose a photo'}
             </Button>
+            {hasPhoto && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => void handleReshoot()}
+              >
+                <Sparkles aria-hidden="true" /> Make it a studio shot
+              </Button>
+            )}
+            {revertable && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={() => void handleRevert()}
+              >
+                <Undo2 aria-hidden="true" /> Back to my photo
+              </Button>
+            )}
           </div>
 
           {/*

@@ -30,6 +30,7 @@ export interface HealthResponse {
     parse: 'live' | 'mock';
     search: 'live' | 'mock';
     recommend: 'live' | 'mock';
+    studioPhoto: 'live' | 'mock';
     sync: 'live' | 'disabled';
   };
 }
@@ -51,6 +52,14 @@ app.http('health', {
         // that store directly, so it is live whenever the model is.
         search: openAi,
         recommend: openAi,
+        // A separate deployment from the chat model: an image model cannot
+        // serve the Responses API and vice versa, so this is live only when
+        // that second deployment is configured.
+        studioPhoto: modeOf(
+          'AZURE_OPENAI_ENDPOINT',
+          'AZURE_OPENAI_KEY',
+          'AZURE_OPENAI_IMAGE_DEPLOYMENT',
+        ),
         sync: syncModeOf(
           'COSMOS_ENDPOINT',
           'COSMOS_DATABASE',

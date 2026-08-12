@@ -14,6 +14,7 @@ param openAiEndpoint string
 @secure()
 param openAiKey string
 param openAiDeployment string
+param openAiImageDeployment string
 param scrapeAllowlist string
 
 @allowed(['owner', 'allowlist', 'open'])
@@ -36,6 +37,14 @@ param openAiModelVersion string = '2024-11-20'
 
 @description('Thousands of tokens per minute for the model deployment.')
 param openAiCapacity int = 10
+
+@description('Name of the image model to deploy for /api/studio-photo. Empty (the default) deploys none, which leaves studio shots in mock mode — the image models are not available on every subscription, and each generated image is billed.')
+param openAiImageModelName string = ''
+
+param openAiImageModelVersion string = '2025-04-15'
+
+@description('Images per minute for the image model deployment.')
+param openAiImageCapacity int = 1
 
 @description('Name of the Foundry project created under the Azure OpenAI account. The new Foundry portal only surfaces projects, not bare accounts.')
 param openAiProjectName string = 'coffee-tracker'
@@ -89,6 +98,14 @@ var provisionedOpenAiEndpoint = 'https://${abbrev.openAi}.openai.azure.com/'
 var effectiveOpenAiEndpoint = empty(openAiEndpoint) ? provisionedOpenAiEndpoint : openAiEndpoint
 var effectiveOpenAiKey = empty(openAiKey) ? openAi.listKeys().key1 : openAiKey
 var effectiveOpenAiDeployment = empty(openAiDeployment) ? openAiModelName : openAiDeployment
+
+// Three states, not two. An operator can point at an image deployment they
+// already have (`openAiImageDeployment`), have this template create one
+// (`openAiImageModelName`), or — the default — have neither, in which case
+// studio shots stay in mock mode and nothing is billed for images.
+var effectiveOpenAiImageDeployment = !empty(openAiImageDeployment)
+  ? openAiImageDeployment
+  : openAiImageModelName
 
 // The BFF still falls back to deterministic mocks when a key is absent, which is
 // what local development runs on. In Azure the credentials are always present,
@@ -227,6 +244,30 @@ resource openAiModelDeployment 'Microsoft.CognitiveServices/accounts/deployments
     }
   }
 }
+
+// Only when asked for: the image models require capacity that is not available
+// on every subscription, and a deployment nobody uses still occupies quota.
+//
+// Serialised behind the chat deployment on purpose. Azure rejects concurrent
+// deployment writes to one Cognitive Services account with a conflict, and
+// nothing in the template otherwise orders these two.
+resource openAiImageModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2026-05-01' =
+  if (!empty(openAiImageModelName)) {
+    parent: openAi
+    name: openAiImageModelName
+    sku: {
+      name: 'GlobalStandard'
+      capacity: openAiImageCapacity
+    }
+    properties: {
+      model: {
+        format: 'OpenAI'
+        name: openAiImageModelName
+        version: openAiImageModelVersion
+      }
+    }
+    dependsOn: [openAiModelDeployment]
+  }
 
 // ---------------------------------------------------------------------------
 // Key Vault
@@ -480,20 +521,33 @@ var visionSettings = [
   }
 ]
 
-var openAiSettings = [
-  {
-    name: 'AZURE_OPENAI_ENDPOINT'
-    value: effectiveOpenAiEndpoint
-  }
-  {
-    name: 'AZURE_OPENAI_KEY'
-    value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/azure-openai-key/)'
-  }
-  {
-    name: 'AZURE_OPENAI_DEPLOYMENT'
-    value: effectiveOpenAiDeployment
-  }
-]
+var openAiSettings = concat(
+  [
+    {
+      name: 'AZURE_OPENAI_ENDPOINT'
+      value: effectiveOpenAiEndpoint
+    }
+    {
+      name: 'AZURE_OPENAI_KEY'
+      value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/azure-openai-key/)'
+    }
+    {
+      name: 'AZURE_OPENAI_DEPLOYMENT'
+      value: effectiveOpenAiDeployment
+    }
+  ],
+  // Omitted entirely rather than set empty when no image model is available.
+  // `/api/studio-photo` decides between live and mock on whether this variable
+  // is present, and an empty string would be a third state neither side means.
+  empty(effectiveOpenAiImageDeployment)
+    ? []
+    : [
+        {
+          name: 'AZURE_OPENAI_IMAGE_DEPLOYMENT'
+          value: effectiveOpenAiImageDeployment
+        }
+      ]
+)
 
 // Every value here is a deterministic string, never a property of the
 // conditional resources above. Referencing `cosmos.properties.documentEndpoint`

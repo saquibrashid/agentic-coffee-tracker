@@ -44,6 +44,22 @@ export interface RateLimitConfig {
  */
 export const SYNC_RATE_LIMIT: RateLimitConfig = { capacity: 120, refillPerSecond: 2 };
 
+/**
+ * Far tighter than the sync budget, because this one guards a bill rather than
+ * a resource.
+ *
+ * Every allowed request generates an image, and an image costs money — unlike a
+ * Cosmos read, which costs a fraction of a cent's worth of RUs. The shape being
+ * defended against is different too: not a retry loop but a bulk re-shoot of a
+ * whole library, which is a legitimate thing to ask for and still must not turn
+ * into an unbounded spend from a single stuck client.
+ *
+ * 20 back-to-back covers re-shooting a shelf's worth by hand in one sitting;
+ * 6/minute sustained is comfortably above what the queue runner asks for and
+ * far below what a runaway client would.
+ */
+export const IMAGE_RATE_LIMIT: RateLimitConfig = { capacity: 20, refillPerSecond: 0.1 };
+
 interface Bucket {
   tokens: number;
   /** ms epoch of the last refill. */

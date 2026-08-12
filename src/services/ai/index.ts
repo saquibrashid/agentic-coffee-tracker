@@ -20,6 +20,13 @@ const APP_VERSION = '0.1.0';
 const DEFAULT_TIMEOUT_MS = 20_000;
 /** Model-backed endpoints legitimately take longer than a plain HTTP hop. */
 const MODEL_TIMEOUT_MS = 60_000;
+/**
+ * Image generation is slower again — a re-shoot routinely runs past a minute,
+ * where a text completion that slow would already be a failure. A shorter
+ * ceiling here would abort requests the service was about to answer, and the
+ * user would be billed for an image they never received.
+ */
+const STUDIO_PHOTO_TIMEOUT_MS = 180_000;
 
 export class ApiError extends Error {
   constructor(
@@ -191,6 +198,35 @@ export interface ImageResponse {
  * public the image is.
  */
 export const fetchImage = (req: ImageRequest): Promise<ImageResponse> => apiPost('/api/image', req);
+
+// ---- Studio photo ----
+export interface StudioPhotoRequest {
+  /** Base64 bytes of the existing photo, without the data URL prefix. */
+  imageBase64: string;
+  mimeType: string;
+}
+export interface StudioPhotoResponse {
+  /** The generated image as a data URL, ready for the canvas resize pipeline. */
+  dataUrl: string;
+  contentType: string;
+  byteSize: number;
+  /** `mock-image` means the BFF has no image deployment and echoed the source back. */
+  provider: 'azure-openai' | 'mock-image';
+  model?: string;
+}
+/**
+ * Re-shoots a bag photo as a studio product shot.
+ *
+ * Slower and more expensive than every other endpoint — a generation runs to
+ * tens of seconds and is billed per image — so it gets the long timeout and is
+ * never called without the user having asked for it.
+ *
+ * What comes back is decoration. The model can alter a logo or a word, so the
+ * result is stored as a `bag-studio` photo and kept away from every path that
+ * reads details off a picture. See `services/enrich/studioPhoto.ts`.
+ */
+export const generateStudioPhoto = (req: StudioPhotoRequest): Promise<StudioPhotoResponse> =>
+  apiPost('/api/studio-photo', req, STUDIO_PHOTO_TIMEOUT_MS);
 
 // ---- Recommend ----
 export interface RankedSummaryItem {

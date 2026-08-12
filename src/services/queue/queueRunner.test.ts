@@ -8,16 +8,35 @@ const mocks = vi.hoisted(() => ({
   autoEnrichBean: vi.fn(),
   isTerminalEnrichFailure: vi.fn(),
   extractBeanFromPhoto: vi.fn(),
+  prepareStudioPhoto: vi.fn(),
+  applyStudioPhoto: vi.fn(),
+  isTerminalStudioFailure: vi.fn(),
+  sourcePhotoFor: vi.fn(),
 }));
 
 vi.mock('@/services/enrich/autoEnrich', () => mocks);
+
+vi.mock('@/services/enrich/studioPhoto', () => ({
+  prepareStudioPhoto: mocks.prepareStudioPhoto,
+  applyStudioPhoto: mocks.applyStudioPhoto,
+  isTerminalStudioFailure: mocks.isTerminalStudioFailure,
+  sourcePhotoFor: mocks.sourcePhotoFor,
+}));
 
 vi.mock('@/services/ai/pipeline', () => ({
   extractBeanFromPhoto: mocks.extractBeanFromPhoto,
   PipelineUnavailableError: class PipelineUnavailableError extends Error {},
 }));
 
-const { autoEnrichBean, isTerminalEnrichFailure, extractBeanFromPhoto } = mocks;
+const {
+  autoEnrichBean,
+  isTerminalEnrichFailure,
+  extractBeanFromPhoto,
+  prepareStudioPhoto,
+  applyStudioPhoto,
+  isTerminalStudioFailure,
+  sourcePhotoFor,
+} = mocks;
 
 const { runQueueNow } = await import('./queueRunner');
 
@@ -53,7 +72,15 @@ beforeEach(async () => {
   autoEnrichBean.mockReset();
   isTerminalEnrichFailure.mockReset();
   extractBeanFromPhoto.mockReset();
+  prepareStudioPhoto.mockReset();
+  applyStudioPhoto.mockReset();
+  isTerminalStudioFailure.mockReset();
+  sourcePhotoFor.mockReset();
   isTerminalEnrichFailure.mockReturnValue(false);
+  isTerminalStudioFailure.mockReturnValue(false);
+  // The extraction paths ask for the photograph behind a photo; the default is
+  // that the stored photo is itself a real one.
+  sourcePhotoFor.mockImplementation((photoId: string) => db.photos.get(photoId));
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
   await Promise.all([db.beans.clear(), db.pendingAiTasks.clear(), db.photos.clear()]);
@@ -208,5 +235,96 @@ describe('queue runner: web-enrich', () => {
 
     expect(autoEnrichBean).not.toHaveBeenCalled();
     await expect(db.pendingAiTasks.count()).resolves.toBe(1);
+  });
+});
+
+describe('queue runner: studio-photo', () => {
+  it('applies the generated photo and clears the task', async () => {
+    await db.beans.add(bean({ photoId: 'p1' }));
+    await db.pendingAiTasks.add(task({ type: 'studio-photo', payload: { reason: 'bulk' } }));
+    prepareStudioPhoto.mockResolvedValue({ staged: {}, sourcePhotoId: 'p1' });
+
+    await runQueueNow();
+
+    expect(applyStudioPhoto).toHaveBeenCalled();
+    await expect(db.pendingAiTasks.count()).resolves.toBe(0);
+  });
+
+  it('drops a coffee that lost its photo while the task waited', async () => {
+    await db.beans.add(bean());
+    await db.pendingAiTasks.add(task({ type: 'studio-photo' }));
+
+    await runQueueNow();
+
+    expect(prepareStudioPhoto).not.toHaveBeenCalled();
+    await expect(db.pendingAiTasks.count()).resolves.toBe(0);
+  });
+
+  it('drops a refusal rather than paying to retry it hourly', async () => {
+    await db.beans.add(bean({ photoId: 'p1' }));
+    await db.pendingAiTasks.add(task({ type: 'studio-photo' }));
+    prepareStudioPhoto.mockRejectedValue(new Error('model refused'));
+    isTerminalStudioFailure.mockReturnValue(true);
+
+    await runQueueNow();
+
+    await expect(db.pendingAiTasks.count()).resolves.toBe(0);
+  });
+
+  it('backs off a transient failure instead of dropping it', async () => {
+    await db.beans.add(bean({ photoId: 'p1' }));
+    await db.pendingAiTasks.add(task({ type: 'studio-photo' }));
+    prepareStudioPhoto.mockRejectedValue(new Error('offline'));
+
+    await runQueueNow();
+
+    const remaining = await db.pendingAiTasks.get('t1');
+    expect(remaining?.attempts).toBe(1);
+    expect(remaining?.nextAttemptAt).toBeDefined();
+  });
+
+  it('generates only one image per pass', async () => {
+    // Tighter than the enrichment budget on purpose: every one of these is a
+    // billed image, so a bulk run stays a slow background job.
+    const beans = Array.from({ length: 4 }, (_, i) => bean({ id: `b${i}`, photoId: 'p1' }));
+    await db.beans.bulkAdd(beans);
+    await db.pendingAiTasks.bulkAdd(
+      beans.map((b, i) => task({ id: `t${i}`, beanId: b.id, type: 'studio-photo' })),
+    );
+    prepareStudioPhoto.mockResolvedValue({ staged: {}, sourcePhotoId: 'p1' });
+
+    await runQueueNow();
+
+    expect(applyStudioPhoto).toHaveBeenCalledTimes(1);
+    await expect(db.pendingAiTasks.count()).resolves.toBe(3);
+  });
+});
+
+describe('queue runner: generated photos are never read', () => {
+  it('reads the original photograph behind a studio shot', async () => {
+    const original = new Blob(['real']);
+    await db.beans.add(bean());
+    await db.photos.add({ id: 'gen', kind: 'bag-studio', blob: new Blob(['drawn']) } as never);
+    await db.pendingAiTasks.add(task({ type: 'ocr', payload: { photoId: 'gen' } }));
+    sourcePhotoFor.mockResolvedValue({ id: 'p1', blob: original });
+    extractBeanFromPhoto.mockResolvedValue({ parsed: null, rawText: '', model: 'gpt-4o' });
+
+    await runQueueNow();
+
+    expect(extractBeanFromPhoto).toHaveBeenCalledWith(original);
+  });
+
+  it('drops the task when only a generated photo survives', async () => {
+    // A model that redraws packaging can invent text, and details parsed off an
+    // invented label would be indistinguishable from real ones.
+    await db.beans.add(bean());
+    await db.photos.add({ id: 'gen', kind: 'bag-studio', blob: new Blob(['drawn']) } as never);
+    await db.pendingAiTasks.add(task({ type: 'ocr', payload: { photoId: 'gen' } }));
+    sourcePhotoFor.mockResolvedValue(null);
+
+    await runQueueNow();
+
+    expect(extractBeanFromPhoto).not.toHaveBeenCalled();
+    await expect(db.pendingAiTasks.count()).resolves.toBe(0);
   });
 });

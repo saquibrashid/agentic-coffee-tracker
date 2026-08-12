@@ -23,7 +23,7 @@ import { fetchImage } from '@/services/ai';
 import { db } from '@/services/db';
 import { createThumbnail, dataUrlToBlob, resizeDataUrl } from '@/services/image/imagePipeline';
 import { enqueueDelete, enqueueUpsert } from '@/services/sync/outbox';
-import type { CoffeeBean, PhotoBlob } from '@/types';
+import type { CoffeeBean, PhotoBlob, PhotoKind } from '@/types';
 
 /** The fields an attached photo contributes to the bean record. */
 export interface PhotoUpdate {
@@ -171,19 +171,31 @@ export async function preparePhotoFromUrl(imageUrl: string): Promise<StagedPhoto
   }
 }
 
+/** Optional provenance for a photo about to be written. */
+export interface CommitOptions {
+  /** Defaults to `bag`: everything that comes through here is a picture of one. */
+  kind?: PhotoKind;
+  /** The photo this one was generated from. Only meaningful for `bag-studio`. */
+  sourcePhotoId?: string;
+}
+
 /** Writes a staged image to the photo store and returns the bean fields for it. */
-export async function commitStagedPhoto(staged: StagedPhoto): Promise<PhotoUpdate> {
+export async function commitStagedPhoto(
+  staged: StagedPhoto,
+  options: CommitOptions = {},
+): Promise<PhotoUpdate> {
   const photoId = ulid();
   await db.photos.add({
     id: photoId,
     schemaVersion: 1,
-    kind: 'bag',
+    kind: options.kind ?? 'bag',
     mimeType: staged.blob.type,
     blob: staged.blob,
     widthPx: staged.widthPx,
     heightPx: staged.heightPx,
     byteSize: staged.blob.size,
     createdAt: new Date().toISOString(),
+    ...(options.sourcePhotoId ? { sourcePhotoId: options.sourcePhotoId } : {}),
   });
   await enqueueUpsert('photo', photoId);
   return { photoId, thumbnailDataUrl: staged.thumbnailDataUrl };
@@ -242,27 +254,49 @@ export async function setBeanPhoto(bean: CoffeeBean, staged: StagedPhoto): Promi
  * blob would leave another record showing a broken image, so a swap leaks the
  * old photo rather than risk that.
  *
+ * Studio shots add a third owner and a second direction. A generated photo
+ * *references* the photograph it was drawn from, which keeps that original alive
+ * even though no bean points at it — otherwise the first swap after a re-shoot
+ * would silently destroy the only real picture of the bag. And releasing a
+ * generated photo releases the original with it, since nothing else was ever
+ * going to.
+ *
  * Returns true when the photo was actually removed.
  */
 export async function releasePhotoIfOrphaned(photoId: string | undefined): Promise<boolean> {
   if (!photoId) return false;
   try {
-    return await db.transaction(
+    const released = await db.transaction(
       'rw',
       [db.beans, db.ratings, db.photos, db.ocrResults, db.outbox],
       async () => {
+        const photo = await db.photos.get(photoId);
         const stillOwned = await db.beans.filter((b) => b.photoId === photoId).count();
-        if (stillOwned > 0) return false;
+        if (stillOwned > 0) return null;
         const stillRated = await db.ratings.filter((r) => r.cupPhotoId === photoId).count();
-        if (stillRated > 0) return false;
+        if (stillRated > 0) return null;
+        // A studio shot still standing is a claim on its original: reverting it
+        // has to have something to revert to.
+        const stillReferenced = await db.photos.where('sourcePhotoId').equals(photoId).count();
+        if (stillReferenced > 0) return null;
 
         const ocrIds = await db.ocrResults.where('photoId').equals(photoId).primaryKeys();
         await db.ocrResults.bulkDelete(ocrIds);
         await db.photos.delete(photoId);
         await enqueueDelete('photo', photoId);
-        return true;
+        return photo ?? null;
       },
     );
+
+    if (!released) return false;
+
+    // Recursed rather than inlined so the original goes through the same owner
+    // checks: it may well still belong to a bean of its own, if a duplicate
+    // import left two coffees sharing one picture.
+    if (released.kind === 'bag-studio' && released.sourcePhotoId) {
+      await releasePhotoIfOrphaned(released.sourcePhotoId);
+    }
+    return true;
   } catch (err) {
     // A leaked blob costs storage; throwing here would cost the user the photo
     // swap they just asked for, which has already succeeded by this point.
