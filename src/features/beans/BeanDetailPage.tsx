@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ulid } from 'ulid';
-import { ArrowLeft, Camera, Globe, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Camera, Check, CircleAlert, Globe, Pencil, Plus, Trash2 } from 'lucide-react';
 import { db } from '@/services/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +13,7 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
+import { markBeanReviewed } from '@/services/beans/review';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
 import { enqueueUpsert } from '@/services/sync/outbox';
 import {
@@ -139,6 +140,60 @@ function hasNoAttributes(bean: CoffeeBean): boolean {
 function enrichHint(bean: CoffeeBean): string {
   if (hasNoAttributes(bean)) return 'Nothing known yet';
   return bean.sourceUrl ? 'Imported' : 'Fill in what is missing';
+}
+
+/**
+ * The answer to "it says this coffee needs review — review what?"
+ *
+ * The library badges a coffee `needsReview`, but until now that flag appeared
+ * nowhere on the coffee's own page and nothing outside the capture flow could
+ * clear it. Since `enrich/diff.ts` sets it on every accepted web suggestion,
+ * enriching an imported coffee badged it permanently, with no way to answer.
+ *
+ * So this states which values are in question and offers the one action that
+ * settles it. It sits directly under the details it is talking about, and
+ * disappears the moment it is answered.
+ */
+function ReviewCard({ bean }: { bean: CoffeeBean }) {
+  const [saving, setSaving] = useState(false);
+
+  if (!bean.needsReview) return null;
+
+  const reason = bean.sourceUrl
+    ? 'These details were read off a web page rather than entered by you.'
+    : 'These details were read automatically and have not been confirmed.';
+
+  return (
+    <Card className="border-primary/40 bg-accent/40">
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <CircleAlert className="text-primary mt-0.5 size-5 shrink-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-base">Check these details</CardTitle>
+            <p className="text-muted-foreground mt-1 text-sm">
+              {reason} Correct them with <span className="font-medium">Details from the web</span>{' '}
+              below, or confirm them here.
+            </p>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <Button
+          type="button"
+          size="sm"
+          disabled={saving}
+          onClick={() => {
+            setSaving(true);
+            void markBeanReviewed(bean.id).finally(() => {
+              setSaving(false);
+            });
+          }}
+        >
+          <Check aria-hidden="true" /> Looks right
+        </Button>
+      </CardContent>
+    </Card>
+  );
 }
 
 export function BeanDetailPage() {
@@ -271,6 +326,8 @@ export function BeanDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      <ReviewCard bean={bean} />
 
       <RatingsCard beanId={bean.id} ratings={ratings} />
 

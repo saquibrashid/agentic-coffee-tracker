@@ -151,6 +151,49 @@ describe('BeanDetailPage', () => {
     expect(form.compareDocumentPosition(list)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
+  /*
+   * The library badges a coffee "Needs review". Every accepted web suggestion
+   * raises that flag, and nothing outside the capture flow used to lower it, so
+   * an enriched import carried the badge for good and its own page said nothing
+   * about it. These pin both halves of the answer.
+   */
+  it('says what needs reviewing when the library badges the coffee', async () => {
+    await db.beans.clear();
+    await db.beans.add({ ...bean, needsReview: true, sourceUrl: 'https://example.test/coffee' });
+    renderPage();
+
+    expect(
+      await screen.findByRole('heading', { name: /check these details/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/read off a web page/i)).toBeInTheDocument();
+  });
+
+  it('stays quiet about review when the coffee is not flagged', async () => {
+    renderPage();
+
+    await screen.findByRole('heading', { name: bean.name });
+    expect(screen.queryByRole('heading', { name: /check these details/i })).not.toBeInTheDocument();
+  });
+
+  it('lets the reader settle the flag, which nothing on this page could do', async () => {
+    const user = userEvent.setup();
+    await db.beans.clear();
+    await db.beans.add({ ...bean, needsReview: true });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /looks right/i }));
+
+    await waitFor(async () => {
+      expect((await db.beans.get('bean-1'))?.needsReview).toBe(false);
+    });
+    // The prompt has been answered, so it stops taking up the page.
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('heading', { name: /check these details/i }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   it('offers a way back, which used to mean going Home', async () => {
     renderPage();
     // Opened directly — there is no history to go back through, so the link has

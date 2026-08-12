@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"Needs review" can now be answered.** The library badged a coffee as needing
+  review, but its own page never mentioned the flag and nothing outside the
+  photo-capture flow could clear it — and since accepting any web suggestion
+  raises it, an imported coffee that was later enriched kept the badge for good
+  with no way to act on it. The coffee's page now says which details are in
+  question and offers a **Looks right** button that settles it.
+
 - **Signing in and out no longer shows a 404.** The app is a single-page app, so
   its offline service worker answers navigations with the app itself and lets
   the router take over — correct for every route the app owns, and wrong for
