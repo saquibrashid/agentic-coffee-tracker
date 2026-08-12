@@ -6,6 +6,7 @@ import {
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
 import { extractImageUrl } from '../lib/extractImage.js';
+import { extractEmbeddedProduct } from '../lib/embeddedData.js';
 import { safeFetch, UnsafeUrlError } from '../lib/safeFetch.js';
 
 interface ScrapeRequest {
@@ -44,6 +45,16 @@ function extractTextFromHtml(html: string): string {
     .trim()
     .slice(0, 8000);
 }
+
+/**
+ * Below this, a page has not told us anything about a coffee.
+ *
+ * A storefront that renders on the server runs to thousands of characters; one
+ * that renders in the browser leaves a shell whose only text is a noscript
+ * warning, if that. The gap between the two is wide enough that the exact
+ * figure does not matter — it only has to sit clear of both.
+ */
+const MIN_USEFUL_TEXT = 400;
 
 /**
  * `.example` is reserved by RFC 2606 and never resolves, so a request for one
@@ -99,13 +110,28 @@ app.http('scrape', {
       }
 
       const imageUrl = extractImageUrl(res.body, res.finalUrl);
+      let rawText = extractTextFromHtml(res.body);
+      let productImageUrl = imageUrl;
+
+      // A page that renders in the browser has its product in a JSON block
+      // instead of in the markup. Only consulted when the markup came back
+      // empty, so every page that already worked keeps behaving exactly as it
+      // did.
+      if (rawText.length < MIN_USEFUL_TEXT) {
+        const embedded = extractEmbeddedProduct(res.body, res.finalUrl);
+        if (embedded) {
+          ctx.log('recovered product from embedded page data', { url: res.finalUrl });
+          rawText = embedded.text.slice(0, 8000);
+          productImageUrl ??= embedded.imageUrl;
+        }
+      }
 
       return json(200, {
-        extracted: { rawText: extractTextFromHtml(res.body) },
+        extracted: { rawText },
         // The URL after redirects, so the recorded source is where the text
         // actually came from rather than where we started looking.
         sourceUrl: res.finalUrl,
-        ...(imageUrl ? { imageUrl } : {}),
+        ...(productImageUrl ? { imageUrl: productImageUrl } : {}),
       });
     } catch (err) {
       if (err instanceof UnsafeUrlError) return errorResponse(ctx, 400, err.message, err);
