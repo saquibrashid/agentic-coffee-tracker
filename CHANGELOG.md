@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Coffees on storefronts that render in the browser no longer enrich to
+  blank.** Scraping assumed the words were in the HTML. A storefront built as a
+  single-page app sends a shell of script tags instead and assembles itself once
+  JavaScript runs, so stripping the tags left _nothing at all_ — Blue Bottle's
+  Night Light Decaf yielded zero characters, and pasting the address by hand
+  failed for exactly the same reason. The details were never missing, only
+  hidden: these sites serialise the page's state into a JSON block so the
+  browser can carry on where the server left off, and reading that recovers the
+  name, description, roast level, tasting notes and product photo. Standard
+  schema.org markup is preferred where a page publishes it. Because a product
+  page carries its recommendations in the same blob — sitting _ahead_ of the
+  product itself — the coffee is identified first and read from on its own,
+  rather than flattening the page and enriching a coffee with its neighbour's
+  details. Pages that already scraped cleanly are untouched: this is only
+  consulted when the markup yields nothing.
+
 - **Coffees whose roaster the model does not recognise can now be found.** Every
   lookup starts by working out where the roaster sells, and that was left
   entirely to the language model — which answers from recognition, so it goes
