@@ -71,6 +71,7 @@ test('migrates an existing 1-5 history to the 1-10 scale on first load', async (
   await page.goto('/beans/legacy-1');
 
   await expect(page.getByRole('heading', { name: 'Legacy Lot' })).toBeVisible();
-  // 4 on the old scale is a good cup, so it must read 8/10 — not 4/10.
-  await expect(page.getByText('8/10')).toBeVisible();
+  // 4 on the old scale is a good cup, so it must read 8/10 — not 4/10. Scoped to
+  // the rating list because the page header now shows the average too.
+  await expect(page.getByRole('listitem').filter({ hasText: '8/10' })).toBeVisible();
 });
