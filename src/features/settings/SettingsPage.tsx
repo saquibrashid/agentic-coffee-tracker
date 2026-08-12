@@ -276,7 +276,8 @@ function StudioPhotoPanel() {
   );
 }
 
-function DangerZone() {  const [estimate, setEstimate] = useState<StorageEstimateSummary | null>(null);
+function DangerZone() {
+  const [estimate, setEstimate] = useState<StorageEstimateSummary | null>(null);
   const [confirmation, setConfirmation] = useState('');
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);

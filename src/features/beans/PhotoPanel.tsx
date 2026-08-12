@@ -233,7 +233,9 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
                     alt="Studio shot generated from what you took"
                     className="size-20 rounded object-cover"
                   />
-                  <figcaption className="text-muted-foreground mt-1 text-xs">Studio shot</figcaption>
+                  <figcaption className="text-muted-foreground mt-1 text-xs">
+                    Studio shot
+                  </figcaption>
                 </figure>
               </div>
               <p className="text-muted-foreground text-xs">

@@ -52,7 +52,9 @@ function budgetKey(req: HttpRequest): string {
   if (!header) return 'anonymous';
   try {
     const raw = JSON.parse(Buffer.from(header, 'base64').toString('utf8')) as { userId?: unknown };
-    return typeof raw.userId === 'string' && raw.userId !== '' ? `image:${raw.userId}` : 'anonymous';
+    return typeof raw.userId === 'string' && raw.userId !== ''
+      ? `image:${raw.userId}`
+      : 'anonymous';
   } catch {
     return 'anonymous';
   }

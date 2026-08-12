@@ -29,7 +29,9 @@ export async function summariseDeletion(beanIds: string[]): Promise<DeletionSumm
   const bagPhotos = await db.photos.bulkGet(bagPhotoIds);
   const photos = new Set([
     ...bagPhotoIds,
-    ...bagPhotos.flatMap((p) => (p?.kind === 'bag-studio' && p.sourcePhotoId ? [p.sourcePhotoId] : [])),
+    ...bagPhotos.flatMap((p) =>
+      p?.kind === 'bag-studio' && p.sourcePhotoId ? [p.sourcePhotoId] : [],
+    ),
     ...doomedRatings.flatMap((r) => (r.cupPhotoId ? [r.cupPhotoId] : [])),
   ]);
 
