@@ -26,7 +26,7 @@
 import { ApiError, generateStudioPhoto } from '@/services/ai';
 import { blobToBase64 } from '@/services/ai/pipeline';
 import { db } from '@/services/db';
-import { createThumbnail } from '@/services/image/imagePipeline';
+import { createThumbnail, resizeDataUrl } from '@/services/image/imagePipeline';
 import { enqueueUpsert } from '@/services/sync/outbox';
 import { ulid } from 'ulid';
 import {
@@ -97,6 +97,45 @@ export interface StudioPhotoCandidate {
 }
 
 /**
+ * What the image model will accept as a reference picture.
+ *
+ * Narrower than what the app stores. Every photo goes through the shared
+ * pipeline, which encodes to WebP for size, so in practice *nothing* on a
+ * coffee is in a format the model takes — a re-shoot without the conversion
+ * below fails on every single coffee, not just unusual ones.
+ */
+const MODEL_IMAGE_TYPES = new Set(['image/jpeg', 'image/png']);
+
+/**
+ * The stored photograph as something the model will read.
+ *
+ * JPEG rather than PNG: this is a photograph, and a lossless re-encode of an
+ * image that has already been through a lossy WebP pass buys nothing but
+ * megabytes — and the request has a size ceiling. Quality is high because the
+ * model is being asked to preserve the packaging text, which is exactly what
+ * compression artefacts destroy.
+ *
+ * The 1600px ceiling matches the one the pipeline already applied on the way
+ * in, so this re-encodes without resizing anything further.
+ */
+async function asModelReadableImage(
+  photo: Pick<PhotoBlob, 'blob' | 'mimeType'>,
+): Promise<{ imageBase64: string; mimeType: string }> {
+  const base64 = await blobToBase64(photo.blob);
+  if (MODEL_IMAGE_TYPES.has(photo.mimeType)) {
+    return { imageBase64: base64, mimeType: photo.mimeType };
+  }
+
+  const converted = await resizeDataUrl(
+    `data:${photo.mimeType};base64,${base64}`,
+    1600,
+    'image/jpeg',
+    0.92,
+  );
+  return { imageBase64: converted.dataUrl.split(',')[1] ?? '', mimeType: 'image/jpeg' };
+}
+
+/**
  * Generates a studio shot for `bean` and stages it, without writing anything.
  *
  * Always generated from the *original* photograph, never from a studio shot the
@@ -110,10 +149,7 @@ export async function prepareStudioPhoto(
   const original = await sourcePhotoFor(bean.photoId);
   if (!original) throw new NoPhotoToReshootError();
 
-  const result = await generateStudioPhoto({
-    imageBase64: await blobToBase64(original.blob),
-    mimeType: original.mimeType,
-  });
+  const result = await generateStudioPhoto(await asModelReadableImage(original));
 
   // Through the same pipeline as every other arriving picture: same WebP
   // encoding, same 1600px ceiling, same 160px thumbnail. A generated image is

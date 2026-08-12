@@ -6,7 +6,7 @@ import {
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
 import { callImageEdit, getImageModelConfig, ImageModelError } from '../lib/imageModel.js';
-import { ALLOWED_IMAGE_TYPES, sniffImageType } from '../lib/imageType.js';
+import { sniffImageType } from '../lib/imageType.js';
 import { consume, IMAGE_RATE_LIMIT } from '../lib/rateLimit.js';
 import { STUDIO_PHOTO_PROMPT } from '../lib/studioPrompt.js';
 
@@ -36,6 +36,12 @@ interface StudioPhotoRequest {
 
 /** Matches `/api/image`: comfortably above a bag shot, well below the memory cap. */
 const MAX_IMAGE_BYTES = 6_000_000;
+
+/**
+ * What the image model accepts as a reference picture — narrower than the app's
+ * `ALLOWED_IMAGE_TYPES`, which exists to decide what is safe to *store*.
+ */
+const MODEL_IMAGE_TYPES: ReadonlySet<string> = new Set(['image/jpeg', 'image/png']);
 
 /**
  * Bucket key for the rate limiter.
@@ -82,9 +88,20 @@ app.http('studioPhoto', {
 
       // The declared type is not trusted, exactly as in `/api/image`: what gets
       // uploaded to the model is whatever the bytes actually are.
+      //
+      // Checked against the *model's* formats rather than the app's wider set.
+      // The image model takes only JPEG and PNG, so a WebP — which is what the
+      // client's pipeline stores everything as — would otherwise sail past this
+      // guard and come back as a 422 blaming the model for refusing the picture,
+      // when in truth the request never reached it. Callers are expected to
+      // convert; this says so plainly instead of mislabelling the failure.
       const sniffed = sniffImageType(bytes);
-      if (!sniffed || !ALLOWED_IMAGE_TYPES.has(sniffed)) {
-        return errorResponse(ctx, 415, 'That is not an image we can re-shoot.');
+      if (!sniffed || !MODEL_IMAGE_TYPES.has(sniffed)) {
+        return errorResponse(
+          ctx,
+          415,
+          'A studio shot needs a JPEG or PNG. Convert the image before sending it.',
+        );
       }
 
       const limit = consume(budgetKey(req), IMAGE_RATE_LIMIT);

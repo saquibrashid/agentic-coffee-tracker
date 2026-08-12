@@ -28,7 +28,11 @@ vi.mock('@/services/ai/pipeline', () => ({
 }));
 
 vi.mock('@/services/image/imagePipeline', () => ({
-  resizeDataUrl: vi.fn(async (dataUrl: string) => ({ dataUrl, width: 1024, height: 1024 })),
+  resizeDataUrl: vi.fn(async (dataUrl: string, _maxWidth?: number, mimeType?: string) => ({
+    dataUrl: mimeType === 'image/jpeg' ? 'data:image/jpeg;base64,Y29udmVydGVk' : dataUrl,
+    width: 1024,
+    height: 1024,
+  })),
   createThumbnail: vi.fn(async () => ({ dataUrl: 'data:image/webp;base64,thumb' })),
   dataUrlToBlob: vi.fn(() => new Blob([new Uint8Array([1, 2, 3])], { type: 'image/webp' })),
 }));
@@ -139,6 +143,34 @@ describe('prepareStudioPhoto', () => {
   it('refuses a coffee with no photo', async () => {
     await expect(prepareStudioPhoto(bean('b1'))).rejects.toBeInstanceOf(NoPhotoToReshootError);
     expect(generateStudioPhoto).not.toHaveBeenCalled();
+  });
+
+  // The pipeline stores everything as WebP and the model takes only JPEG or
+  // PNG, so without this every re-shoot in the app fails upstream.
+  it('converts a stored WebP to JPEG before sending it', async () => {
+    await db.photos.add(photo('p1'));
+    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-mai' });
+
+    await prepareStudioPhoto(bean('b1', 'p1'));
+
+    expect(generateStudioPhoto).toHaveBeenCalledWith({
+      imageBase64: 'Y29udmVydGVk',
+      mimeType: 'image/jpeg',
+    });
+  });
+
+  it('sends a JPEG as it is rather than re-encoding it', async () => {
+    await db.photos.add(
+      photo('p1', { mimeType: 'image/jpeg', blob: new Blob(['b'], { type: 'image/jpeg' }) }),
+    );
+    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-mai' });
+
+    await prepareStudioPhoto(bean('b1', 'p1'));
+
+    expect(generateStudioPhoto).toHaveBeenCalledWith({
+      imageBase64: 'c291cmNl',
+      mimeType: 'image/jpeg',
+    });
   });
 });
 
