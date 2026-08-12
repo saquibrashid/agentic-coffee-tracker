@@ -128,6 +128,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Add your own photo to a coffee you already have.** A coffee only got a
+  picture if enrichment found its page, so an import full of coffees that were
+  never matched had no pictures and no way to get any — while the bags were
+  sitting on the shelf the whole time. Each coffee's page now offers to take a
+  photo with the camera or choose one off the device, whether or not it has one
+  already. Your photo always wins: enrichment weighs an automatically found
+  image against the existing one and refuses a worse one, but a picture you
+  chose yourself is not a guess to be second-guessed. Replacing a photo removes
+  the one it supersedes, and only after the coffee points at the new one, so a
+  failure part-way leaves the picture that was there rather than none.
+
 - **Paste a product page address to enrich a coffee.** Automatic lookup finds a
   coffee by working out where its roaster sells online, so it can only ever
   reach roasters it manages to place — one selling through a platform it does

@@ -17,6 +17,7 @@ import { enqueueUpsert } from '@/services/sync/outbox';
 import { DEFAULT_SCORE, SCORE_CHOICES, formatOutOf, formatScore } from '@/services/ratings/scale';
 import { BREW_TYPE_OPTIONS, DEFAULT_BREW_TYPE, brewLabel } from '@/services/ratings/brewTypes';
 import { EnrichPanel } from './EnrichPanel';
+import { PhotoPanel } from './PhotoPanel';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import type { BrewType, Rating } from '@/types';
 
@@ -143,6 +144,8 @@ export function BeanDetailPage() {
           </div>
 
           <EnrichPanel bean={bean} />
+
+          <PhotoPanel bean={bean} />
 
           <div>
             <h3 className="text-sm font-medium">Ratings</h3>

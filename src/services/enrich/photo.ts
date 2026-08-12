@@ -112,6 +112,45 @@ export async function getPhotoDimensions(
 }
 
 /**
+ * Runs an image through the storage pipeline without writing it.
+ *
+ * The single place a picture becomes a `StagedPhoto`, whichever way it arrived
+ * — fetched from a roaster's page, chosen off the device, or taken with the
+ * camera. Keeping one implementation is what makes those indistinguishable
+ * downstream: same WebP encoding, same 1600px ceiling, same thumbnail.
+ */
+export async function preparePhotoFromDataUrl(dataUrl: string): Promise<StagedPhoto> {
+  const [resized, thumb] = await Promise.all([
+    resizeDataUrl(dataUrl, 1600),
+    createThumbnail(dataUrl, 160),
+  ]);
+
+  return {
+    blob: dataUrlToBlob(resized.dataUrl),
+    thumbnailDataUrl: thumb.dataUrl,
+    widthPx: resized.width,
+    heightPx: resized.height,
+  };
+}
+
+/**
+ * Reads a file the user chose and stages it.
+ *
+ * Unlike the URL path this does *not* swallow failures. A picture the user
+ * picked themselves is the whole point of the interaction, so a file that
+ * cannot be read has to be reported rather than quietly ignored.
+ */
+export async function preparePhotoFromFile(file: File): Promise<StagedPhoto> {
+  const dataUrl = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('Could not read that image.'));
+    reader.readAsDataURL(file);
+  });
+  return preparePhotoFromDataUrl(dataUrl);
+}
+
+/**
  * Fetches and normalises `imageUrl` without storing it, so the caller can
  * inspect the result — chiefly its resolution — before committing.
  *
@@ -121,18 +160,7 @@ export async function getPhotoDimensions(
 export async function preparePhotoFromUrl(imageUrl: string): Promise<StagedPhoto | null> {
   try {
     const { dataUrl } = await fetchImage({ url: imageUrl });
-
-    const [resized, thumb] = await Promise.all([
-      resizeDataUrl(dataUrl, 1600),
-      createThumbnail(dataUrl, 160),
-    ]);
-
-    return {
-      blob: dataUrlToBlob(resized.dataUrl),
-      thumbnailDataUrl: thumb.dataUrl,
-      widthPx: resized.width,
-      heightPx: resized.height,
-    };
+    return await preparePhotoFromDataUrl(dataUrl);
   } catch (err) {
     // Swallowed by design — see the rules at the top of this file. A roaster
     // that blocks our user agent, serves a broken asset, or simply has no
@@ -174,6 +202,34 @@ export async function attachPhotoFromUrl(imageUrl: string): Promise<PhotoUpdate 
     console.warn('Could not store enrichment photo', imageUrl, err);
     return null;
   }
+}
+
+/**
+ * Stores a photo the user supplied and points the coffee at it.
+ *
+ * The order matters and is the opposite of the obvious one: the new photo is
+ * written *first*, the bean is repointed second, and only then is the outgoing
+ * photo released. A failure at any step leaves the coffee showing the picture
+ * it had rather than none at all — which is the whole risk of replacing a photo
+ * that was fine.
+ *
+ * Unlike the automated path there is no resolution test. Deciding a user's own
+ * photo is not good enough would be answering a question they already answered
+ * by choosing it.
+ */
+export async function setBeanPhoto(bean: CoffeeBean, staged: StagedPhoto): Promise<PhotoUpdate> {
+  const previousPhotoId = bean.photoId;
+  const update = await commitStagedPhoto(staged);
+
+  await db.beans.update(bean.id, { ...update, updatedAt: new Date().toISOString() });
+  await enqueueUpsert('bean', bean.id);
+
+  // Only now does the old photo look like the orphan it has become.
+  if (previousPhotoId && previousPhotoId !== update.photoId) {
+    await releasePhotoIfOrphaned(previousPhotoId);
+  }
+
+  return update;
 }
 
 /**
