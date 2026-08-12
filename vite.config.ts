@@ -72,6 +72,18 @@ export default defineConfig({
     // recharts is the largest single dependency and is only pulled in by the
     // (lazy) analytics route, so it sits above the app-code threshold on purpose.
     chunkSizeWarningLimit: 400,
+    /**
+     * Keeps the PDF reader out of the landing page's preload list.
+     *
+     * Splitting it into its own chunk is not enough on its own: the entry still
+     * emits a `<link rel="modulepreload">` for it, which makes the browser
+     * fetch all ~400KB before anything asks for it — the eager download that
+     * code-splitting it was meant to avoid. Dropping the hint costs a
+     * PDF-uploading user one round trip and saves everyone else the whole file.
+     */
+    modulePreload: {
+      resolveDependencies: (_url, deps) => deps.filter((dep) => !/[\\/]pdf-[^\\/]*\.js$/.test(dep)),
+    },
     // Vite 8 bundles with Rolldown, which dropped the object form of
     // `manualChunks` and deprecated the function form. `codeSplitting.groups`
     // is the replacement. `includeDependenciesRecursively` (on by default, set
