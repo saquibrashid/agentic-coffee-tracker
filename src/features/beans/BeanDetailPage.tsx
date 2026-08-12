@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ulid } from 'ulid';
-import { Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { db } from '@/services/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +14,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
 import { enqueueUpsert } from '@/services/sync/outbox';
-import { DEFAULT_SCORE, SCORE_CHOICES, formatOutOf, formatScore } from '@/services/ratings/scale';
+import {
+  DEFAULT_SCORE,
+  SCORE_CHOICES,
+  clampScore,
+  formatOutOf,
+  formatScore,
+} from '@/services/ratings/scale';
 import { BREW_TYPE_OPTIONS, DEFAULT_BREW_TYPE, brewLabel } from '@/services/ratings/brewTypes';
 import { EnrichPanel } from './EnrichPanel';
 import { PhotoPanel } from './PhotoPanel';
@@ -23,10 +29,79 @@ import type { BrewType, Rating } from '@/types';
 
 const SCORE_OPTIONS = SCORE_CHOICES;
 
+/**
+ * The way back out of a coffee.
+ *
+ * The library is not in the bottom nav, so without this the only way off this
+ * page is Home — which is not where most people came from.
+ *
+ * Going back through history returns them wherever that was, but history is
+ * empty when the page was opened directly: a bookmark, a reload, or the shared
+ * link that sends someone straight to a coffee. React Router marks that first
+ * entry with the key `default`, which is how this tells the two apart and falls
+ * back to the library rather than leaving the link doing nothing.
+ */
+function BackLink() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const canGoBack = location.key !== 'default';
+
+  if (!canGoBack) {
+    return (
+      <Link
+        to="/beans"
+        className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+      >
+        <ArrowLeft className="size-4" aria-hidden="true" /> All coffees
+      </Link>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => void navigate(-1)}
+      className="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-sm"
+    >
+      <ArrowLeft className="size-4" aria-hidden="true" /> Back
+    </button>
+  );
+}
+
+/**
+ * What this coffee has scored, at a glance.
+ *
+ * The individual ratings are listed further down; this is the one number people
+ * come to the page for, so it sits with the name rather than below the fold.
+ */
+function RatingSummary({ ratings }: { ratings: Rating[] | undefined }) {
+  if (ratings === undefined) return <Skeleton className="mt-2 h-5 w-32" />;
+  if (ratings.length === 0) {
+    return <p className="text-muted-foreground mt-1 text-sm">Not rated yet</p>;
+  }
+
+  const average = ratings.reduce((sum, r) => sum + r.score, 0) / ratings.length;
+  return (
+    <p className="mt-1 text-sm">
+      <span className="font-medium">{formatOutOf(clampScore(average))}</span>
+      <span className="text-muted-foreground">
+        {' '}
+        · {ratings.length} {ratings.length === 1 ? 'rating' : 'ratings'}
+      </span>
+    </p>
+  );
+}
+
 export function BeanDetailPage() {
   const { beanId } = useParams<{ beanId: string }>();
   const navigate = useNavigate();
   const bean = useLiveQuery(() => (beanId ? db.beans.get(beanId) : undefined), [beanId]);
+  // Queried once here rather than inside the list, so the score beside the name
+  // and the ratings below it can never disagree with each other mid-update.
+  const ratings = useLiveQuery(
+    () => (beanId ? db.ratings.where('beanId').equals(beanId).reverse().toArray() : []),
+    [beanId],
+  );
 
   const [pendingSummary, setPendingSummary] = useState<DeletionSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -76,19 +151,22 @@ export function BeanDetailPage() {
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <CardTitle>{bean.name}</CardTitle>
-            <p className="text-muted-foreground text-sm">{bean.roaster}</p>
+        <div className="space-y-3">
+          <BackLink />
+          <div className="flex items-start gap-3">
+            {bean.thumbnailDataUrl && (
+              <img
+                src={bean.thumbnailDataUrl}
+                alt={`${bean.name} bag`}
+                className="size-16 shrink-0 rounded object-cover"
+              />
+            )}
+            <div className="min-w-0">
+              <CardTitle>{bean.name}</CardTitle>
+              <p className="text-muted-foreground text-sm">{bean.roaster}</p>
+              <RatingSummary ratings={ratings} />
+            </div>
           </div>
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={() => void requestDelete(beanIdForDelete)}
-          >
-            <Trash2 aria-hidden="true" /> Remove coffee
-          </Button>
         </div>
       </CardHeader>
       <CardContent>
@@ -143,15 +221,40 @@ export function BeanDetailPage() {
             )}
           </div>
 
-          <EnrichPanel bean={bean} />
-
-          <PhotoPanel bean={bean} />
-
           <div>
             <h3 className="text-sm font-medium">Ratings</h3>
-            <RatingsList beanId={bean.id} />
-            <AddRatingForm beanId={bean.id} />
+            <RatingsList ratings={ratings} />
           </div>
+
+          {/*
+            Everything below this line changes the coffee. It sits after the
+            details because the page is read far more often than it is edited,
+            and the forms are tall enough to push what people came for off the
+            screen entirely.
+          */}
+          <section className="space-y-4 border-t pt-4">
+            <h3 className="text-sm font-medium">Make changes</h3>
+
+            <div className="rounded border p-3">
+              <h4 className="text-sm font-medium">Add a rating</h4>
+              <AddRatingForm beanId={bean.id} />
+            </div>
+
+            <EnrichPanel bean={bean} />
+
+            <PhotoPanel bean={bean} />
+
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={() => void requestDelete(beanIdForDelete)}
+              >
+                <Trash2 aria-hidden="true" /> Remove coffee
+              </Button>
+            </div>
+          </section>
 
           {deleteError && !pendingSummary && (
             <p role="alert" className="text-destructive text-sm">
@@ -176,18 +279,14 @@ export function BeanDetailPage() {
   );
 }
 
-function RatingsList({ beanId }: { beanId: string }) {
-  const ratings = useLiveQuery(
-    () => db.ratings.where('beanId').equals(beanId).reverse().toArray(),
-    [beanId],
-  );
+function RatingsList({ ratings }: { ratings: Rating[] | undefined }) {
   const [editingId, setEditingId] = useState<string | null>(null);
 
   if (ratings === undefined) return <Skeleton className="h-24" />;
   if (ratings.length === 0) return <p className="text-muted-foreground text-sm">No ratings yet.</p>;
 
   return (
-    <ul className="space-y-2">
+    <ul className="mt-2 space-y-2">
       {ratings.map((r) => (
         <li key={r.id} className="rounded border p-2">
           {editingId === r.id ? (

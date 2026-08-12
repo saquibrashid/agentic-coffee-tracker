@@ -170,9 +170,11 @@ test.describe('Ratings on a bean', () => {
     await page.getByRole('button', { name: /remove coffee/i }).click();
 
     // The confirmation names the ratings that go with it, which is the part the
-    // user cannot otherwise see.
-    await expect(page.getByRole('heading', { name: /remove this coffee\?/i })).toBeVisible();
-    await expect(page.getByText(/2 ratings/i)).toBeVisible();
+    // user cannot otherwise see. Scoped to the dialog: the page now also shows
+    // the rating count beside the coffee's name.
+    const dialog = page.getByRole('dialog');
+    await expect(dialog.getByRole('heading', { name: /remove this coffee\?/i })).toBeVisible();
+    await expect(dialog.getByText(/2 ratings/i)).toBeVisible();
 
     await page.getByRole('button', { name: /^remove$/i }).click();
 

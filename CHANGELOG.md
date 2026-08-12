@@ -106,6 +106,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A coffee's page now leads with the coffee.** Opening one put the web
+  enrichment and photo forms directly under the name, pushing the score, the
+  ratings and half the attributes off the screen — so the page opened on its
+  own controls rather than on what it is about. Details come first now: the
+  photo, name, roaster and score together at the top, then attributes, then the
+  ratings. Everything that changes the coffee is gathered under **Make
+  changes** at the bottom, including adding a rating and removing the coffee.
+
+  Removing a coffee was a red button beside the title, one mis-tap from the name
+  someone was reading. It now sits at the end, with the other actions.
+
+- **A coffee's page has a way back.** The library is not in the bottom bar, so
+  the only way off this page was Home — which is rarely where anyone came from.
+  There is now a back link that returns you where you were, and which names the
+  library instead when the page was opened directly from a bookmark, a reload or
+  a shared link, where there is no history to go back through.
+
 - **`SYNC_RECORD_QUOTA` is now actually configurable.** The API read the
   variable and `SECURITY.md` documented it as the way to raise the record
   ceiling, but nothing in `infra/` or `deploy.yml` ever set it, so the 20,000
