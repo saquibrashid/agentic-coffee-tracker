@@ -23,6 +23,7 @@ const TASK_LABELS: Record<string, string> = {
   ocr: 'Reading a bag photo',
   'llm-parse': 'Reading a bag photo',
   'web-enrich': 'Looking up details',
+  'studio-photo': 'Re-shooting a bag photo',
   recommendation: 'Refreshing recommendations',
 };
 
@@ -85,6 +86,8 @@ export function SettingsPage() {
       <ImportPanel />
 
       <RelookupPanel />
+
+      <StudioPhotoPanel />
 
       <Card>
         <CardHeader>
@@ -179,6 +182,94 @@ function RelookupPanel() {
         <Button disabled={busy || incomplete === 0} onClick={() => void handleRelookup()}>
           {busy ? 'Queueing…' : 'Look up missing details'}
         </Button>
+        {status && <p className="text-sm">{status}</p>}
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Re-shooting a whole library as studio product shots.
+ *
+ * The one operation in this app that spends money per item, which is why it
+ * looks different from its neighbour above. Nothing is queued on its own: the
+ * count is stated before the button is pressed and it is the exact number of
+ * images that will be generated, because a rounded-up "about 40" would be a bill
+ * nobody agreed to. The queue then runs them one at a time, in the open, where
+ * they can be cancelled.
+ */
+function StudioPhotoPanel() {
+  const reshootable =
+    useLiveQuery(async () => {
+      const { countReshootableBeans } = await import('@/services/enrich/studioPhoto');
+      return countReshootableBeans();
+    }, []) ?? 0;
+  const [confirming, setConfirming] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleQueue() {
+    setBusy(true);
+    setStatus(null);
+    try {
+      const { queueStudioPhotos } = await import('@/services/enrich/studioPhoto');
+      const result = await queueStudioPhotos();
+      const mod = await import('@/services/queue/queueRunner');
+      await mod.runQueueNow();
+
+      setStatus(
+        result.queued === 0
+          ? 'Nothing new to re-shoot — every eligible coffee is already queued.'
+          : `Queued ${result.queued} ${result.queued === 1 ? 'photo' : 'photos'}. They run in the background, one at a time, and each one can be undone from the coffee's page.`,
+      );
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : 'Could not queue the re-shoots.');
+    } finally {
+      setConfirming(false);
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Studio photos</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-muted-foreground text-sm">
+          {reshootable === 0
+            ? 'Every coffee with a photo has already been re-shot.'
+            : `${reshootable} ${reshootable === 1 ? 'coffee has a photo that has' : 'coffees have photos that have'} not been re-shot. A model re-photographs the bag as a studio product shot, keeping the packaging and changing only the lighting and angle.`}
+        </p>
+        <p className="text-muted-foreground text-xs">
+          Each photo costs money to generate and the model can get a label subtly wrong, so the
+          result is decoration only — your original is kept, details are never read off a generated
+          photo, and any coffee can be put back from its own page.
+        </p>
+        {confirming ? (
+          <div className="space-y-2">
+            <p className="text-sm">
+              This will generate {reshootable} {reshootable === 1 ? 'image' : 'images'}, one for
+              each of those coffees. Carry on?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={busy} onClick={() => void handleQueue()}>
+                {busy ? 'Queueing…' : `Generate ${reshootable}`}
+              </Button>
+              <Button variant="outline" disabled={busy} onClick={() => setConfirming(false)}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <Button
+            variant="outline"
+            disabled={busy || reshootable === 0}
+            onClick={() => setConfirming(true)}
+          >
+            Re-shoot every bag photo
+          </Button>
+        )}
         {status && <p className="text-sm">{status}</p>}
       </CardContent>
     </Card>

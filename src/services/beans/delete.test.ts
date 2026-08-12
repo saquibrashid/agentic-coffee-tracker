@@ -193,3 +193,38 @@ describe('summariseDeletion', () => {
     expect(await summariseDeletion([])).toEqual({ beans: 0, ratings: 0, photos: 0 });
   });
 });
+
+describe('deleteBeans: studio shots', () => {
+  function studio(id: string, sourcePhotoId: string): PhotoBlob {
+    return { id, kind: 'bag-studio', sourcePhotoId, blob: new Blob(['x']) } as unknown as PhotoBlob;
+  }
+
+  it('takes the original photograph with the coffee showing a studio shot', async () => {
+    // The original stopped belonging to a bean the moment the studio shot
+    // replaced it, so nothing else would ever clean it up.
+    await db.photos.bulkAdd([photo('original'), studio('gen', 'original')]);
+    await db.beans.add(bean('b1', { photoId: 'gen' }));
+
+    const summary = await deleteBeans(['b1']);
+
+    expect(summary.photos).toBe(2);
+    await expect(db.photos.count()).resolves.toBe(0);
+  });
+
+  it('keeps an original another coffee still shows', async () => {
+    await db.photos.bulkAdd([photo('original'), studio('gen', 'original')]);
+    await db.beans.bulkAdd([bean('b1', { photoId: 'gen' }), bean('b2', { photoId: 'original' })]);
+
+    await deleteBeans(['b1']);
+
+    await expect(db.photos.get('original')).resolves.toBeDefined();
+    await expect(db.photos.get('gen')).resolves.toBeUndefined();
+  });
+
+  it('counts the original in the confirmation', async () => {
+    await db.photos.bulkAdd([photo('original'), studio('gen', 'original')]);
+    await db.beans.add(bean('b1', { photoId: 'gen' }));
+
+    await expect(summariseDeletion(['b1'])).resolves.toMatchObject({ photos: 2 });
+  });
+});

@@ -128,6 +128,18 @@ azd env set AZURE_OPENAI_DEPLOYMENT gpt-4o
 azd env set AZURE_OPENAI_KEY        <key>
 ```
 
+Optional — enable studio product shots. This is a **separate, image-generation
+deployment**; the chat deployment above cannot serve `/images/edits`. Leave it
+unset and `/api/studio-photo` stays in mock mode (it echoes the source photo
+back), which is the default because every generated image is billed.
+
+```bash
+# Provision one alongside the chat model...
+azd env set AZURE_OPENAI_IMAGE_MODEL      gpt-image-1
+# ...or point at a deployment you already have.
+azd env set AZURE_OPENAI_IMAGE_DEPLOYMENT gpt-image-1
+```
+
 Optional — upgrade the Static Web App so the SPA reaches the BFF same-origin:
 
 ```bash
@@ -161,12 +173,19 @@ curl "$(azd env get-value SERVICE_WEB_URI)/api/health"
   "status": "ok",
   "version": "0.1.0",
   "timestamp": "2025-01-01T00:00:00.000Z",
-  "services": { "ocr": "live", "parse": "live", "search": "mock", "recommend": "live" }
+  "services": {
+    "ocr": "live",
+    "parse": "live",
+    "search": "mock",
+    "recommend": "live",
+    "studioPhoto": "mock"
+  }
 }
 ```
 
 `live` means the endpoint has real credentials; `mock` means it will return synthetic data. `search`
-is expected to be `mock` (see above).
+is expected to be `mock` (see above), and so is `studioPhoto` unless you opted into an image
+deployment.
 
 > **Gotcha:** a Flex Consumption Function App does **not** pick up new app settings on its own. If
 > `/api/health` still says `mock` right after adding credentials, run
@@ -346,6 +365,7 @@ The job needs these repository **variables**:
 | `AZURE_LOCATION`                                                            | Azure region (default `eastus2`)            |
 | `STATIC_WEB_APP_SKU`                                                        | `Free` or `Standard` (default `Free`)       |
 | `AZURE_VISION_ENDPOINT`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT` | Non-secret AI config                        |
+| `AZURE_OPENAI_IMAGE_DEPLOYMENT`, `AZURE_OPENAI_IMAGE_MODEL`                 | Optional studio-photo image model           |
 
 Keys go in repository **secrets**: `AZURE_VISION_KEY`, `AZURE_OPENAI_KEY`.
 

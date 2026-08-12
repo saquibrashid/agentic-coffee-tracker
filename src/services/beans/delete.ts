@@ -23,8 +23,15 @@ export async function summariseDeletion(beanIds: string[]): Promise<DeletionSumm
 
   const doomedRatings = await db.ratings.where('beanId').anyOf(beanIds).toArray();
   const beans = await db.beans.bulkGet(beanIds);
+  const bagPhotoIds = beans.flatMap((b) => (b?.photoId ? [b.photoId] : []));
+  // Counted the same way `deleteBeans` deletes them: a studio shot takes the
+  // photograph behind it with it, and the confirmation must not undercount.
+  const bagPhotos = await db.photos.bulkGet(bagPhotoIds);
   const photos = new Set([
-    ...beans.flatMap((b) => (b?.photoId ? [b.photoId] : [])),
+    ...bagPhotoIds,
+    ...bagPhotos.flatMap((p) =>
+      p?.kind === 'bag-studio' && p.sourcePhotoId ? [p.sourcePhotoId] : [],
+    ),
     ...doomedRatings.flatMap((r) => (r.cupPhotoId ? [r.cupPhotoId] : [])),
   ]);
 
@@ -62,7 +69,15 @@ export async function deleteBeans(beanIds: string[]): Promise<DeletionSummary> {
       // going with the bean, so they are checked the same way.
       const bagPhotoIds = targets.flatMap((b) => (b.photoId ? [b.photoId] : []));
       const cupPhotoIds = doomedRatings.flatMap((r) => (r.cupPhotoId ? [r.cupPhotoId] : []));
-      const photoIds = [...new Set([...bagPhotoIds, ...cupPhotoIds])];
+      // A studio shot is only ever half of a pair. Deleting the coffee that
+      // showed it leaves the photograph it was drawn from referenced by nothing
+      // — no bean, no rating — so it has to be considered here or a re-shot
+      // library would leak an original per deletion.
+      const bagPhotos = await db.photos.bulkGet(bagPhotoIds);
+      const sourcePhotoIds = bagPhotos.flatMap((p) =>
+        p?.kind === 'bag-studio' && p.sourcePhotoId ? [p.sourcePhotoId] : [],
+      );
+      const photoIds = [...new Set([...bagPhotoIds, ...cupPhotoIds, ...sourcePhotoIds])];
       const orphaned: string[] = [];
       for (const photoId of photoIds) {
         const otherBeans = await db.beans
@@ -72,7 +87,13 @@ export async function deleteBeans(beanIds: string[]): Promise<DeletionSummary> {
         // The doomed ratings are already gone, so anything left here is a
         // survivor that still needs the photo.
         const otherRatings = await db.ratings.filter((r) => r.cupPhotoId === photoId).count();
-        if (otherRatings === 0) orphaned.push(photoId);
+        if (otherRatings > 0) continue;
+        // A surviving studio shot elsewhere still needs this original to revert
+        // to; the ones going with these beans are in `photoIds` themselves.
+        const otherGenerated = await db.photos
+          .filter((p) => p.sourcePhotoId === photoId && !photoIds.includes(p.id))
+          .count();
+        if (otherGenerated === 0) orphaned.push(photoId);
       }
 
       if (orphaned.length > 0) {

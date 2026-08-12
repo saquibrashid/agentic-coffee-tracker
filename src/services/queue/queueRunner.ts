@@ -10,6 +10,12 @@ import { db } from '@/services/db';
 import { extractBeanFromPhoto, PipelineUnavailableError } from '@/services/ai/pipeline';
 import { parsedBeanToUpdate } from '@/services/ai/mapping';
 import { autoEnrichBean, isTerminalEnrichFailure } from '@/services/enrich/autoEnrich';
+import {
+  applyStudioPhoto,
+  isTerminalStudioFailure,
+  prepareStudioPhoto,
+  sourcePhotoFor,
+} from '@/services/enrich/studioPhoto';
 import { enqueueUpsert } from '@/services/sync/outbox';
 import type { CoffeeBean, PendingAiTask } from '@/types';
 
@@ -23,6 +29,17 @@ const MAX_BACKOFF_MS = 60 * 60 * 1000;
  */
 const MAX_ENRICH_PER_DRAIN = 3;
 
+/**
+ * Studio re-shoots per drain, deliberately lower than enrichment's budget.
+ *
+ * A web lookup costs fractions of a cent; a generated image costs real money and
+ * takes the better part of a minute. One per drain re-shoots a library at two an
+ * hour on the default interval — slow enough that a bulk run stays a background
+ * job the user can watch and cancel from Settings, rather than a bill that
+ * arrives before they notice.
+ */
+const MAX_STUDIO_PER_DRAIN = 1;
+
 let running = false;
 let intervalId: number | null = null;
 
@@ -33,6 +50,11 @@ interface PhotoPayload {
 async function processTask(task: PendingAiTask): Promise<void> {
   if (task.type === 'web-enrich') {
     await processEnrichTask(task);
+    return;
+  }
+
+  if (task.type === 'studio-photo') {
+    await processStudioPhotoTask(task);
     return;
   }
 
@@ -48,8 +70,19 @@ async function processTask(task: PendingAiTask): Promise<void> {
 
   const photo = await db.photos.get(payload.photoId);
   if (!photo) throw new Error(`Photo ${payload.photoId} no longer exists`);
+  // A model that redraws packaging can invent text, and details parsed off an
+  // invented label would be indistinguishable from real ones. Reading the
+  // photograph a studio shot was generated from is both safe and what the task
+  // meant; a generated image with no surviving original is nothing to read at
+  // all, and the task is dropped rather than retried.
+  const source = await sourcePhotoFor(photo.id);
+  if (!source) {
+    console.warn('QueueRunner dropping extraction for a generated photo', photo.id);
+    await db.pendingAiTasks.delete(task.id);
+    return;
+  }
 
-  const result = await extractBeanFromPhoto(photo.blob);
+  const result = await extractBeanFromPhoto(source.blob);
 
   if (task.beanId) {
     const bean = await db.beans.get(task.beanId);
@@ -109,6 +142,33 @@ async function processEnrichTask(task: PendingAiTask): Promise<void> {
   await db.pendingAiTasks.delete(task.id);
 }
 
+/**
+ * Re-shoots one coffee's bag photo as a studio product shot.
+ *
+ * Applied rather than offered, which is the one place this differs from the
+ * per-coffee flow. A bulk re-shoot is a thing someone explicitly asked for over
+ * a whole library, and stacking up dozens of decisions to make later would be a
+ * worse answer than applying them and leaving each one revertible — the original
+ * photograph is kept either way, so nothing here is destructive.
+ */
+async function processStudioPhotoTask(task: PendingAiTask): Promise<void> {
+  if (!task.beanId) {
+    await db.pendingAiTasks.delete(task.id);
+    return;
+  }
+
+  const bean = await db.beans.get(task.beanId);
+  // The coffee was deleted while the task waited, or lost its photo since.
+  if (!bean || !bean.photoId) {
+    await db.pendingAiTasks.delete(task.id);
+    return;
+  }
+
+  const candidate = await prepareStudioPhoto(bean);
+  await applyStudioPhoto(bean, candidate);
+  await db.pendingAiTasks.delete(task.id);
+}
+
 async function handleFailure(task: PendingAiTask, err: unknown): Promise<void> {
   const error = err instanceof Error ? err : new Error(String(err));
   const attempts = (task.attempts || 0) + 1;
@@ -124,12 +184,17 @@ async function drain(): Promise<void> {
   const tasks = await db.pendingAiTasks.toArray();
   const now = Date.now();
   let enrichBudget = MAX_ENRICH_PER_DRAIN;
+  let studioBudget = MAX_STUDIO_PER_DRAIN;
 
   for (const task of tasks) {
     if (task.nextAttemptAt && new Date(task.nextAttemptAt).getTime() > now) continue;
     if (task.type === 'web-enrich') {
       if (enrichBudget <= 0) continue;
       enrichBudget -= 1;
+    }
+    if (task.type === 'studio-photo') {
+      if (studioBudget <= 0) continue;
+      studioBudget -= 1;
     }
     try {
       await processTask(task);
@@ -140,6 +205,14 @@ async function drain(): Promise<void> {
       // with, which is exactly the pre-enrichment state.
       if (task.type === 'web-enrich' && isTerminalEnrichFailure(err)) {
         console.warn('QueueRunner dropping unenrichable task', task.beanId, err);
+        await db.pendingAiTasks.delete(task.id);
+        continue;
+      }
+      // Same reasoning, and more urgent: a refused re-shoot that retried hourly
+      // would be a request the model declines every time, and each attempt that
+      // did get through would be billed.
+      if (task.type === 'studio-photo' && isTerminalStudioFailure(err)) {
+        console.warn('QueueRunner dropping unshootable task', task.beanId, err);
         await db.pendingAiTasks.delete(task.id);
         continue;
       }

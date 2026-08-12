@@ -131,16 +131,36 @@ export interface UserPreferences {
   totalBeans: number;
 }
 
+/**
+ * What a stored image *is*, which decides what may be done with it.
+ *
+ * `bag-studio` is a picture of the bag that a model re-drew from another photo
+ * (`services/enrich/studioPhoto.ts`). It is decoration and nothing else: the
+ * model can quietly alter a logo or a word, so details read off one would be
+ * invented details indistinguishable from real ones. Every extraction path —
+ * OCR, `/api/parse`, any future re-parse — must refuse it and use
+ * `sourcePhotoId` instead.
+ */
+export type PhotoKind = 'bag' | 'cup' | 'bag-studio';
+
 export interface PhotoBlob {
   id: string;
   schemaVersion: 1;
-  kind: 'bag' | 'cup';
+  kind: PhotoKind;
   mimeType: string;
   blob: Blob;
   widthPx: number;
   heightPx: number;
   byteSize: number;
   createdAt: string;
+  /**
+   * The photo this one was generated from, set only on `bag-studio`.
+   *
+   * The original is evidence and is kept: it is what a re-parse must read, and
+   * what reverting a studio shot puts back. A generated photo whose source has
+   * gone is still displayable — it just cannot be reverted or re-read.
+   */
+  sourcePhotoId?: string;
 }
 
 /**
@@ -187,7 +207,13 @@ export interface OcrResult {
   createdAt: string;
 }
 
-export type AiTaskType = 'ocr' | 'llm-parse' | 'web-enrich' | 'recommendation';
+export type AiTaskType =
+  | 'ocr'
+  | 'llm-parse'
+  | 'web-enrich'
+  | 'recommendation'
+  /** Re-shoot a coffee's bag photo as a studio product shot. Costs money per run. */
+  | 'studio-photo';
 
 export interface PendingAiTask {
   id: string;

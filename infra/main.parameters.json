@@ -23,6 +23,12 @@
     "openAiDeployment": {
       "value": "${AZURE_OPENAI_DEPLOYMENT=}"
     },
+    "openAiImageDeployment": {
+      "value": "${AZURE_OPENAI_IMAGE_DEPLOYMENT=}"
+    },
+    "openAiImageModelName": {
+      "value": "${AZURE_OPENAI_IMAGE_MODEL=}"
+    },
     "staticWebAppSkuName": {
       "value": "${STATIC_WEB_APP_SKU=Free}"
     },
