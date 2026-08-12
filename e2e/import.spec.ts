@@ -120,8 +120,9 @@ test.describe('bulk import', () => {
     await expect(page.getByText('Restored Bean')).toBeVisible();
 
     // The backup was taken on the old 1–5 scale, so 5 must come back as 10/10
-    // rather than being restored verbatim as a mediocre score.
+    // rather than being restored verbatim as a mediocre score. Scoped to the
+    // rating list because the page header now shows the average too.
     await page.getByText('Restored Bean').click();
-    await expect(page.getByText('10/10')).toBeVisible();
+    await expect(page.getByRole('listitem').filter({ hasText: '10/10' })).toBeVisible();
   });
 });
