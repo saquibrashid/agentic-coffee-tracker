@@ -93,7 +93,7 @@ export interface StudioPhotoCandidate {
   /** The photo it was generated from, which the applied record points back at. */
   sourcePhotoId: string;
   /** `mock-image` means the BFF has no image deployment and echoed the source back. */
-  provider: 'azure-openai' | 'mock-image';
+  provider: 'azure-mai' | 'mock-image';
 }
 
 /**

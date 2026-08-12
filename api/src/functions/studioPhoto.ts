@@ -5,8 +5,8 @@ import {
   type InvocationContext,
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
+import { callImageEdit, getImageModelConfig, ImageModelError } from '../lib/imageModel.js';
 import { ALLOWED_IMAGE_TYPES, sniffImageType } from '../lib/imageType.js';
-import { callImageEdit, getOpenAiImageConfig, OpenAiError } from '../lib/openai.js';
 import { consume, IMAGE_RATE_LIMIT } from '../lib/rateLimit.js';
 import { STUDIO_PHOTO_PROMPT } from '../lib/studioPrompt.js';
 
@@ -102,7 +102,7 @@ app.http('studioPhoto', {
 
       ctx.log('studio-photo invoked', { mimeType: sniffed, bytes: bytes.byteLength });
 
-      const config = getOpenAiImageConfig();
+      const config = getImageModelConfig();
       if (!config) {
         // Mock fallback, following the `/api/image` precedent. The source image
         // is echoed back rather than a fixture substituted: it is a real,
@@ -128,14 +128,26 @@ app.http('studioPhoto', {
         dataUrl: `data:${result.contentType};base64,${result.bytes.toString('base64')}`,
         contentType: result.contentType,
         byteSize: result.bytes.byteLength,
-        provider: 'azure-openai',
+        provider: 'azure-mai',
         model: result.model,
       });
     } catch (err) {
+      // The image deployment has a very small per-minute capacity, so an
+      // upstream 429 is routine rather than exceptional — a bulk run and an
+      // interactive re-shoot overlapping is enough. It must stay a 429: the
+      // client treats 4xx as "this will fail forever" and drops the task, which
+      // for a throttle would silently skip a coffee that was only busy.
+      if (err instanceof ImageModelError && err.status === 429) {
+        return {
+          status: 429,
+          headers: { 'content-type': 'application/json', 'retry-after': '60' },
+          body: JSON.stringify({ error: 'The image model is busy. Try again shortly.' }),
+        };
+      }
       // A refusal or a content filter is the model declining this particular
       // picture, and it will decline it identically forever. Passing the status
       // through lets the client stop rather than retry an hour at a time.
-      if (err instanceof OpenAiError && err.status >= 400 && err.status < 500) {
+      if (err instanceof ImageModelError && err.status >= 400 && err.status < 500) {
         return errorResponse(ctx, 422, 'The model would not re-shoot that photo.', err);
       }
       return errorResponse(ctx, 500, 'Could not re-shoot that photo', err);

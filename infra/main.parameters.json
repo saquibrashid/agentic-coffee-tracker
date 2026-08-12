@@ -23,11 +23,17 @@
     "openAiDeployment": {
       "value": "${AZURE_OPENAI_DEPLOYMENT=}"
     },
-    "openAiImageDeployment": {
-      "value": "${AZURE_OPENAI_IMAGE_DEPLOYMENT=}"
+    "imageEndpoint": {
+      "value": "${AZURE_IMAGE_ENDPOINT=}"
     },
-    "openAiImageModelName": {
-      "value": "${AZURE_OPENAI_IMAGE_MODEL=}"
+    "imageKey": {
+      "value": "${AZURE_IMAGE_KEY=}"
+    },
+    "imageDeployment": {
+      "value": "${AZURE_IMAGE_DEPLOYMENT=}"
+    },
+    "imageModelName": {
+      "value": "${AZURE_IMAGE_MODEL=}"
     },
     "staticWebAppSkuName": {
       "value": "${STATIC_WEB_APP_SKU=Free}"

@@ -21,12 +21,16 @@ const DEFAULT_TIMEOUT_MS = 20_000;
 /** Model-backed endpoints legitimately take longer than a plain HTTP hop. */
 const MODEL_TIMEOUT_MS = 60_000;
 /**
- * Image generation is slower again — a re-shoot routinely runs past a minute,
- * where a text completion that slow would already be a failure. A shorter
- * ceiling here would abort requests the service was about to answer, and the
- * user would be billed for an image they never received.
+ * Image generation is slower again — a re-shoot takes tens of seconds, where a
+ * text completion that slow would already be a failure.
+ *
+ * The ceiling is nonetheless *below* a minute, because Static Web Apps gives up
+ * on a linked-backend call at 45 seconds and answers `Backend call failure`
+ * itself. Waiting past that point cannot produce anything but a longer wait
+ * before the same failure, so the request is abandoned just after the front
+ * door would have abandoned it.
  */
-const STUDIO_PHOTO_TIMEOUT_MS = 180_000;
+const STUDIO_PHOTO_TIMEOUT_MS = 50_000;
 
 export class ApiError extends Error {
   constructor(
@@ -211,7 +215,7 @@ export interface StudioPhotoResponse {
   contentType: string;
   byteSize: number;
   /** `mock-image` means the BFF has no image deployment and echoed the source back. */
-  provider: 'azure-openai' | 'mock-image';
+  provider: 'azure-mai' | 'mock-image';
   model?: string;
 }
 /**
