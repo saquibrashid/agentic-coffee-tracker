@@ -34,9 +34,16 @@ manual setup. Two things to know:
 - **Azure AI Vision `F0` is limited to one free account per subscription per region.** A second
   environment in the same region will fail to provision until you set `visionSkuName=S1` (paid) or
   pick another region.
-- **No general web search API is used.** Bing Search v7 is retired to new customers, so `/api/search`
-  resolves a roaster to its storefront domain with the model and then queries that store's own
-  product search. No extra key, no extra cost.
+- **Web search needs no extra resource or key.** `/api/search` first resolves a roaster to its
+  storefront domain with the model and queries that store's own product search, which costs nothing
+  beyond an HTTP request. Only when that finds nothing does it fall back to a general web search,
+  which runs as the `web_search` tool on the **same Azure OpenAI resource** — there is no Grounding
+  with Bing resource to deploy, which matters because that resource cannot be created on
+  credit-based subscriptions such as Visual Studio Enterprise at all.
+
+  The fallback is billed per lookup (roughly 12k input tokens, so a few cents), so set
+  `WEB_SEARCH_ENABLED=false` on the Function App to switch it off without a redeploy. Coffees found
+  by the free path never reach it.
 
 Every AI parameter also accepts a bring-your-own value (`visionEndpoint`/`visionKey`,
 `openAiEndpoint`/`openAiKey`/`openAiDeployment`). Set one and the provisioned account is bypassed in

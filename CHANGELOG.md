@@ -140,6 +140,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Coffees are now found on roasters who don't run Shopify.** Looking a coffee
+  up asked the roaster's own store for it, which is free and works for most
+  roasters — but only because most run Shopify and expose a search endpoint. A
+  roaster who doesn't was invisible no matter how well the domain was guessed,
+  so Blue Bottle's Night Light Decaf came back with nothing while its product
+  page sat in plain sight. A general web search now runs when the store search
+  finds nothing, and it has no such blind spot.
+
+  It reads only the pages the search actually returned, never a URL the model
+  wrote: asked for addresses directly, a model invents plausible ones that 404.
+  Results are scored against the coffee's name exactly as store results are, and
+  a near miss — a category page, or a different coffee by the same roaster — is
+  discarded rather than ranked last, because unattended enrichment takes the top
+  result without asking anyone.
+
+  Coffees already imported reach it through **Settings → Look up missing
+  details**. The search only runs after the free path has failed, and can be
+  switched off with `WEB_SEARCH_ENABLED=false`.
+
 - **Give a coffee its details from text or a PDF, when it has no page at all.**
   Pasting a product address still assumes there is a page to point at. Some
   coffees have none — a roaster with no storefront, a subscription insert, a

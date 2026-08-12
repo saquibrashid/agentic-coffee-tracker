@@ -3,6 +3,7 @@ import {
   OpenAiError,
   callResponses,
   extractOutputText,
+  extractUrlCitations,
   getOpenAiConfig,
   parseJsonOutput,
 } from './openai.js';
@@ -68,6 +69,55 @@ describe('extractOutputText', () => {
   it('returns an empty string for a malformed payload', () => {
     expect(extractOutputText({})).toBe('');
     expect(extractOutputText(null)).toBe('');
+  });
+});
+
+describe('extractUrlCitations', () => {
+  it('reads the sources annotated on the answer', () => {
+    const payload = {
+      output: [
+        {
+          type: 'message',
+          content: [
+            {
+              type: 'output_text',
+              text: 'see here',
+              annotations: [
+                { type: 'url_citation', url: 'https://example.com/a', title: 'A' },
+                { type: 'file_citation', file_id: 'f1' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(extractUrlCitations(payload)).toEqual([{ url: 'https://example.com/a', title: 'A' }]);
+  });
+
+  it('reports a page once however often it is cited', () => {
+    const payload = {
+      output: [
+        {
+          type: 'message',
+          content: [
+            {
+              type: 'output_text',
+              text: 'twice',
+              annotations: [
+                { type: 'url_citation', url: 'https://example.com/a', title: 'A' },
+                { type: 'url_citation', url: 'https://example.com/a', title: 'A' },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(extractUrlCitations(payload)).toHaveLength(1);
+  });
+
+  it('returns an empty list when there are no annotations at all', () => {
+    expect(extractUrlCitations(responsePayload('plain answer'))).toEqual([]);
+    expect(extractUrlCitations(null)).toEqual([]);
   });
 });
 

@@ -13,6 +13,7 @@ import {
   roasterDomainCandidates,
   type RankableHit,
 } from '../lib/productSearch.js';
+import { isWebSearchEnabled, searchWeb } from '../lib/webSearch.js';
 
 interface SearchRequest {
   roaster?: unknown;
@@ -27,18 +28,15 @@ export interface SearchHit {
 }
 
 /**
- * There is no general web search API available here. Bing Search v7 is retired
- * to new customers, and its replacement (Grounding with Bing) is priced per
- * thousand queries with no free tier, which is hard to justify for a personal
- * app that already pays for a language model.
+ * Finds the page where a coffee is sold, cheapest route first.
  *
- * So this endpoint does the one search that actually matters: find the coffee
- * on the roaster's own store. The product lookup runs against that store's own
- * search, which returns real listings.
+ * The first route asks the roaster's own store. It costs nothing beyond a
+ * request or two, and it resolves most roasters, because most run Shopify and
+ * expose a predictable JSON search endpoint.
  *
  * Asking the model for full product URLs was tried first and does not work: it
- * confidently returns plausible paths that 404. Every URL returned here came
- * back from a store that actually listed the product.
+ * confidently returns plausible paths that 404. Every URL returned by this
+ * route came back from a store that actually listed the product.
  *
  * Finding the store is therefore the whole problem, and it is done twice over:
  * the model is asked, and candidates are derived from the roaster's name. The
@@ -46,9 +44,14 @@ export interface SearchHit {
  * smaller roasters and on spellings it has not seen. Both are only guesses, and
  * a wrong one costs a single request that returns nothing.
  *
- * The known limit of this approach is that it can only find roasters who sell
- * through Shopify. One who does not is invisible to it no matter how the domain
- * is spelled, which is what the manual URL entry in the app is for.
+ * The structural limit of that route is that it only sees roasters selling
+ * through Shopify. One who does not — Blue Bottle, for instance — is invisible
+ * to it no matter how the domain is spelled, and no improvement to the guessing
+ * could ever have changed that.
+ *
+ * So when it comes back empty, a general web search runs (see `webSearch.ts`).
+ * That has no such blind spot, but it is billed per lookup, which is why it is
+ * the fallback and not the first thing tried.
  */
 
 interface DomainGuess {
@@ -249,6 +252,7 @@ app.http('search', {
       }
 
       let hits: RankableHit[] = [];
+      let provider = 'roaster-site';
       for (const domain of domains.slice(0, 8)) {
         try {
           const found = await searchStore(domain, body.name, max, ctx);
@@ -266,13 +270,23 @@ app.http('search', {
         }
       }
 
+      // Only now, having spent nothing and found nothing, is the paid search
+      // worth it. Roasters who are not on Shopify reach the app through here.
+      if (hits.length === 0 && isWebSearchEnabled()) {
+        const config = getOpenAiConfig();
+        if (config) {
+          hits = await searchWeb(config, body.roaster, body.name, max, ctx);
+          if (hits.length > 0) provider = 'web-search';
+        }
+      }
+
       const seen = new Set<string>();
       const results = hits
         .filter((h) => (seen.has(h.url) ? false : seen.add(h.url)))
         .slice(0, max)
         .map(({ url, title, snippet }) => ({ url, title, snippet }));
 
-      return json(200, { results, provider: 'roaster-site' });
+      return json(200, { results, provider });
     } catch (err) {
       return errorResponse(ctx, 500, 'Search failed', err);
     }

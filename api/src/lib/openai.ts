@@ -30,14 +30,43 @@ export type ResponseFormat =
   | { type: 'json_object' }
   | { type: 'json_schema'; name: string; strict: true; schema: Record<string, unknown> };
 
+/**
+ * Server-side tools the model may call while producing a response.
+ *
+ * `web_search` runs Bing inside the service, so it needs no separate Grounding
+ * with Bing resource — which matters, because that resource cannot be deployed
+ * on credit-based subscriptions at all.
+ */
+export type ResponsesTool = {
+  type: 'web_search';
+  /** How much retrieved page context is fed to the model. Defaults to medium. */
+  search_context_size?: 'low' | 'medium' | 'high';
+};
+
 export interface ResponsesRequest {
   system: string;
   user: string;
-  format: ResponseFormat;
+  /** Omitted for plain-text answers, which is what the tool-using calls want. */
+  format?: ResponseFormat;
   temperature?: number;
   /** Overrides the configured deployment. */
   model?: string;
   timeoutMs?: number;
+  tools?: ResponsesTool[];
+  /** `required` forces the tool to run rather than letting the model answer from memory. */
+  toolChoice?: 'auto' | 'required';
+}
+
+/**
+ * A source the model was shown, as reported by the service.
+ *
+ * These are the only trustworthy URLs in a response. Prose the model writes
+ * around them may contain plausible-looking addresses it invented; a citation
+ * is a page the search index actually returned.
+ */
+export interface UrlCitation {
+  url: string;
+  title: string;
 }
 
 export interface ResponsesResult {
@@ -45,12 +74,18 @@ export interface ResponsesResult {
   text: string;
   /** The deployment that actually served the request. */
   model: string;
+  /** Sources annotated on the answer, in the order they appear. */
+  citations: UrlCitation[];
 }
 
 interface ResponsesPayload {
   output?: {
     type?: string;
-    content?: { type?: string; text?: string }[];
+    content?: {
+      type?: string;
+      text?: string;
+      annotations?: { type?: string; url?: string; title?: string }[];
+    }[];
   }[];
 }
 
@@ -69,6 +104,32 @@ export function extractOutputText(data: unknown): string {
     .filter((part) => part.type === 'output_text')
     .map((part) => part.text ?? '')
     .join('');
+}
+
+/**
+ * Pulls the cited sources out of a Responses payload.
+ *
+ * Deduplicated on URL, because the model cites the same page once per sentence
+ * that leans on it and the caller wants a list of pages, not of mentions.
+ */
+export function extractUrlCitations(data: unknown): UrlCitation[] {
+  if (typeof data !== 'object' || data === null) return [];
+  const payload = data as ResponsesPayload;
+  if (!Array.isArray(payload.output)) return [];
+
+  const seen = new Set<string>();
+  return payload.output
+    .filter((item) => item.type === 'message')
+    .flatMap((item) => item.content ?? [])
+    .flatMap((part) => part.annotations ?? [])
+    .flatMap((annotation) => {
+      if (annotation.type !== 'url_citation') return [];
+      const { url, title } = annotation;
+      if (typeof url !== 'string' || url.length === 0) return [];
+      if (seen.has(url)) return [];
+      seen.add(url);
+      return [{ url, title: typeof title === 'string' ? title : '' }];
+    });
 }
 
 export class OpenAiError extends Error {
@@ -96,7 +157,9 @@ export async function callResponses(
         { role: 'system', content: request.system },
         { role: 'user', content: request.user },
       ],
-      text: { format: request.format },
+      ...(request.format ? { text: { format: request.format } } : {}),
+      ...(request.tools ? { tools: request.tools } : {}),
+      ...(request.toolChoice ? { tool_choice: request.toolChoice } : {}),
       temperature: request.temperature ?? 0,
       // Bag text and taste history are the user's data; don't leave copies in
       // the service-side response store.
@@ -105,7 +168,8 @@ export async function callResponses(
   });
 
   if (!res.ok) throw new OpenAiError(res.status, await res.text());
-  return { text: extractOutputText(await res.json()), model };
+  const data: unknown = await res.json();
+  return { text: extractOutputText(data), model, citations: extractUrlCitations(data) };
 }
 
 /** Parses model output that is expected to be JSON, returning undefined if it is not. */
