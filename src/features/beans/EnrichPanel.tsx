@@ -357,10 +357,13 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
     </div>
   );
 
+  /*
+   * No box and no heading of its own: this renders inside a CollapsibleCard on
+   * the bean page, which supplies both. Nesting a bordered section inside a
+   * bordered card was one of the things making that page look busy.
+   */
   return (
-    <section className="rounded border p-3">
-      <h3 className="text-sm font-medium">Web enrichment</h3>
-
+    <div>
       {error && (
         <p role="alert" className="text-destructive mt-2 text-sm">
           {error}
@@ -552,6 +555,6 @@ export function EnrichPanel({ bean }: { bean: CoffeeBean }) {
           </Button>
         </div>
       )}
-    </section>
+    </div>
   );
 }

@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ulid } from 'ulid';
-import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { ArrowLeft, Camera, Globe, Pencil, Plus, Trash2 } from 'lucide-react';
 import { db } from '@/services/db';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { RoastScale } from '@/components/ui/roast-scale';
 import { Select } from '@/components/ui/select';
@@ -16,6 +17,7 @@ import { deleteRating, updateRating } from '@/services/ratings/mutations';
 import { enqueueUpsert } from '@/services/sync/outbox';
 import {
   DEFAULT_SCORE,
+  MAX_SCORE,
   SCORE_CHOICES,
   clampScore,
   formatOutOf,
@@ -25,7 +27,7 @@ import { BREW_TYPE_OPTIONS, DEFAULT_BREW_TYPE, brewLabel } from '@/services/rati
 import { EnrichPanel } from './EnrichPanel';
 import { PhotoPanel } from './PhotoPanel';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
-import type { BrewType, Rating } from '@/types';
+import type { BrewType, CoffeeBean, Rating } from '@/types';
 
 const SCORE_OPTIONS = SCORE_CHOICES;
 
@@ -69,27 +71,74 @@ function BackLink() {
 }
 
 /**
- * What this coffee has scored, at a glance.
+ * What this coffee has scored, as the biggest thing on the page after its name.
  *
- * The individual ratings are listed further down; this is the one number people
- * come to the page for, so it sits with the name rather than below the fold.
+ * This is the one number people open a coffee to see, so it is set at display
+ * size beside the name rather than as another line of small print. The average
+ * is snapped to a legal half-step so it is written in the same vocabulary as
+ * every individual rating, instead of appearing as 7.3333.
  */
-function RatingSummary({ ratings }: { ratings: Rating[] | undefined }) {
-  if (ratings === undefined) return <Skeleton className="mt-2 h-5 w-32" />;
+function ScoreBlock({ ratings }: { ratings: Rating[] | undefined }) {
+  if (ratings === undefined) return <Skeleton className="h-12 w-16" />;
+
   if (ratings.length === 0) {
-    return <p className="text-muted-foreground mt-1 text-sm">Not rated yet</p>;
+    return (
+      <div className="text-muted-foreground shrink-0 text-sm whitespace-nowrap">Not rated</div>
+    );
   }
 
-  const average = ratings.reduce((sum, r) => sum + r.score, 0) / ratings.length;
+  const average = clampScore(ratings.reduce((sum, r) => sum + r.score, 0) / ratings.length);
   return (
-    <p className="mt-1 text-sm">
-      <span className="font-medium">{formatOutOf(clampScore(average))}</span>
-      <span className="text-muted-foreground">
-        {' '}
-        · {ratings.length} {ratings.length === 1 ? 'rating' : 'ratings'}
-      </span>
-    </p>
+    <div className="shrink-0 text-right">
+      <div className="text-3xl leading-none font-semibold">
+        {formatScore(average)}
+        <span className="text-muted-foreground text-base font-normal">/{MAX_SCORE}</span>
+      </div>
+      <div className="text-meta text-muted-foreground mt-1">
+        {ratings.length} {ratings.length === 1 ? 'rating' : 'ratings'}
+      </div>
+    </div>
   );
+}
+
+/**
+ * One field of the coffee.
+ *
+ * Renders nothing at all when the value is missing. The previous version
+ * printed an em dash for every empty field, which meant a freshly imported
+ * coffee showed four rows of punctuation — noise that looks like content and
+ * takes up the same space. What is actually known is more useful than a fixed
+ * shape, and `EmptyAttributes` covers the case where nothing is.
+ */
+function Attribute({ label, children }: { label: string; children: React.ReactNode }) {
+  if (children === null || children === undefined || children === false) return null;
+  return (
+    <div>
+      <dt className="text-meta text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 text-sm">{children}</dd>
+    </div>
+  );
+}
+
+/** True when there is nothing to say about the coffee beyond its name. */
+function hasNoAttributes(bean: CoffeeBean): boolean {
+  const roastKnown = bean.roastLevel !== undefined && bean.roastLevel !== 'unknown';
+  const processKnown = bean.process !== undefined && bean.process !== 'unknown';
+  return (
+    !roastKnown &&
+    !processKnown &&
+    (bean.origins ?? []).length === 0 &&
+    bean.roastDate === undefined
+  );
+}
+
+/**
+ * The line beside a folded card's title, so its contents are knowable without
+ * opening it — the trade that makes collapsing these panels safe.
+ */
+function enrichHint(bean: CoffeeBean): string {
+  if (hasNoAttributes(bean)) return 'Nothing known yet';
+  return bean.sourceUrl ? 'Imported' : 'Fill in what is missing';
 }
 
 export function BeanDetailPage() {
@@ -148,11 +197,18 @@ export function BeanDetailPage() {
 
   const beanIdForDelete = bean.id;
 
+  /*
+   * Four cards rather than one, because a single card with six headings in it
+   * gives a reader no way to tell the coffee apart from the tools that change
+   * it. Reading comes first and stays open; the three editing panels below are
+   * folded away until asked for.
+   */
   return (
-    <Card>
-      <CardHeader>
-        <div className="space-y-3">
-          <BackLink />
+    <div className="space-y-4">
+      <BackLink />
+
+      <Card>
+        <CardHeader>
           <div className="flex items-start gap-3">
             {bean.thumbnailDataUrl && (
               <img
@@ -161,108 +217,103 @@ export function BeanDetailPage() {
                 className="size-16 shrink-0 rounded object-cover"
               />
             )}
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <CardTitle>{bean.name}</CardTitle>
               <p className="text-muted-foreground text-sm">{bean.roaster}</p>
-              <RatingSummary ratings={ratings} />
             </div>
+            <ScoreBlock ratings={ratings} />
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <div className="space-y-4">
-          <div>
-            <h3 className="text-sm font-medium">Attributes</h3>
-            {/*
+        </CardHeader>
+        <CardContent>
+          {hasNoAttributes(bean) ? (
+            <p className="text-muted-foreground text-sm">
+              Nothing else is known about this coffee yet. Try{' '}
+              <span className="font-medium">Details from the web</span> below.
+            </p>
+          ) : (
+            /*
               A description list rather than sentences: these are field/value
               pairs, and marking them as such is what lets a screen reader
               announce "Roast, medium-dark" instead of running the labels and
               values together into one paragraph.
-            */}
-            <dl className="mt-2 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-              <div>
-                <dt className="text-meta text-muted-foreground">Roast</dt>
-                <dd className="mt-0.5 text-sm">
-                  {bean.roastLevel !== undefined && bean.roastLevel !== 'unknown' ? (
-                    <RoastScale level={bean.roastLevel} />
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-meta text-muted-foreground">Origin</dt>
-                <dd className="mt-0.5 text-sm">
-                  {(bean.origins ?? []).map((o) => o.country).join(', ') || (
-                    <span className="text-muted-foreground">—</span>
-                  )}
-                </dd>
-              </div>
-              {bean.process !== undefined && bean.process !== 'unknown' && (
-                <div>
-                  <dt className="text-meta text-muted-foreground">Process</dt>
-                  <dd className="mt-0.5 text-sm">{bean.process}</dd>
-                </div>
-              )}
-              {bean.roastDate !== undefined && (
-                <div>
-                  <dt className="text-meta text-muted-foreground">Roasted</dt>
-                  <dd className="mt-0.5 text-sm">{bean.roastDate}</dd>
-                </div>
-              )}
+
+              Two columns on a phone as well as on a desktop. These values are
+              a few words each, so one per row left most of the line empty and
+              made four short facts as tall as a paragraph.
+            */
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+              <Attribute label="Roast">
+                {bean.roastLevel !== undefined && bean.roastLevel !== 'unknown' && (
+                  <RoastScale level={bean.roastLevel} className="flex-wrap gap-y-1" />
+                )}
+              </Attribute>
+              <Attribute label="Origin">
+                {(bean.origins ?? []).length > 0 &&
+                  (bean.origins ?? []).map((o) => o.country).join(', ')}
+              </Attribute>
+              <Attribute label="Process">
+                {bean.process !== undefined && bean.process !== 'unknown' && bean.process}
+              </Attribute>
+              <Attribute label="Roasted">{bean.roastDate}</Attribute>
             </dl>
-            {bean.sourceUrl && (
-              <p className="text-muted-foreground mt-3 text-xs break-all">
-                Source:{' '}
-                <a href={bean.sourceUrl} target="_blank" rel="noreferrer" className="underline">
-                  {bean.sourceUrl}
-                </a>
-              </p>
-            )}
-          </div>
-
-          <div>
-            <h3 className="text-sm font-medium">Ratings</h3>
-            <RatingsList ratings={ratings} />
-          </div>
-
-          {/*
-            Everything below this line changes the coffee. It sits after the
-            details because the page is read far more often than it is edited,
-            and the forms are tall enough to push what people came for off the
-            screen entirely.
-          */}
-          <section className="space-y-4 border-t pt-4">
-            <h3 className="text-sm font-medium">Make changes</h3>
-
-            <div className="rounded border p-3">
-              <h4 className="text-sm font-medium">Add a rating</h4>
-              <AddRatingForm beanId={bean.id} />
-            </div>
-
-            <EnrichPanel bean={bean} />
-
-            <PhotoPanel bean={bean} />
-
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                onClick={() => void requestDelete(beanIdForDelete)}
+          )}
+          {bean.sourceUrl && (
+            <p className="text-muted-foreground mt-4 text-xs">
+              <a
+                href={bean.sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2"
               >
-                <Trash2 aria-hidden="true" /> Remove coffee
-              </Button>
-            </div>
-          </section>
-
-          {deleteError && !pendingSummary && (
-            <p role="alert" className="text-destructive text-sm">
-              {deleteError}
+                View on the roaster&rsquo;s site
+              </a>
             </p>
           )}
-        </div>
-      </CardContent>
+        </CardContent>
+      </Card>
+
+      <RatingsCard beanId={bean.id} ratings={ratings} />
+
+      <CollapsibleCard
+        title="Details from the web"
+        hint={enrichHint(bean)}
+        icon={<Globe className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />}
+      >
+        <EnrichPanel bean={bean} />
+      </CollapsibleCard>
+
+      <CollapsibleCard
+        title="Photo"
+        hint={bean.thumbnailDataUrl ? 'Added' : 'None yet'}
+        icon={<Camera className="text-muted-foreground size-4 shrink-0" aria-hidden="true" />}
+      >
+        <PhotoPanel bean={bean} />
+      </CollapsibleCard>
+
+      {/*
+        Quiet and last. Removing a coffee is rare and unrecoverable, so it gets
+        the least emphasis on the page rather than the most — it was previously
+        a filled red button, which drew the eye straight to the one control
+        nobody opens this page to use. The confirmation dialog is what actually
+        protects the record.
+      */}
+      <div className="flex justify-end pt-2">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground hover:text-destructive"
+          onClick={() => void requestDelete(beanIdForDelete)}
+        >
+          <Trash2 aria-hidden="true" /> Remove coffee
+        </Button>
+      </div>
+
+      {deleteError && !pendingSummary && (
+        <p role="alert" className="text-destructive text-sm">
+          {deleteError}
+        </p>
+      )}
 
       <ConfirmDeleteDialog
         open={pendingSummary !== null}
@@ -275,6 +326,41 @@ export function BeanDetailPage() {
           setDeleteError(null);
         }}
       />
+    </div>
+  );
+}
+
+/**
+ * The rating history, and the form that adds to it.
+ *
+ * The history is always visible — it is half the reason the page exists. The
+ * form is not: it was permanently open below the list, roughly a third of the
+ * page's height spent on two dropdowns and a textarea that are used once per
+ * visit at most. Behind a button it costs one tap and nothing at all when
+ * unused.
+ */
+function RatingsCard({ beanId, ratings }: { beanId: string; ratings: Rating[] | undefined }) {
+  const [adding, setAdding] = useState(false);
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-center justify-between space-y-0">
+        <CardTitle>Ratings</CardTitle>
+        {!adding && (
+          <Button type="button" size="sm" variant="outline" onClick={() => setAdding(true)}>
+            <Plus aria-hidden="true" /> Add rating
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {adding && (
+          <div className="mb-4">
+            <h3 className="text-sm font-medium">Add a rating</h3>
+            <AddRatingForm beanId={beanId} onDone={() => setAdding(false)} />
+          </div>
+        )}
+        <RatingsList ratings={ratings} />
+      </CardContent>
     </Card>
   );
 }
@@ -285,10 +371,16 @@ function RatingsList({ ratings }: { ratings: Rating[] | undefined }) {
   if (ratings === undefined) return <Skeleton className="h-24" />;
   if (ratings.length === 0) return <p className="text-muted-foreground text-sm">No ratings yet.</p>;
 
+  /*
+   * Divided rows rather than a bordered box per rating. Inside a card, a list
+   * of boxes reads as a stack of separate things competing with their
+   * container; a hairline between rows says "these belong together" with a
+   * fraction of the ink.
+   */
   return (
-    <ul className="mt-2 space-y-2">
+    <ul className="divide-y">
       {ratings.map((r) => (
-        <li key={r.id} className="rounded border p-2">
+        <li key={r.id} className="py-3 first:pt-0 last:pb-0">
           {editingId === r.id ? (
             <EditRatingForm
               rating={r}
@@ -323,8 +415,15 @@ function RatingRow({ rating, onEdit }: { rating: Rating; onEdit: () => void }) {
   }
 
   // The date is what tells two ratings of the same coffee apart, so it belongs
-  // in the accessible name of the per-row buttons.
+  // in the accessible name of the per-row buttons — at full precision, since
+  // two cups of the same coffee on one day are not unusual.
   const rated = new Date(rating.ratedAt).toLocaleString();
+  // On screen the seconds are noise: they wrapped the line and said nothing.
+  const ratedShort = new Date(rating.ratedAt).toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  });
 
   return (
     <>
@@ -332,7 +431,7 @@ function RatingRow({ rating, onEdit }: { rating: Rating; onEdit: () => void }) {
         <div>
           <div className="font-medium">{formatOutOf(rating.score)}</div>
           <div className="text-muted-foreground text-sm">
-            {brewLabel(rating.brewType)} — {rated}
+            {brewLabel(rating.brewType)} — {ratedShort}
           </div>
         </div>
         <div className="flex gap-1">
@@ -461,7 +560,7 @@ function EditRatingForm({
   );
 }
 
-function AddRatingForm({ beanId }: { beanId: string }) {
+function AddRatingForm({ beanId, onDone }: { beanId: string; onDone: () => void }) {
   const [score, setScore] = useState(DEFAULT_SCORE);
   const [brewType, setBrewType] = useState<BrewType>(DEFAULT_BREW_TYPE);
   const [notes, setNotes] = useState('');
@@ -487,13 +586,23 @@ function AddRatingForm({ beanId }: { beanId: string }) {
       await enqueueUpsert('rating', rating.id);
       setNotes('');
       setScore(DEFAULT_SCORE);
+      // Folds the form away again: the new rating is now the top of the list
+      // directly below, which is the confirmation that it worked.
+      onDone();
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <div className="mt-2 space-y-2">
+    <form
+      aria-label="Add rating"
+      className="mt-2 space-y-2"
+      onSubmit={(e) => {
+        e.preventDefault();
+        void onAdd();
+      }}
+    >
       <div className="flex gap-2">
         <Select value={score} onChange={(e) => setScore(Number(e.target.value))} aria-label="Score">
           {SCORE_OPTIONS.map((n) => (
@@ -520,15 +629,19 @@ function AddRatingForm({ beanId }: { beanId: string }) {
         aria-label="Tasting notes"
         placeholder="Tasting notes (optional)"
       />
-      <div className="flex justify-end">
-        <button
-          onClick={onAdd}
-          disabled={saving}
-          className="bg-primary rounded px-3 py-2 text-white"
-        >
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" size="sm" onClick={onDone} disabled={saving}>
+          Cancel
+        </Button>
+        {/*
+          Was a bare <button> with hand-written classes, which meant it alone
+          ignored the theme — the one control on the page that did not match
+          the rest in dark mode.
+        */}
+        <Button type="submit" size="sm" disabled={saving}>
           {saving ? 'Adding…' : 'Add rating'}
-        </button>
+        </Button>
       </div>
-    </div>
+    </form>
   );
 }

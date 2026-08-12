@@ -106,6 +106,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A coffee's page is now four cards, and its tools stay out of the way.** The
+  page was one long card with six headings in it, most of them forms: an
+  enrichment panel, a photo panel and a rating form, all permanently open, all
+  below the coffee itself. On a phone that ran to about three screens, of which
+  roughly half was forms nobody had asked for. The coffee and its ratings now
+  sit in cards of their own and stay open; **Details from the web** and
+  **Photo** fold away behind a summary line that says what is inside, and
+  **Add rating** opens the form only when it is wanted. A freshly imported
+  coffee no longer prints a row of em dashes for the four things it does not
+  know — it says so once, and points at the tool that fills them in.
+- **Dark mode's cards look like cards.** A card sat four points of lightness
+  above the page, the same step light mode uses — but light mode also gets a
+  pure white surface against a tinted page and a drop shadow that actually
+  lands on it, and neither of those works on a dark background. The step is
+  eight points now, the border is stronger, and the surfaces painted on top of
+  a card moved up with it so a muted badge does not vanish into it.
+  `--destructive` was lightened to stay readable as text on the lighter card,
+  and `src/styles/contrast.test.ts` now pins the separation instead of
+  accepting anything above 1.05:1.
+
 - **A coffee's page now leads with the coffee.** Opening one put the web
   enrichment and photo forms directly under the name, pushing the score, the
   ratings and half the attributes off the screen — so the page opened on its

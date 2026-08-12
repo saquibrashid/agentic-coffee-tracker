@@ -85,6 +85,21 @@ async function stubEnrichmentApi(page: Page, options: { imageUrl?: string } = {}
   });
 }
 
+/**
+ * Unfolds the enrichment panel on a bean page.
+ *
+ * It is collapsed by default now — it is a tool, not something you read — so
+ * reaching its controls takes the same tap a person would make.
+ */
+async function openEnrichPanel(page: Page) {
+  const panel = page.locator('details').filter({ hasText: 'Details from the web' });
+  await expect(panel).toBeVisible({ timeout: 20000 });
+  if (!(await panel.evaluate((el: HTMLDetailsElement) => el.open))) {
+    await panel.locator('summary').click();
+  }
+  await expect(page.getByRole('button', { name: /find details on the web/i })).toBeVisible();
+}
+
 test.describe('Web enrichment', () => {
   test('imports a bean from a product URL and lands on the confirm form', async ({ page }) => {
     await stubEnrichmentApi(page);
@@ -120,6 +135,8 @@ test.describe('Web enrichment', () => {
     await page.getByRole('button', { name: /save coffee/i }).click();
     await expect(page).toHaveURL(/\/beans\//, { timeout: 15000 });
 
+    await openEnrichPanel(page);
+
     await page.getByRole('button', { name: /find details on the web/i }).click();
     await page.getByRole('button', { name: /use this page/i }).click();
 
@@ -153,6 +170,8 @@ test.describe('Web enrichment', () => {
     await roaster.fill('My Local Roaster');
     await page.getByRole('button', { name: /save coffee/i }).click();
     await expect(page).toHaveURL(/\/beans\//, { timeout: 15000 });
+
+    await openEnrichPanel(page);
 
     await page.getByRole('button', { name: /find details on the web/i }).click();
     await page.getByRole('button', { name: /use this page/i }).click();
@@ -212,6 +231,7 @@ test.describe('Web enrichment', () => {
 
     // Now the lookup does find one.
     await stubEnrichmentApi(page, { imageUrl: 'https://mockroaster.example/bag.png' });
+    await openEnrichPanel(page);
     await page.getByRole('button', { name: /find details on the web/i }).click();
     await page.getByRole('button', { name: /use this page/i }).click();
 

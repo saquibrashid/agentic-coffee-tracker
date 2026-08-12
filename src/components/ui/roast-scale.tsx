@@ -91,7 +91,13 @@ export function RoastScale({ level, compact = false, className }: RoastScaleProp
           />
         ))}
       </span>
-      {!compact && <span className="text-meta text-muted-foreground">{ROAST_LABEL[level]}</span>}
+      {!compact && (
+        // Never break "Medium-dark" across lines at its hyphen — in a narrow
+        // column that reads as two different roast levels.
+        <span className="text-meta text-muted-foreground whitespace-nowrap">
+          {ROAST_LABEL[level]}
+        </span>
+      )}
     </span>
   );
 }

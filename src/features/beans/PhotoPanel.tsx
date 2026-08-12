@@ -81,10 +81,12 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
 
   const busy = phase !== 'idle';
 
+  /*
+   * No box and no heading of its own — the CollapsibleCard on the bean page
+   * supplies both. See EnrichPanel for the same note.
+   */
   return (
-    <section className="rounded border p-3">
-      <h3 className="text-sm font-medium">Photo</h3>
-
+    <div>
       {error && (
         <p role="alert" className="text-destructive mt-2 text-sm">
           {error}
@@ -171,6 +173,6 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
           />
         </div>
       )}
-    </section>
+    </div>
   );
 }

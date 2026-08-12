@@ -167,4 +167,34 @@ describe('dark palette is brown rather than near-black', () => {
       expect(saturation, `--${name} saturation`).toBeGreaterThan(15);
     }
   });
+
+  /*
+   * Dark mode has to work harder than light mode to make a card look like a
+   * card, and the shared 1.05 floor above is far too generous to catch it.
+   *
+   * Light mode separates the two surfaces three ways over: a pure white card
+   * against a tinted page, a border, and a drop shadow that actually lands.
+   * On a dark page the shadow is invisible and both surfaces share a hue, so
+   * lightness is the only cue left — which is why it is held to a real number
+   * here. At the original four-point step the cards dissolved into the page.
+   */
+  it('lifts a card clearly off the page', () => {
+    const [, , backgroundL] = dark.get('background')!;
+    const [, , cardL] = dark.get('card')!;
+    expect(cardL - backgroundL).toBeGreaterThanOrEqual(7);
+  });
+
+  /*
+   * Every surface that can be painted *onto* a card — a muted badge, a
+   * secondary button — has to stay distinguishable from it. These sit within
+   * a few points of the card, so raising the card without raising them is an
+   * easy way to make a control silently vanish.
+   */
+  it('keeps stacked surfaces above the card', () => {
+    const [, , cardL] = dark.get('card')!;
+    for (const name of ['secondary', 'muted', 'accent']) {
+      const [, , lightness] = dark.get(name)!;
+      expect(lightness, `--${name} lightness`).toBeGreaterThan(cardL);
+    }
+  });
 });
