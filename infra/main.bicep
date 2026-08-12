@@ -26,11 +26,18 @@ param openAiKey string = ''
 @description('Optional. Azure OpenAI chat deployment name. Defaults to the model this template deploys.')
 param openAiDeployment string = ''
 
-@description('Optional. Azure OpenAI image deployment name, used by /api/studio-photo to re-shoot bag photos as studio product shots. Empty (the default) leaves that endpoint in mock mode, which is deliberate: image generation is billed per image and the image models are not available on every subscription.')
-param openAiImageDeployment string = ''
+@description('Optional. Bring-your-own endpoint for the image model, e.g. https://<name>.services.ai.azure.com/. Leave empty to use the account this template provisions when imageModelName is set.')
+param imageEndpoint string = ''
 
-@description('Optional. Image model for this template to deploy so that openAiImageDeployment has something to point at, e.g. "gpt-image-1". Empty (the default) deploys none. Ignored when openAiImageDeployment names a deployment you already have.')
-param openAiImageModelName string = ''
+@secure()
+@description('Optional. Key for a bring-your-own image resource. Stored in Key Vault, never in app settings.')
+param imageKey string = ''
+
+@description('Optional. Image deployment name, used by /api/studio-photo to re-shoot bag photos as studio product shots. Empty (the default) leaves that endpoint in mock mode, which is deliberate: image generation is billed per image.')
+param imageDeployment string = ''
+
+@description('Optional. MAI image model for this template to deploy, e.g. "MAI-Image-2.5". Empty (the default) deploys none. The image model needs its own account because it is not offered in the region the rest of the stack runs in.')
+param imageModelName string = ''
 
 @description('Optional. Comma-separated hosts the /api/scrape endpoint may fetch. Empty (the default) allows any publicly routable host, which is what lets enrichment read arbitrary roaster storefronts; the endpoint still refuses private, loopback, and link-local addresses on every redirect hop. Set this to pin the deployment to a fixed set of stores.')
 param scrapeAllowlist string = ''
@@ -70,8 +77,10 @@ module resources 'resources.bicep' = {
     openAiEndpoint: openAiEndpoint
     openAiKey: openAiKey
     openAiDeployment: openAiDeployment
-    openAiImageDeployment: openAiImageDeployment
-    openAiImageModelName: openAiImageModelName
+    imageEndpoint: imageEndpoint
+    imageKey: imageKey
+    imageDeployment: imageDeployment
+    imageModelName: imageModelName
     scrapeAllowlist: scrapeAllowlist
     syncAccessMode: syncAccessMode
     syncAllowlist: syncAllowlist

@@ -128,17 +128,35 @@ azd env set AZURE_OPENAI_DEPLOYMENT gpt-4o
 azd env set AZURE_OPENAI_KEY        <key>
 ```
 
-Optional — enable studio product shots. This is a **separate, image-generation
-deployment**; the chat deployment above cannot serve `/images/edits`. Leave it
-unset and `/api/studio-photo` stays in mock mode (it echoes the source photo
-back), which is the default because every generated image is billed.
+Optional — enable studio product shots. This is a **separate account in a
+separate region**, not another deployment on the Azure OpenAI resource: MAI
+image models are not offered in `eastus2`, and they answer on the Foundry host
+under `/mai/v1` rather than the OpenAI-compatible route. Leave it unset and
+`/api/studio-photo` stays in mock mode (it echoes the source photo back), which
+is the default because every generated image is billed.
 
 ```bash
-# Provision one alongside the chat model...
-azd env set AZURE_OPENAI_IMAGE_MODEL      gpt-image-1
-# ...or point at a deployment you already have.
-azd env set AZURE_OPENAI_IMAGE_DEPLOYMENT gpt-image-1
+# Provision an image account and model...
+azd env set AZURE_IMAGE_MODEL      MAI-Image-2.5
+# ...or point at a resource you already have.
+azd env set AZURE_IMAGE_ENDPOINT   https://<your-foundry>.services.ai.azure.com/
+azd env set AZURE_IMAGE_KEY        <key>
+azd env set AZURE_IMAGE_DEPLOYMENT MAI-Image-2.5
 ```
+
+`MAI-Image-2.5` was chosen over `gpt-image-1` on measurements, not preference.
+Static Web Apps abandons a linked-backend call after **45 seconds** and returns
+`Backend call failure`, discarding whatever the function eventually answers:
+
+| model                  | latency | packaging text |
+| ---------------------- | ------- | -------------- |
+| `gpt-image-1` `high`   | ~46s    | preserved      |
+| `gpt-image-1` `medium` | ~25s    | **corrupted**  |
+| `MAI-Image-2.5`        | ~26s    | preserved      |
+
+gpt-image-1 cannot fit inside that window at the only quality setting that
+keeps a label intact — at `medium` it renders "Guji Natural" as "Guij Natural".
+Note that MAI image models are in **preview**, with no SLA.
 
 Optional — upgrade the Static Web App so the SPA reaches the BFF same-origin:
 
@@ -365,9 +383,9 @@ The job needs these repository **variables**:
 | `AZURE_LOCATION`                                                            | Azure region (default `eastus2`)            |
 | `STATIC_WEB_APP_SKU`                                                        | `Free` or `Standard` (default `Free`)       |
 | `AZURE_VISION_ENDPOINT`, `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT` | Non-secret AI config                        |
-| `AZURE_OPENAI_IMAGE_DEPLOYMENT`, `AZURE_OPENAI_IMAGE_MODEL`                 | Optional studio-photo image model           |
+| `AZURE_IMAGE_ENDPOINT`, `AZURE_IMAGE_DEPLOYMENT`, `AZURE_IMAGE_MODEL`       | Optional studio-photo image model           |
 
-Keys go in repository **secrets**: `AZURE_VISION_KEY`, `AZURE_OPENAI_KEY`.
+Keys go in repository **secrets**: `AZURE_VISION_KEY`, `AZURE_OPENAI_KEY`, `AZURE_IMAGE_KEY`.
 
 Configure the federated credential in one step:
 

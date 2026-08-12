@@ -52,14 +52,10 @@ app.http('health', {
         // that store directly, so it is live whenever the model is.
         search: openAi,
         recommend: openAi,
-        // A separate deployment from the chat model: an image model cannot
-        // serve the Responses API and vice versa, so this is live only when
-        // that second deployment is configured.
-        studioPhoto: modeOf(
-          'AZURE_OPENAI_ENDPOINT',
-          'AZURE_OPENAI_KEY',
-          'AZURE_OPENAI_IMAGE_DEPLOYMENT',
-        ),
+        // A separate resource from the chat model, not just a separate
+        // deployment: MAI image models are not offered in every region an Azure
+        // OpenAI account can live in, so they carry their own endpoint and key.
+        studioPhoto: modeOf('AZURE_IMAGE_ENDPOINT', 'AZURE_IMAGE_KEY', 'AZURE_IMAGE_DEPLOYMENT'),
         sync: syncModeOf(
           'COSMOS_ENDPOINT',
           'COSMOS_DATABASE',

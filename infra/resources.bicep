@@ -14,7 +14,10 @@ param openAiEndpoint string
 @secure()
 param openAiKey string
 param openAiDeployment string
-param openAiImageDeployment string
+param imageEndpoint string
+@secure()
+param imageKey string
+param imageDeployment string
 param scrapeAllowlist string
 
 @allowed(['owner', 'allowlist', 'open'])
@@ -38,13 +41,16 @@ param openAiModelVersion string = '2024-11-20'
 @description('Thousands of tokens per minute for the model deployment.')
 param openAiCapacity int = 10
 
-@description('Name of the image model to deploy for /api/studio-photo. Empty (the default) deploys none, which leaves studio shots in mock mode — the image models are not available on every subscription, and each generated image is billed.')
-param openAiImageModelName string = ''
+@description('Name of the MAI image model to deploy for /api/studio-photo. Empty (the default) deploys none, which leaves studio shots in mock mode — the model is in preview, is not available on every subscription, and each generated image is billed.')
+param imageModelName string = ''
 
-param openAiImageModelVersion string = '2025-04-15'
+param imageModelVersion string = '2026-06-02'
 
-@description('Images per minute for the image model deployment.')
-param openAiImageCapacity int = 1
+@description('Region for the image account. MAI image models are offered in a different set of regions than the chat model, so this is deliberately independent of the resource group location.')
+param imageLocation string = 'eastus'
+
+@description('Images per minute for the image model deployment. One image takes roughly 25 seconds, so a small number here is not the bottleneck a bulk re-shoot hits first.')
+param imageCapacity int = 2
 
 @description('Name of the Foundry project created under the Azure OpenAI account. The new Foundry portal only surfaces projects, not bare accounts.')
 param openAiProjectName string = 'coffee-tracker'
@@ -99,13 +105,25 @@ var effectiveOpenAiEndpoint = empty(openAiEndpoint) ? provisionedOpenAiEndpoint 
 var effectiveOpenAiKey = empty(openAiKey) ? openAi.listKeys().key1 : openAiKey
 var effectiveOpenAiDeployment = empty(openAiDeployment) ? openAiModelName : openAiDeployment
 
-// Three states, not two. An operator can point at an image deployment they
-// already have (`openAiImageDeployment`), have this template create one
-// (`openAiImageModelName`), or — the default — have neither, in which case
-// studio shots stay in mock mode and nothing is billed for images.
-var effectiveOpenAiImageDeployment = !empty(openAiImageDeployment)
-  ? openAiImageDeployment
-  : openAiImageModelName
+// Three states, not two. An operator can point at an image resource they
+// already have (`imageEndpoint`/`imageKey`/`imageDeployment`), have this
+// template create one (`imageModelName`), or — the default — have neither, in
+// which case studio shots stay in mock mode and nothing is billed for images.
+var provisionImageAccount = empty(imageEndpoint) && !empty(imageModelName)
+var effectiveImageDeployment = !empty(imageDeployment) ? imageDeployment : imageModelName
+// MAI models answer on the Foundry host, not the `openai.azure.com` one the
+// chat model uses: `/mai/v1/images/edits` does not exist on the latter. The
+// endpoint and key come from the module rather than being composed here, so
+// that a resource which may not exist is only referenced from a scope that
+// deployed it. Safe-dereference because a module that did not run has no
+// outputs, and ARM does not reliably short-circuit the guarding ternary.
+var effectiveImageEndpoint = provisionImageAccount
+  ? (imageAccount.?outputs.endpoint ?? '')
+  : imageEndpoint
+var effectiveImageKey = provisionImageAccount ? (imageAccount.?outputs.key ?? '') : imageKey
+// Derived from parameters, not from `effectiveImageEndpoint`: this gates
+// resource creation, so it has to be computable before the deployment starts.
+var imageConfigured = (provisionImageAccount || !empty(imageEndpoint)) && !empty(effectiveImageDeployment)
 
 // The BFF still falls back to deterministic mocks when a key is absent, which is
 // what local development runs on. In Azure the credentials are always present,
@@ -245,29 +263,28 @@ resource openAiModelDeployment 'Microsoft.CognitiveServices/accounts/deployments
   }
 }
 
-// Only when asked for: the image models require capacity that is not available
-// on every subscription, and a deployment nobody uses still occupies quota.
+// A second account, not a second deployment on the one above.
 //
-// Serialised behind the chat deployment on purpose. Azure rejects concurrent
-// deployment writes to one Cognitive Services account with a conflict, and
-// nothing in the template otherwise orders these two.
-resource openAiImageModelDeployment 'Microsoft.CognitiveServices/accounts/deployments@2026-05-01' =
-  if (!empty(openAiImageModelName)) {
-    parent: openAi
-    name: openAiImageModelName
-    sku: {
-      name: 'GlobalStandard'
-      capacity: openAiImageCapacity
-    }
-    properties: {
-      model: {
-        format: 'OpenAI'
-        name: openAiImageModelName
-        version: openAiImageModelVersion
-      }
-    }
-    dependsOn: [openAiModelDeployment]
+// MAI image models are offered in a different set of regions than the chat
+// model — `eastus2`, where the rest of this stack lives, has none of them — so
+// the image model cannot be a deployment on the existing account no matter how
+// convenient that would be. It answers on the Foundry host under `/mai/v1`
+// rather than the OpenAI-compatible `/openai/v1`, which is why the application
+// reads a separate endpoint and key rather than reusing the chat resource's.
+//
+// Only created when asked for: the models are in preview, need capacity that is
+// not available on every subscription, and each generated image is billed.
+module imageAccount 'imageAccount.bicep' = if (provisionImageAccount) {
+  name: 'image-account'
+  params: {
+    name: '${abbrev.openAi}-img'
+    location: imageLocation
+    tags: tags
+    modelName: imageModelName
+    modelVersion: imageModelVersion
+    capacity: imageCapacity
   }
+}
 
 // ---------------------------------------------------------------------------
 // Key Vault
@@ -297,6 +314,15 @@ resource openAiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
   name: 'azure-openai-key'
   properties: { value: effectiveOpenAiKey }
+}
+
+// Only when there is an image resource to hold a key for. Writing an empty
+// secret would leave the Function App with a Key Vault reference that resolves
+// to nothing, which reads as "configured" to the endpoint.
+resource imageKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (imageConfigured) {
+  parent: keyVault
+  name: 'azure-image-key'
+  properties: { value: effectiveImageKey }
 }
 
 // ---------------------------------------------------------------------------
@@ -521,33 +547,40 @@ var visionSettings = [
   }
 ]
 
-var openAiSettings = concat(
-  [
-    {
-      name: 'AZURE_OPENAI_ENDPOINT'
-      value: effectiveOpenAiEndpoint
-    }
-    {
-      name: 'AZURE_OPENAI_KEY'
-      value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/azure-openai-key/)'
-    }
-    {
-      name: 'AZURE_OPENAI_DEPLOYMENT'
-      value: effectiveOpenAiDeployment
-    }
-  ],
-  // Omitted entirely rather than set empty when no image model is available.
-  // `/api/studio-photo` decides between live and mock on whether this variable
-  // is present, and an empty string would be a third state neither side means.
-  empty(effectiveOpenAiImageDeployment)
-    ? []
-    : [
-        {
-          name: 'AZURE_OPENAI_IMAGE_DEPLOYMENT'
-          value: effectiveOpenAiImageDeployment
-        }
-      ]
-)
+var openAiSettings = [
+  {
+    name: 'AZURE_OPENAI_ENDPOINT'
+    value: effectiveOpenAiEndpoint
+  }
+  {
+    name: 'AZURE_OPENAI_KEY'
+    value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/azure-openai-key/)'
+  }
+  {
+    name: 'AZURE_OPENAI_DEPLOYMENT'
+    value: effectiveOpenAiDeployment
+  }
+]
+
+// Omitted entirely rather than set empty when no image model is available.
+// `/api/studio-photo` decides between live and mock on whether these are
+// present, and an empty string would be a third state neither side means.
+var imageSettings = imageConfigured
+  ? [
+      {
+        name: 'AZURE_IMAGE_ENDPOINT'
+        value: effectiveImageEndpoint
+      }
+      {
+        name: 'AZURE_IMAGE_KEY'
+        value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/azure-image-key/)'
+      }
+      {
+        name: 'AZURE_IMAGE_DEPLOYMENT'
+        value: effectiveImageDeployment
+      }
+    ]
+  : []
 
 // Every value here is a deterministic string, never a property of the
 // conditional resources above. Referencing `cosmos.properties.documentEndpoint`
@@ -670,7 +703,13 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         ]
         supportCredentials: false
       }
-      appSettings: concat(baseAppSettings, visionSettings, openAiSettings, syncSettings)
+      appSettings: concat(
+        baseAppSettings,
+        visionSettings,
+        openAiSettings,
+        imageSettings,
+        syncSettings
+      )
     }
   }
   dependsOn: [

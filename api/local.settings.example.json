@@ -9,7 +9,9 @@
     "AZURE_OPENAI_ENDPOINT": "",
     "AZURE_OPENAI_KEY": "",
     "AZURE_OPENAI_DEPLOYMENT": "",
-    "AZURE_OPENAI_IMAGE_DEPLOYMENT": "",
+    "AZURE_IMAGE_ENDPOINT": "",
+    "AZURE_IMAGE_KEY": "",
+    "AZURE_IMAGE_DEPLOYMENT": "",
     "SCRAPE_ALLOWLIST": "",
     "ALLOWED_ORIGINS": "http://localhost:5173"
   },

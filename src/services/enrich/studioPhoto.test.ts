@@ -114,7 +114,7 @@ describe('sourcePhotoFor', () => {
 describe('prepareStudioPhoto', () => {
   it('stages the generated image without writing anything', async () => {
     await db.photos.add(photo('p1'));
-    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-openai' });
+    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-mai' });
 
     const candidate = await prepareStudioPhoto(bean('b1', 'p1'));
 
@@ -129,7 +129,7 @@ describe('prepareStudioPhoto', () => {
       photo('original'),
       photo('studio', { kind: 'bag-studio', sourcePhotoId: 'original' }),
     ]);
-    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-openai' });
+    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-mai' });
 
     const candidate = await prepareStudioPhoto(bean('b1', 'studio'));
 
@@ -147,7 +147,7 @@ describe('applyStudioPhoto', () => {
     await db.photos.add(photo('p1'));
     const b = bean('b1', 'p1');
     await db.beans.add(b);
-    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-openai' });
+    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-mai' });
 
     const update = await applyStudioPhoto(b, await prepareStudioPhoto(b));
 
@@ -161,7 +161,7 @@ describe('applyStudioPhoto', () => {
     await db.photos.add(photo('p1'));
     const b = bean('b1', 'p1');
     await db.beans.add(b);
-    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-openai' });
+    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-mai' });
 
     await applyStudioPhoto(b, await prepareStudioPhoto(b));
 
@@ -177,7 +177,7 @@ describe('applyStudioPhoto', () => {
     ]);
     const b = bean('b1', 'old-studio');
     await db.beans.add(b);
-    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-openai' });
+    generateStudioPhoto.mockResolvedValue({ ...generated(), provider: 'azure-mai' });
 
     await applyStudioPhoto(b, await prepareStudioPhoto(b));
 
