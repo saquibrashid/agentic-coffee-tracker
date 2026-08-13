@@ -10,9 +10,19 @@
  * and is often imperfect, so the user gets to correct it before the prediction
  * is drawn — and the correction costs nothing, because the estimate is local.
  */
-import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Sparkles, ThumbsDown, ThumbsUp, HelpCircle } from 'lucide-react';
+import {
+  CheckCircle2,
+  HelpCircle,
+  Image,
+  Link2,
+  LoaderCircle,
+  RotateCcw,
+  Sparkles,
+  ThumbsDown,
+  ThumbsUp,
+} from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -78,11 +88,151 @@ const EMPTY_FORM: FormState = {
   tastingNotes: '',
 };
 
+type BusyKind = 'photo' | 'link';
+type ProcessingStage = 'preparing' | 'reading' | 'interpreting';
+
+type CheckSource =
+  { kind: 'photo'; previewUrl: string; name: string } | { kind: 'link'; url: string; host: string };
+
+const STAGE_COPY: Record<
+  BusyKind,
+  Record<ProcessingStage, { title: string; description: string }>
+> = {
+  photo: {
+    preparing: {
+      title: 'Preparing your photo',
+      description: 'Optimizing the image so the label is clear enough to read.',
+    },
+    reading: {
+      title: 'Reading the bag',
+      description: 'Looking for the roaster, origin, process, roast, and tasting notes.',
+    },
+    interpreting: {
+      title: 'Interpreting the details',
+      description: 'Turning the label into fields you can review before the verdict.',
+    },
+  },
+  link: {
+    preparing: {
+      title: 'Opening the coffee page',
+      description: 'Fetching readable product information from the source.',
+    },
+    reading: {
+      title: 'Reading the coffee details',
+      description: 'Looking for the roaster, origin, process, roast, and tasting notes.',
+    },
+    interpreting: {
+      title: 'Interpreting the details',
+      description: 'Turning the page into fields you can review before the verdict.',
+    },
+  },
+};
+
 function splitList(value: string): string[] {
   return value
     .split(/[;,\n]/)
     .map((part) => part.trim())
     .filter(Boolean);
+}
+
+function sourceFromUrl(value: string): CheckSource {
+  const parsed = new URL(value);
+  return { kind: 'link', url: parsed.toString(), host: parsed.hostname.replace(/^www\./, '') };
+}
+
+function ProcessingPanel({
+  kind,
+  stage,
+  onCancel,
+}: {
+  kind: BusyKind;
+  stage: ProcessingStage;
+  onCancel: () => void;
+}) {
+  const copy = STAGE_COPY[kind][stage];
+  const stages: ProcessingStage[] = ['preparing', 'reading', 'interpreting'];
+  const activeIndex = stages.indexOf(stage);
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="from-primary/12 via-accent/65 to-card overflow-hidden rounded-lg border bg-linear-to-br p-5 shadow-sm"
+    >
+      <div className="flex items-start gap-4">
+        <div className="bg-primary text-primary-foreground flex size-12 shrink-0 items-center justify-center rounded-full">
+          <LoaderCircle className="size-6 motion-safe:animate-spin" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-meta text-primary">Working on your coffee</p>
+          <p className="font-display mt-1 text-xl font-semibold">{copy.title}</p>
+          <p className="text-muted-foreground mt-1 text-sm">{copy.description}</p>
+          <ol className="mt-4 grid grid-cols-3 gap-2" aria-label="Processing stages">
+            {stages.map((item, index) => (
+              <li
+                key={item}
+                className={`rounded-md border px-2 py-2 text-center text-xs ${
+                  index <= activeIndex
+                    ? 'border-primary/35 bg-primary/10 text-foreground'
+                    : 'bg-card/50 text-muted-foreground'
+                }`}
+              >
+                {index < activeIndex ? (
+                  <CheckCircle2 className="mx-auto mb-1 size-4" aria-hidden="true" />
+                ) : (
+                  <span
+                    className={`mx-auto mb-1 block size-4 rounded-full border ${
+                      index === activeIndex
+                        ? 'border-primary bg-primary'
+                        : 'border-muted-foreground'
+                    }`}
+                    aria-hidden="true"
+                  />
+                )}
+                {item === 'preparing' ? 'Prepare' : item === 'reading' ? 'Read' : 'Review'}
+              </li>
+            ))}
+          </ol>
+          <Button type="button" variant="ghost" size="sm" className="mt-3" onClick={onCancel}>
+            Cancel and start over
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SourcePreview({ source }: { source: CheckSource }) {
+  return (
+    <div className="bg-muted/45 overflow-hidden rounded-lg border">
+      {source.kind === 'photo' ? (
+        <img
+          src={source.previewUrl}
+          alt={`Selected coffee bag: ${source.name}`}
+          className="max-h-72 w-full object-contain"
+        />
+      ) : (
+        <div className="flex min-h-36 items-center justify-center bg-linear-to-br from-amber-100 to-stone-200 p-6 dark:from-amber-950 dark:to-stone-900">
+          <Link2 className="text-primary size-12" aria-hidden="true" />
+        </div>
+      )}
+      <div className="bg-card flex items-center gap-3 border-t px-4 py-3">
+        {source.kind === 'photo' ? (
+          <Image className="text-primary size-5 shrink-0" aria-hidden="true" />
+        ) : (
+          <Link2 className="text-primary size-5 shrink-0" aria-hidden="true" />
+        )}
+        <div className="min-w-0">
+          <p className="text-meta text-muted-foreground">
+            {source.kind === 'photo' ? 'Selected photo' : 'Source page'}
+          </p>
+          <p className="truncate text-sm font-medium">
+            {source.kind === 'photo' ? source.name : source.host}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** Folds a parsed bag or product page into the form the user can correct. */
@@ -166,12 +316,30 @@ function VerdictCard({ prediction }: { prediction: Prediction }) {
 
 export function PredictPage() {
   const index = useLiveQuery(() => loadPredictionIndex(), []);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const requestRef = useRef(0);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [url, setUrl] = useState('');
-  const [busy, setBusy] = useState<'photo' | 'link' | null>(null);
+  const [busy, setBusy] = useState<BusyKind | null>(null);
+  const [stage, setStage] = useState<ProcessingStage>('preparing');
+  const [source, setSource] = useState<CheckSource | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  function startSession(nextSource: CheckSource | null, kind: BusyKind): number {
+    const requestId = requestRef.current + 1;
+    requestRef.current = requestId;
+    setForm(EMPTY_FORM);
+    setPrediction(null);
+    setError(null);
+    setNotice(null);
+    setSource(nextSource);
+    if (kind === 'photo') setUrl('');
+    setBusy(kind);
+    setStage('preparing');
+    return requestId;
+  }
 
   function update(patch: Partial<FormState>) {
     setForm((current) => ({ ...current, ...patch }));
@@ -191,13 +359,17 @@ export function PredictPage() {
   async function handlePhoto(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
-    setError(null);
-    setNotice(null);
-    setBusy('photo');
+    const requestId = startSession(null, 'photo');
     try {
       const dataUrl = await readFileAsDataUrl(file);
+      if (requestId !== requestRef.current) return;
+      setSource({ kind: 'photo', previewUrl: dataUrl, name: file.name || 'Coffee bag' });
       const resized = await resizeDataUrl(dataUrl, 1600);
+      if (requestId !== requestRef.current) return;
+      setStage('reading');
       const result = await extractBeanFromPhoto(dataUrlToBlob(resized.dataUrl));
+      if (requestId !== requestRef.current) return;
+      setStage('interpreting');
       if (!result.parsed) {
         setError('We could not read that label. Try typing the details below.');
         return;
@@ -210,9 +382,10 @@ export function PredictPage() {
           : 'Read from the photo. Correct anything below, then check the verdict.',
       );
     } catch (err) {
+      if (requestId !== requestRef.current) return;
       setError(describeFailure(err, 'Something went wrong reading that photo.'));
     } finally {
-      setBusy(null);
+      if (requestId === requestRef.current) setBusy(null);
       // Let the same file be chosen again after a failure.
       event.target.value = '';
     }
@@ -222,18 +395,26 @@ export function PredictPage() {
     event.preventDefault();
     const trimmed = url.trim();
     if (!trimmed) return;
-    setError(null);
-    setNotice(null);
-    setBusy('link');
+    let nextSource: CheckSource;
+    try {
+      nextSource = sourceFromUrl(trimmed);
+    } catch {
+      setError('Enter a valid coffee page URL.');
+      return;
+    }
+    const requestId = startSession(nextSource, 'link');
     try {
       const enriched = await enrichFromUrl(trimmed);
+      if (requestId !== requestRef.current) return;
+      setStage('interpreting');
       setForm(formFromParsed(enriched.parsed));
       setPrediction(null);
       setNotice('Read from that page. Correct anything below, then check the verdict.');
     } catch (err) {
+      if (requestId !== requestRef.current) return;
       setError(describeFailure(err, 'Could not read that link.'));
     } finally {
-      setBusy(null);
+      if (requestId === requestRef.current) setBusy(null);
     }
   }
 
@@ -254,12 +435,22 @@ export function PredictPage() {
     );
   }
 
-  function reset() {
+  function reset({ focus = false }: { focus?: boolean } = {}) {
+    requestRef.current += 1;
     setForm(EMPTY_FORM);
     setPrediction(null);
     setUrl('');
+    setBusy(null);
+    setStage('preparing');
+    setSource(null);
     setError(null);
     setNotice(null);
+    if (focus) {
+      requestAnimationFrame(() => {
+        photoInputRef.current?.focus();
+        photoInputRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+      });
+    }
   }
 
   const hasAnyDetail =
@@ -308,6 +499,7 @@ export function PredictPage() {
               Photo of the bag
             </label>
             <input
+              ref={photoInputRef}
               id="predict-photo"
               type="file"
               accept="image/*"
@@ -330,6 +522,7 @@ export function PredictPage() {
                 placeholder="https://roaster.example/coffee"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
+                disabled={busy !== null}
                 className="flex-1"
               />
               <Button type="submit" variant="outline" disabled={busy !== null || !url.trim()}>
@@ -338,11 +531,6 @@ export function PredictPage() {
             </div>
           </form>
 
-          {busy === 'photo' && (
-            <p role="status" className="text-muted-foreground text-sm">
-              Reading the label…
-            </p>
-          )}
           {error && (
             <p role="alert" className="text-destructive text-sm">
               {error}
@@ -356,6 +544,10 @@ export function PredictPage() {
         </CardContent>
       </Card>
 
+      {busy && (
+        <ProcessingPanel kind={busy} stage={stage} onCancel={() => reset({ focus: true })} />
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">The coffee</CardTitle>
@@ -364,7 +556,8 @@ export function PredictPage() {
             the answer.
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
+          {source && <SourcePreview source={source} />}
           <form onSubmit={handlePredict} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -375,6 +568,7 @@ export function PredictPage() {
                   id="predict-roaster"
                   value={form.roaster}
                   onChange={(e) => update({ roaster: e.target.value })}
+                  disabled={busy !== null}
                 />
               </div>
               <div>
@@ -386,6 +580,7 @@ export function PredictPage() {
                   placeholder="Ethiopia, Colombia"
                   value={form.origin}
                   onChange={(e) => update({ origin: e.target.value })}
+                  disabled={busy !== null}
                 />
               </div>
               <div>
@@ -396,6 +591,7 @@ export function PredictPage() {
                   id="predict-process"
                   value={form.process}
                   onChange={(e) => update({ process: e.target.value as Process | '' })}
+                  disabled={busy !== null}
                 >
                   {PROCESS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -412,6 +608,7 @@ export function PredictPage() {
                   id="predict-roast"
                   value={form.roastLevel}
                   onChange={(e) => update({ roastLevel: e.target.value as RoastLevel | '' })}
+                  disabled={busy !== null}
                 >
                   {ROAST_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -431,25 +628,29 @@ export function PredictPage() {
                 placeholder="blueberry, cocoa, jasmine"
                 value={form.tastingNotes}
                 onChange={(e) => update({ tastingNotes: e.target.value })}
+                disabled={busy !== null}
               />
             </div>
 
             <div className="flex gap-2">
-              <Button type="submit" disabled={!hasAnyDetail}>
+              <Button type="submit" disabled={busy !== null || !hasAnyDetail}>
                 <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
                 Will I like it?
               </Button>
               {hasAnyDetail && (
-                <Button type="button" variant="ghost" onClick={reset}>
-                  Clear
+                <Button type="button" variant="ghost" onClick={() => reset()}>
+                  Start over
                 </Button>
               )}
             </div>
           </form>
 
           {prediction && (
-            <div className="mt-4">
+            <div className="space-y-3">
               <VerdictCard prediction={prediction} />
+              <Button type="button" variant="outline" onClick={() => reset({ focus: true })}>
+                <RotateCcw aria-hidden="true" /> Check another coffee
+              </Button>
             </div>
           )}
         </CardContent>
