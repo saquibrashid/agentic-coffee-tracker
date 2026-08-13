@@ -192,6 +192,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Home shows the bag.** The library has led with each coffee's photo for a
+  while; home's recent list was still text alone, so the two grids of the same
+  coffees looked unrelated and the one you land on first was the harder to scan.
+  A coffee with no photo keeps a placeholder tile so the titles stay in line.
+
 - **Coffees are now found on roasters who don't run Shopify.** Looking a coffee
   up asked the roaster's own store for it, which is free and works for most
   roasters — but only because most run Shopify and expose a search endpoint. A

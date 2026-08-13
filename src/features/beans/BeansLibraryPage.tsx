@@ -19,6 +19,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import { BeanFilters } from './BeanFilters';
+import { BeanThumbnail } from './BeanThumbnail';
 import {
   DEFAULT_FILTERS,
   collectFacets,
@@ -267,20 +268,7 @@ function BeanRow({
             aria-label={`Select ${bean.name}`}
           />
         )}
-        {bean.thumbnailDataUrl ? (
-          <img
-            src={bean.thumbnailDataUrl}
-            alt=""
-            className="size-14 shrink-0 rounded object-cover"
-          />
-        ) : (
-          <div
-            className="bg-muted flex size-14 shrink-0 items-center justify-center rounded"
-            aria-hidden="true"
-          >
-            <Coffee className="text-muted-foreground size-6" />
-          </div>
-        )}
+        <BeanThumbnail dataUrl={bean.thumbnailDataUrl} />
         <div className="min-w-0 flex-1">
           <CardTitle className="truncate text-base">{bean.name}</CardTitle>
           <CardDescription className="truncate">{bean.roaster}</CardDescription>

@@ -8,6 +8,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { EmptyState } from '@/components/ui/empty-state';
 import { RoastScale } from '@/components/ui/roast-scale';
 import { Skeleton } from '@/components/ui/skeleton';
+import { BeanThumbnail } from '@/features/beans/BeanThumbnail';
 
 export function HomePage() {
   const beans = useLiveQuery(() => db.beans.orderBy('createdAt').reverse().limit(6).toArray(), []);
@@ -52,10 +53,13 @@ export function HomePage() {
             <li key={b.id}>
               <Link to={`/beans/${b.id}`} className="block">
                 <Card className="h-full transition hover:shadow-md">
-                  <CardHeader>
-                    <CardTitle className="text-lg">{b.name}</CardTitle>
-                    <CardDescription>{b.roaster}</CardDescription>
-                    <RoastScale level={b.roastLevel} compact className="pt-1" />
+                  <CardHeader className="flex-row items-start gap-3 space-y-0">
+                    <BeanThumbnail dataUrl={b.thumbnailDataUrl} />
+                    <div className="min-w-0 flex-1">
+                      <CardTitle className="line-clamp-2 text-lg">{b.name}</CardTitle>
+                      <CardDescription className="truncate">{b.roaster}</CardDescription>
+                      <RoastScale level={b.roastLevel} compact className="pt-1" />
+                    </div>
                   </CardHeader>
                 </Card>
               </Link>
