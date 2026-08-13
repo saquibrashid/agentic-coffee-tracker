@@ -97,7 +97,9 @@ describe('PredictPage check sessions', () => {
     await user.upload(input, new File(['image'], 'epilogue.jpg', { type: 'image/jpeg' }));
 
     expect(await screen.findByText(/working on your coffee/i)).toBeInTheDocument();
-    expect(screen.getByRole('img', { name: /selected coffee bag: epilogue.jpg/i })).toBeVisible();
+    expect(
+      await screen.findByRole('img', { name: /selected coffee bag: epilogue.jpg/i }),
+    ).toBeVisible();
 
     finish?.({
       parsed,
