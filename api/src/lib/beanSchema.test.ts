@@ -137,4 +137,16 @@ describe('PARSED_BEAN_SCHEMA', () => {
   it('forbids extra properties so structured outputs stay strict', () => {
     expect(PARSED_BEAN_SCHEMA.additionalProperties).toBe(false);
   });
+
+  /*
+   * The schema is the only per-field instruction the model gets. A pasted
+   * "About" paragraph came back with `roasterDescription: null` because the
+   * field was declared as a bare nullable string and nothing said what belongs
+   * in it — the type alone leaves the model to guess from the name.
+   */
+  it('tells the model what the free-text fields are for', () => {
+    expect(PARSED_BEAN_SCHEMA.properties.roasterDescription.description).toMatch(/prose|story/i);
+    expect(PARSED_BEAN_SCHEMA.properties.tastingNotes.description).toBeTruthy();
+    expect(PARSED_BEAN_SCHEMA.properties.varietals.description).toBeTruthy();
+  });
 });

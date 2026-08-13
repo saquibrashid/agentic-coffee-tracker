@@ -11,6 +11,7 @@ import {
   parseJsonOutput,
   type OpenAiConfig,
 } from '../lib/openai.js';
+import { PARSE_SYSTEM_PROMPT } from '../lib/parsePrompt.js';
 import {
   PARSED_BEAN_SCHEMA,
   mockParsedBean,
@@ -22,8 +23,6 @@ interface ParseRequest {
   ocrText?: unknown;
   model?: unknown;
 }
-
-const PARSE_SYSTEM_PROMPT = `You extract structured coffee bean metadata from OCR text of a coffee bag. Return ONLY fields present in or strongly implied by the text. Use null for anything unknown — do not guess. Normalize roast level and process to the provided enums. Output must match the supplied JSON schema exactly.`;
 
 interface RawParseResult {
   parsed: unknown;
@@ -38,7 +37,7 @@ async function callAzureOpenAi(
 ): Promise<RawParseResult> {
   const result = await callResponses(config, {
     system: PARSE_SYSTEM_PROMPT,
-    user: `Extract a bean object from this OCR text:\n\n${ocrText}`,
+    user: `Extract a bean object from this text:\n\n${ocrText}`,
     format: {
       type: 'json_schema',
       name: 'parsed_bean',

@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Pasted and scraped descriptions are no longer thrown away.** Text you paste,
+  a scraped product page and an imported PDF all go through the same extraction
+  prompt, which described its input as OCR of a bag label and told the model not
+  to guess. A roaster's several-paragraph story about a coffee therefore had no
+  field to land in and came back empty, along with the tasting notes buried in
+  it. The prompt now names the sources it actually receives and sends prose
+  about the coffee to "From the roaster".
+
 - **"Needs review" can now be answered.** The library badged a coffee as needing
   review, but its own page never mentioned the flag and nothing outside the
   photo-capture flow could clear it — and since accepting any web suggestion
