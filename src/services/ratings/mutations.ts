@@ -1,5 +1,6 @@
 import { db } from '@/services/db';
 import { MAX_SCORE, MIN_SCORE, SCORE_STEP, isValidScore } from '@/services/ratings/scale';
+import { localDateInputValue } from '@/services/ratings/date';
 import { enqueueDelete, enqueueUpsert } from '@/services/sync/outbox';
 import type { BrewType, Rating } from '@/types';
 
@@ -14,6 +15,7 @@ import type { BrewType, Rating } from '@/types';
 export interface RatingEdit {
   score: number;
   brewType: BrewType;
+  ratedAt: string;
   notes?: string;
 }
 
@@ -32,8 +34,16 @@ function assertValidScore(score: number): void {
   }
 }
 
+function assertValidRatedAt(ratedAt: string): void {
+  if (Number.isNaN(Date.parse(ratedAt))) throw new RangeError('Rating date must be valid');
+  if (ratedAt.slice(0, 10) > localDateInputValue()) {
+    throw new RangeError('Rating date cannot be in the future');
+  }
+}
+
 export async function updateRating(id: string, edit: RatingEdit): Promise<Rating> {
   assertValidScore(edit.score);
+  assertValidRatedAt(edit.ratedAt);
 
   return db.transaction('rw', [db.ratings, db.outbox], async () => {
     const existing = await db.ratings.get(id);
@@ -44,6 +54,7 @@ export async function updateRating(id: string, edit: RatingEdit): Promise<Rating
       ...existing,
       score: edit.score,
       brewType: edit.brewType,
+      ratedAt: edit.ratedAt,
       updatedAt: new Date().toISOString(),
       ...(notes ? { notes } : {}),
     };

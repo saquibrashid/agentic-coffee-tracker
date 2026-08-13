@@ -258,14 +258,79 @@ describe('BeanDetailPage', () => {
     });
   });
 
-  it('keeps removing a coffee last, away from the details', async () => {
+  it('makes coffee management visible in the primary coffee card', async () => {
     renderPage();
 
-    const remove = await screen.findByRole('button', { name: /remove coffee/i });
-    const photo = screen.getByRole('heading', { name: 'Photo' });
-    // A destructive action sat top-right of the title, one mis-tap from the
-    // name of the coffee being read.
-    expect(photo.compareDocumentPosition(remove)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    const remove = await screen.findByRole('button', { name: /^remove$/i });
+    const ratings = screen.getByRole('heading', { name: 'Ratings' });
+    expect(remove.compareDocumentPosition(ratings)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.getByText(/manage this coffee/i)).toBeInTheDocument();
+  });
+
+  it('names the coffee and its dependent records before removal', async () => {
+    const user = userEvent.setup();
+    await db.ratings.add(makeRating('r1', 8));
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /^remove$/i }));
+
+    expect(
+      await screen.findByRole('heading', { name: `Remove ${bean.name}?`, hidden: true }),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/1 coffee, 1 rating/i)).toBeInTheDocument();
+  });
+
+  it('adds a rating with a historical date', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /add rating/i }));
+    const form = screen.getByRole('form', { name: 'Add rating' });
+    const date = within(form).getByLabelText(/date rated/i);
+    await user.clear(date);
+    await user.type(date, '2020-05-04');
+    await user.click(within(form).getByRole('button', { name: /add rating/i }));
+
+    await waitFor(async () => {
+      const stored = await db.ratings.toArray();
+      expect(stored).toHaveLength(1);
+      expect(stored[0]?.ratedAt).toBe('2020-05-04T12:00:00.000Z');
+    });
+    expect(await screen.findByText(/May 4, 2020/i)).toBeInTheDocument();
+  });
+
+  it('edits a rating date without changing its creation date', async () => {
+    const user = userEvent.setup();
+    await db.ratings.add(makeRating('r1', 8));
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /edit rating/i }));
+    const form = screen.getByRole('form', { name: 'Edit rating' });
+    const date = within(form).getByLabelText(/date rated/i);
+    await user.clear(date);
+    await user.type(date, '2020-05-04');
+    await user.click(within(form).getByRole('button', { name: /save rating/i }));
+
+    await waitFor(async () => {
+      const stored = await db.ratings.get('r1');
+      expect(stored?.ratedAt).toBe('2020-05-04T08:00:00.000Z');
+      expect(stored?.createdAt).toBe('2026-07-01T08:00:00.000Z');
+    });
+  });
+
+  it('orders rating history by the corrected rating date', async () => {
+    await db.ratings.bulkAdd([
+      makeRating('older', 7),
+      {
+        ...makeRating('newer', 9),
+        ratedAt: '2026-08-01T08:00:00.000Z',
+      },
+    ]);
+    renderPage();
+
+    const items = within(await screen.findByRole('list')).getAllByRole('listitem');
+    expect(items[0]).toHaveTextContent('Aug 1, 2026');
+    expect(items[1]).toHaveTextContent('Jul 1, 2026');
   });
 
   /*

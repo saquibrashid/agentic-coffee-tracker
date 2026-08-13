@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { RoastScale } from '@/components/ui/roast-scale';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,6 +18,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { markBeanReviewed } from '@/services/beans/review';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
+import {
+  dateInputToRatedAt,
+  localDateInputValue,
+  ratedAtToDateInput,
+} from '@/services/ratings/date';
 import { enqueueUpsert } from '@/services/sync/outbox';
 import {
   DEFAULT_SCORE,
@@ -259,10 +266,11 @@ export function BeanDetailPage() {
   const bean = useLiveQuery(() => (beanId ? db.beans.get(beanId) : undefined), [beanId]);
   // Queried once here rather than inside the list, so the score beside the name
   // and the ratings below it can never disagree with each other mid-update.
-  const ratings = useLiveQuery(
-    () => (beanId ? db.ratings.where('beanId').equals(beanId).reverse().toArray() : []),
-    [beanId],
-  );
+  const ratings = useLiveQuery(async () => {
+    if (!beanId) return [];
+    const records = await db.ratings.where('beanId').equals(beanId).toArray();
+    return records.sort((a, b) => b.ratedAt.localeCompare(a.ratedAt));
+  }, [beanId]);
 
   const [pendingSummary, setPendingSummary] = useState<DeletionSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -422,6 +430,23 @@ export function BeanDetailPage() {
               </a>
             </p>
           )}
+          <div className="mt-5 flex items-center justify-between gap-3 border-t pt-4">
+            <div>
+              <p className="text-sm font-medium">Manage this coffee</p>
+              <p className="text-muted-foreground text-xs">
+                Remove it and its attached ratings or photos.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-destructive hover:text-destructive shrink-0"
+              onClick={() => void requestDelete(beanIdForDelete)}
+            >
+              <Trash2 aria-hidden="true" /> Remove
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
@@ -445,25 +470,6 @@ export function BeanDetailPage() {
         <PhotoPanel bean={bean} />
       </CollapsibleCard>
 
-      {/*
-        Quiet and last. Removing a coffee is rare and unrecoverable, so it gets
-        the least emphasis on the page rather than the most — it was previously
-        a filled red button, which drew the eye straight to the one control
-        nobody opens this page to use. The confirmation dialog is what actually
-        protects the record.
-      */}
-      <div className="flex justify-end pt-2">
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="text-muted-foreground hover:text-destructive"
-          onClick={() => void requestDelete(beanIdForDelete)}
-        >
-          <Trash2 aria-hidden="true" /> Remove coffee
-        </Button>
-      </div>
-
       {deleteError && !pendingSummary && (
         <p role="alert" className="text-destructive text-sm">
           {deleteError}
@@ -475,6 +481,7 @@ export function BeanDetailPage() {
         summary={pendingSummary}
         busy={deleting}
         error={deleteError}
+        coffeeName={bean.name}
         onConfirm={() => void confirmDelete(beanIdForDelete)}
         onCancel={() => {
           setPendingSummary(null);
@@ -569,16 +576,10 @@ function RatingRow({ rating, onEdit }: { rating: Rating; onEdit: () => void }) {
     }
   }
 
-  // The date is what tells two ratings of the same coffee apart, so it belongs
-  // in the accessible name of the per-row buttons — at full precision, since
-  // two cups of the same coffee on one day are not unusual.
-  const rated = new Date(rating.ratedAt).toLocaleString();
-  // On screen the seconds are noise: they wrapped the line and said nothing.
-  const ratedShort = new Date(rating.ratedAt).toLocaleDateString(undefined, {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  // The date distinguishes rating rows and belongs in each action's accessible
+  // name. The app currently edits dates, not times, so calendar precision is
+  // the same information the form exposes.
+  const rated = formatDay(rating.ratedAt);
 
   return (
     <>
@@ -586,7 +587,7 @@ function RatingRow({ rating, onEdit }: { rating: Rating; onEdit: () => void }) {
         <div>
           <div className="font-medium">{formatOutOf(rating.score)}</div>
           <div className="text-muted-foreground text-sm">
-            {brewLabel(rating.brewType)} — {ratedShort}
+            {brewLabel(rating.brewType)} — {rated}
           </div>
         </div>
         <div className="flex gap-1">
@@ -646,6 +647,7 @@ function EditRatingForm({
 }) {
   const [score, setScore] = useState(rating.score);
   const [brewType, setBrewType] = useState<BrewType>(rating.brewType);
+  const [ratedDate, setRatedDate] = useState(ratedAtToDateInput(rating.ratedAt));
   const [notes, setNotes] = useState(rating.notes ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -654,7 +656,12 @@ function EditRatingForm({
     setSaving(true);
     setError(null);
     try {
-      await updateRating(rating.id, { score, brewType, notes });
+      await updateRating(rating.id, {
+        score,
+        brewType,
+        ratedAt: dateInputToRatedAt(ratedDate, rating.ratedAt),
+        notes,
+      });
       onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save this rating.');
@@ -692,6 +699,19 @@ function EditRatingForm({
           ))}
         </Select>
       </div>
+      <div>
+        <Label htmlFor={`rating-date-${rating.id}`} className="mb-1 block">
+          Date rated
+        </Label>
+        <Input
+          id={`rating-date-${rating.id}`}
+          type="date"
+          value={ratedDate}
+          max={localDateInputValue()}
+          onChange={(e) => setRatedDate(e.target.value)}
+          required
+        />
+      </div>
       <Textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
@@ -718,11 +738,14 @@ function EditRatingForm({
 function AddRatingForm({ beanId, onDone }: { beanId: string; onDone: () => void }) {
   const [score, setScore] = useState(DEFAULT_SCORE);
   const [brewType, setBrewType] = useState<BrewType>(DEFAULT_BREW_TYPE);
+  const [ratedDate, setRatedDate] = useState(localDateInputValue);
   const [notes, setNotes] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   async function onAdd() {
     setSaving(true);
+    setError(null);
     try {
       const now = new Date().toISOString();
       const rating: Rating = {
@@ -731,7 +754,7 @@ function AddRatingForm({ beanId, onDone }: { beanId: string; onDone: () => void 
         beanId,
         score,
         brewType,
-        ratedAt: now,
+        ratedAt: dateInputToRatedAt(ratedDate),
         createdAt: now,
         updatedAt: now,
         // Only set when non-empty; an empty string is not a note.
@@ -741,9 +764,12 @@ function AddRatingForm({ beanId, onDone }: { beanId: string; onDone: () => void 
       await enqueueUpsert('rating', rating.id);
       setNotes('');
       setScore(DEFAULT_SCORE);
+      setRatedDate(localDateInputValue());
       // Folds the form away again: the new rating is now the top of the list
       // directly below, which is the confirmation that it worked.
       onDone();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add this rating.');
     } finally {
       setSaving(false);
     }
@@ -778,12 +804,30 @@ function AddRatingForm({ beanId, onDone }: { beanId: string; onDone: () => void 
           ))}
         </Select>
       </div>
+      <div>
+        <Label htmlFor={`new-rating-date-${beanId}`} className="mb-1 block">
+          Date rated
+        </Label>
+        <Input
+          id={`new-rating-date-${beanId}`}
+          type="date"
+          value={ratedDate}
+          max={localDateInputValue()}
+          onChange={(e) => setRatedDate(e.target.value)}
+          required
+        />
+      </div>
       <Textarea
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
         aria-label="Tasting notes"
         placeholder="Tasting notes (optional)"
       />
+      {error && (
+        <p role="alert" className="text-destructive text-sm">
+          {error}
+        </p>
+      )}
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" size="sm" onClick={onDone} disabled={saving}>
           Cancel
