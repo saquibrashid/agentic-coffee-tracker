@@ -144,7 +144,7 @@ export function BeansLibraryPage() {
             </Button>
           ) : (
             <Button type="button" variant="outline" size="sm" onClick={() => setSelecting(true)}>
-              Select
+              Manage
             </Button>
           )}
         </div>
@@ -158,9 +158,12 @@ export function BeansLibraryPage() {
 
       {selecting && (
         <div className="border-border bg-muted/40 flex flex-wrap items-center justify-between gap-3 rounded-md border p-3">
-          <p className="text-sm" role="status">
-            {selected.size} selected
-          </p>
+          <div>
+            <p className="text-sm font-medium">Select coffees to remove</p>
+            <p className="text-muted-foreground text-xs" role="status">
+              {selected.size} selected
+            </p>
+          </div>
           <div className="flex gap-2">
             <Button
               type="button"
@@ -184,7 +187,7 @@ export function BeansLibraryPage() {
               disabled={selected.size === 0}
               onClick={() => void requestDelete()}
             >
-              <Trash2 aria-hidden="true" /> Remove
+              <Trash2 aria-hidden="true" /> Remove selected
             </Button>
           </div>
         </div>

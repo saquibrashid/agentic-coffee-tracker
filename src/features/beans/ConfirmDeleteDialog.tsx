@@ -6,6 +6,7 @@ export interface ConfirmDeleteDialogProps {
   summary: DeletionSummary | null;
   busy: boolean;
   error: string | null;
+  coffeeName?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -20,6 +21,7 @@ export function ConfirmDeleteDialog({
   summary,
   busy,
   error,
+  coffeeName,
   onConfirm,
   onCancel,
 }: ConfirmDeleteDialogProps) {
@@ -38,7 +40,11 @@ export function ConfirmDeleteDialog({
   return (
     <ConfirmDialog
       open={open}
-      title={`Remove ${summary.beans === 1 ? 'this coffee' : `these ${summary.beans} coffees`}?`}
+      title={
+        summary.beans === 1 && coffeeName
+          ? `Remove ${coffeeName}?`
+          : `Remove ${summary.beans === 1 ? 'this coffee' : `these ${summary.beans} coffees`}?`
+      }
       description={`This permanently removes ${parts.join(', ')}. It cannot be undone.`}
       busy={busy}
       error={error}

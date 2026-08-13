@@ -35,11 +35,13 @@ describe('updateRating', () => {
     const updated = await updateRating('r1', {
       score: 5,
       brewType: 'espresso',
+      ratedAt: '2020-05-04T00:00:00.000Z',
       notes: '  syrupy  ',
     });
 
     expect(updated.score).toBe(5);
     expect(updated.brewType).toBe('espresso');
+    expect(updated.ratedAt).toBe('2020-05-04T00:00:00.000Z');
     // Trimmed: leading/trailing whitespace is not part of the note.
     expect(updated.notes).toBe('syrupy');
 
@@ -51,21 +53,30 @@ describe('updateRating', () => {
   it('drops the note entirely when it is cleared, rather than storing an empty string', async () => {
     await db.ratings.add(rating('r1', { notes: 'thin' }));
 
-    await updateRating('r1', { score: 4, brewType: 'drip', notes: '   ' });
+    await updateRating('r1', {
+      score: 4,
+      brewType: 'drip',
+      ratedAt: '2026-01-02T00:00:00.000Z',
+      notes: '   ',
+    });
 
     const stored = await db.ratings.get('r1');
     expect(stored).toBeDefined();
     expect('notes' in stored!).toBe(false);
   });
 
-  it('bumps updatedAt but preserves identity and when it was rated', async () => {
+  it('bumps updatedAt but preserves identity and creation metadata', async () => {
     await db.ratings.add(rating('r1'));
 
-    const updated = await updateRating('r1', { score: 2, brewType: 'latte' });
+    const updated = await updateRating('r1', {
+      score: 2,
+      brewType: 'latte',
+      ratedAt: '2020-05-04T12:00:00.000Z',
+    });
 
     expect(updated.id).toBe('r1');
     expect(updated.beanId).toBe('b1');
-    expect(updated.ratedAt).toBe('2026-01-02T00:00:00.000Z');
+    expect(updated.ratedAt).toBe('2020-05-04T12:00:00.000Z');
     expect(updated.createdAt).toBe('2026-01-02T00:00:00.000Z');
     expect(updated.updatedAt).not.toBe('2026-01-02T00:00:00.000Z');
   });
@@ -73,17 +84,36 @@ describe('updateRating', () => {
   it('rejects a score off the 1..10 half-step scale without touching the stored record', async () => {
     await db.ratings.add(rating('r1'));
 
-    await expect(updateRating('r1', { score: 11, brewType: 'drip' })).rejects.toThrow(RangeError);
-    await expect(updateRating('r1', { score: 0, brewType: 'drip' })).rejects.toThrow(RangeError);
-    await expect(updateRating('r1', { score: 3.7, brewType: 'drip' })).rejects.toThrow(RangeError);
+    const edit = { brewType: 'drip' as const, ratedAt: '2026-01-02T00:00:00.000Z' };
+    await expect(updateRating('r1', { ...edit, score: 11 })).rejects.toThrow(RangeError);
+    await expect(updateRating('r1', { ...edit, score: 0 })).rejects.toThrow(RangeError);
+    await expect(updateRating('r1', { ...edit, score: 3.7 })).rejects.toThrow(RangeError);
 
     expect((await db.ratings.get('r1'))?.score).toBe(8);
   });
 
-  it('reports a rating that no longer exists rather than silently creating one', async () => {
-    await expect(updateRating('gone', { score: 4, brewType: 'drip' })).rejects.toThrow(
-      RatingNotFoundError,
+  it('rejects an invalid or future rating date without touching the stored record', async () => {
+    await db.ratings.add(rating('r1'));
+    const edit = { score: 8, brewType: 'drip' as const };
+
+    await expect(updateRating('r1', { ...edit, ratedAt: 'not-a-date' })).rejects.toThrow(
+      RangeError,
     );
+    await expect(
+      updateRating('r1', { ...edit, ratedAt: '2999-01-01T12:00:00.000Z' }),
+    ).rejects.toThrow(/future/i);
+
+    expect((await db.ratings.get('r1'))?.ratedAt).toBe('2026-01-02T00:00:00.000Z');
+  });
+
+  it('reports a rating that no longer exists rather than silently creating one', async () => {
+    await expect(
+      updateRating('gone', {
+        score: 4,
+        brewType: 'drip',
+        ratedAt: '2026-01-02T00:00:00.000Z',
+      }),
+    ).rejects.toThrow(RatingNotFoundError);
     expect(await db.ratings.count()).toBe(0);
   });
 });
