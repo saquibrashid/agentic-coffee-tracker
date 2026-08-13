@@ -101,9 +101,18 @@ export const PARSED_BEAN_SCHEMA = {
     },
     process: { type: ['string', 'null'], enum: [...PROCESS_VALUES, null] },
     roastLevel: { type: ['string', 'null'], enum: [...ROAST_LEVEL_VALUES, null] },
-    tastingNotes: { type: 'array', items: { type: 'string' } },
+    tastingNotes: {
+      type: 'array',
+      items: { type: 'string' },
+      description:
+        'Flavour descriptors the text gives for the cup, e.g. "floral", "dark chocolate". Individual words or short phrases, not a sentence.',
+    },
     roastDate: { type: ['string', 'null'], description: 'YYYY-MM-DD' },
-    varietals: { type: 'array', items: { type: 'string' } },
+    varietals: {
+      type: 'array',
+      items: { type: 'string' },
+      description: 'Coffee plant varieties, e.g. "Heirloom", "Caturra", "Gesha".',
+    },
     elevationMeters: {
       type: ['object', 'null'],
       additionalProperties: false,
@@ -113,7 +122,11 @@ export const PARSED_BEAN_SCHEMA = {
         max: { type: ['number', 'null'] },
       },
     },
-    roasterDescription: { type: ['string', 'null'] },
+    roasterDescription: {
+      type: ['string', 'null'],
+      description:
+        "The roaster's own prose about this coffee — its story, cooperative or farm, processing, or what it tastes like. Copy it from the text; do not write your own. Exclude shipping, pricing, subscription and other boilerplate that is not about the coffee.",
+    },
     confidence: { type: 'number', minimum: 0, maximum: 1 },
   },
 };
