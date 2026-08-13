@@ -37,6 +37,7 @@ import {
   type StudioPhotoCandidate,
 } from '@/services/enrich/studioPhoto';
 import type { CoffeeBean } from '@/types';
+import { PhotoThumbnail } from './PhotoLightbox';
 
 type Phase = 'idle' | 'reading' | 'saving' | 'reshooting';
 
@@ -180,13 +181,12 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
       ) : (
         <div className="mt-2 space-y-3">
           <div className="flex items-start gap-3">
-            {bean.thumbnailDataUrl && (
-              <img
-                src={bean.thumbnailDataUrl}
-                alt={`${bean.name} bag`}
-                className="size-20 shrink-0 rounded object-cover"
-              />
-            )}
+            <PhotoThumbnail
+              source={bean.photoId ? { kind: 'stored', photoId: bean.photoId } : undefined}
+              thumbnailDataUrl={bean.thumbnailDataUrl}
+              alt={`${bean.name} bag`}
+              className="size-20 shrink-0 rounded object-cover"
+            />
             <p className="text-muted-foreground text-sm">
               {hasPhoto
                 ? 'Replacing this keeps everything else about the coffee as it is.'
@@ -213,14 +213,16 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
 
           {/* Side by side, both from images already in hand, so what is shown is
               exactly what would be stored. The generated one is never applied
-              from here without this step. */}
+              from here without this step — and either can be opened full size,
+              which is the only way to actually check the label survived. */}
           {candidate && !busy && (
             <div className="space-y-2 rounded border p-2">
               <div className="flex items-end gap-3">
                 {bean.thumbnailDataUrl && (
                   <figure className="m-0">
-                    <img
-                      src={bean.thumbnailDataUrl}
+                    <PhotoThumbnail
+                      source={bean.photoId ? { kind: 'stored', photoId: bean.photoId } : undefined}
+                      thumbnailDataUrl={bean.thumbnailDataUrl}
                       alt="What this coffee shows now"
                       className="size-20 rounded object-cover"
                     />
@@ -228,8 +230,9 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
                   </figure>
                 )}
                 <figure className="m-0">
-                  <img
-                    src={candidate.staged.thumbnailDataUrl}
+                  <PhotoThumbnail
+                    source={{ kind: 'blob', blob: candidate.staged.blob }}
+                    thumbnailDataUrl={candidate.staged.thumbnailDataUrl}
                     alt="Studio shot generated from what you took"
                     className="size-20 rounded object-cover"
                   />
