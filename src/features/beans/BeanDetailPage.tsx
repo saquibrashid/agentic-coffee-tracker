@@ -442,6 +442,7 @@ export function BeanDetailPage() {
               variant="outline"
               size="sm"
               className="text-destructive hover:text-destructive shrink-0"
+              aria-label="Remove coffee"
               onClick={() => void requestDelete(beanIdForDelete)}
             >
               <Trash2 aria-hidden="true" /> Remove

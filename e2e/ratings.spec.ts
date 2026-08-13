@@ -144,7 +144,10 @@ test.describe('Ratings on a bean', () => {
       .click();
 
     await expect(page.getByRole('heading', { name: /remove this rating\?/i })).toBeVisible();
-    await page.getByRole('button', { name: /^remove$/i }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /^remove$/i })
+      .click();
 
     await expect(page.getByRole('listitem').filter({ hasText: '6/10' })).toHaveCount(0);
     await expect(page.getByRole('listitem').filter({ hasText: '10/10' })).toBeVisible();
@@ -173,10 +176,10 @@ test.describe('Ratings on a bean', () => {
     // user cannot otherwise see. Scoped to the dialog: the page now also shows
     // the rating count beside the coffee's name.
     const dialog = page.getByRole('dialog');
-    await expect(dialog.getByRole('heading', { name: /remove this coffee\?/i })).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: /remove yirgacheffe\?/i })).toBeVisible();
     await expect(dialog.getByText(/2 ratings/i)).toBeVisible();
 
-    await page.getByRole('button', { name: /^remove$/i }).click();
+    await dialog.getByRole('button', { name: /^remove$/i }).click();
 
     await expect(page).toHaveURL(/\/beans$/);
     await expect(page.getByText('Yirgacheffe')).toHaveCount(0);

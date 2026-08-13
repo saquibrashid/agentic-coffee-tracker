@@ -261,7 +261,7 @@ describe('BeanDetailPage', () => {
   it('makes coffee management visible in the primary coffee card', async () => {
     renderPage();
 
-    const remove = await screen.findByRole('button', { name: /^remove$/i });
+    const remove = await screen.findByRole('button', { name: /remove coffee/i });
     const ratings = screen.getByRole('heading', { name: 'Ratings' });
     expect(remove.compareDocumentPosition(ratings)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
     expect(screen.getByText(/manage this coffee/i)).toBeInTheDocument();
@@ -272,7 +272,7 @@ describe('BeanDetailPage', () => {
     await db.ratings.add(makeRating('r1', 8));
     renderPage();
 
-    await user.click(await screen.findByRole('button', { name: /^remove$/i }));
+    await user.click(await screen.findByRole('button', { name: /remove coffee/i }));
 
     expect(
       await screen.findByRole('heading', { name: `Remove ${bean.name}?`, hidden: true }),

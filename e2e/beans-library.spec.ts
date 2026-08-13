@@ -162,7 +162,7 @@ test.describe('Bean library', () => {
     const rows = page.getByRole('list', { name: 'Beans' }).getByRole('listitem');
     await expect(rows).toHaveCount(7);
 
-    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByRole('button', { name: 'Manage' }).click();
     await page.getByRole('checkbox', { name: /select huila/i }).check();
     await expect(page.getByText('1 selected')).toBeVisible();
 
@@ -181,7 +181,7 @@ test.describe('Bean library', () => {
 
   test('cancelling the confirmation keeps the bean', async ({ page }) => {
     await page.goto('/beans');
-    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByRole('button', { name: 'Manage' }).click();
     await page.getByRole('checkbox', { name: /select huila/i }).check();
     await page.getByRole('button', { name: /remove/i }).click();
 
@@ -193,15 +193,12 @@ test.describe('Bean library', () => {
 
   test('removes several beans at once', async ({ page }) => {
     await page.goto('/beans');
-    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByRole('button', { name: 'Manage' }).click();
     await page.getByRole('checkbox', { name: /select huila/i }).check();
     await page.getByRole('checkbox', { name: /select gesha/i }).check();
     await expect(page.getByText('2 selected')).toBeVisible();
 
-    await page
-      .getByRole('button', { name: /^remove$/i })
-      .first()
-      .click();
+    await page.getByRole('button', { name: /remove selected/i }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Remove' }).click();
 
     await expect(page.getByRole('list', { name: 'Beans' }).getByRole('listitem')).toHaveCount(5);
@@ -209,7 +206,7 @@ test.describe('Bean library', () => {
 
   test('selection mode does not navigate away when a row is tapped', async ({ page }) => {
     await page.goto('/beans');
-    await page.getByRole('button', { name: 'Select' }).click();
+    await page.getByRole('button', { name: 'Manage' }).click();
     await page.getByText('Huila').click();
 
     await expect(page).toHaveURL(/\/beans$/);
