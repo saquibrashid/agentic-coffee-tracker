@@ -27,6 +27,7 @@ import {
 } from '@/services/ratings/scale';
 import { BREW_TYPE_OPTIONS, DEFAULT_BREW_TYPE, brewLabel } from '@/services/ratings/brewTypes';
 import { EnrichPanel } from './EnrichPanel';
+import { PhotoThumbnail } from './PhotoLightbox';
 import { PhotoPanel } from './PhotoPanel';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import type { BrewType, CoffeeBean, Money, Rating } from '@/types';
@@ -321,13 +322,12 @@ export function BeanDetailPage() {
       <Card>
         <CardHeader>
           <div className="flex items-start gap-3">
-            {bean.thumbnailDataUrl && (
-              <img
-                src={bean.thumbnailDataUrl}
-                alt={`${bean.name} bag`}
-                className="size-16 shrink-0 rounded object-cover"
-              />
-            )}
+            <PhotoThumbnail
+              source={bean.photoId ? { kind: 'stored', photoId: bean.photoId } : undefined}
+              thumbnailDataUrl={bean.thumbnailDataUrl}
+              alt={`${bean.name} bag`}
+              className="size-16 shrink-0 rounded object-cover"
+            />
             <div className="min-w-0 flex-1">
               <CardTitle>{bean.name}</CardTitle>
               <p className="text-muted-foreground text-sm">{bean.roaster}</p>
