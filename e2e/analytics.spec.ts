@@ -82,15 +82,20 @@ test.describe('Analytics chart', () => {
   test('draws the score distribution as real bars', async ({ page }) => {
     await page.goto('/analytics');
 
-    await expect(page.getByText('Ratings: 4')).toBeVisible();
+    const ratingsMetric = page.getByText('Ratings', { exact: true }).locator('..');
+    await expect(ratingsMetric.getByText('4', { exact: true })).toBeVisible();
 
-    const chart = page.locator('svg.recharts-surface');
+    const scoreCard = page
+      .getByRole('heading', { name: 'Score distribution' })
+      .locator('..')
+      .locator('..');
+    const chart = scoreCard.locator('svg.recharts-surface');
     await expect(chart).toBeVisible();
 
     // Three distinct scores were seeded, so three bars must have been drawn.
     // Recharts renders zero-height bars for empty buckets too, so filter to
     // the ones with actual height.
-    const bars = page.locator('.recharts-bar-rectangle path');
+    const bars = scoreCard.locator('.recharts-bar-rectangle path');
     await expect(bars).toHaveCount(3);
 
     // A bar with no height is a chart that rendered its axes and gave up. This
@@ -112,6 +117,8 @@ test.describe('Analytics chart', () => {
     // Axis ticks come from the data, not from static markup. Asserted by count
     // rather than visibility: Playwright reports an SVG <g> as hidden because
     // the group itself has no box, even when its children are painted.
-    await expect(page.locator('.recharts-xAxis .recharts-cartesian-axis-tick')).not.toHaveCount(0);
+    await expect(
+      scoreCard.locator('.recharts-xAxis .recharts-cartesian-axis-tick'),
+    ).not.toHaveCount(0);
   });
 });
