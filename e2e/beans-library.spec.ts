@@ -11,7 +11,7 @@ async function seedBeans(page: Page) {
   await expect(
     page
       .getByRole('heading', { level: 2 })
-      .or(page.getByText(/welcome to your coffee log/i))
+      .or(page.getByRole('link', { name: /add your first coffee/i }))
       .first(),
   ).toBeVisible();
 
@@ -92,7 +92,7 @@ test.describe('Bean library', () => {
     // Home caps at six, so the seventh bean is the whole point of this route.
     await expect(page.getByText('Buried Treasure')).toHaveCount(0);
 
-    await page.getByRole('link', { name: /view all 7 beans/i }).click();
+    await page.getByRole('link', { name: /view all 7/i }).click();
     await expect(page).toHaveURL(/\/beans$/);
     await expect(page.getByText('Buried Treasure')).toBeVisible();
 
