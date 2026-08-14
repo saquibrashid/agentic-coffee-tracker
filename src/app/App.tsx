@@ -1,5 +1,6 @@
 import { createBrowserRouter, RouterProvider, Outlet, NavLink } from 'react-router-dom';
 import {
+  Bean,
   Coffee,
   Home,
   Plus,
@@ -13,8 +14,8 @@ import { useEffect, useState } from 'react';
 
 import { HomePage } from '@/features/home/HomePage';
 import { useSyncStatus } from '@/services/sync/useSyncStatus';
-import type { SyncStatus } from '@/services/sync/types';
 import { cn } from '@/lib/utils';
+import { syncMessage } from './syncNotice';
 
 function useOnlineStatus(): boolean {
   const [online, setOnline] = useState(() => navigator.onLine);
@@ -29,28 +30,6 @@ function useOnlineStatus(): boolean {
     };
   }, []);
   return online;
-}
-
-/**
- * The one line the sync engine gets in the chrome, per `specs/sync.md` → UI.
- *
- * Only states that need the user's attention are shown. A sync that is working
- * is invisible on purpose: a permanent "all good" badge trains people to ignore
- * the spot where the genuine warnings appear.
- */
-function syncMessage(status: SyncStatus): string | null {
-  switch (status.state) {
-    case 'syncing':
-      return 'Syncing…';
-    case 'error':
-      return status.lastError ?? 'Sync failed. It will retry automatically.';
-    case 'needs-upgrade':
-      return 'Refresh to continue syncing — this version is out of date.';
-    default:
-      // 'disabled' (the v1 default), 'idle' and 'offline' say nothing here.
-      // Offline already has its own banner directly above.
-      return null;
-  }
 }
 
 function Shell() {
@@ -81,9 +60,30 @@ function Shell() {
   return (
     <div className="flex min-h-full flex-col">
       <header className="bg-background/95 sticky top-0 z-30 border-b backdrop-blur-sm">
-        <div className="container flex h-14 items-center gap-3">
-          <Coffee className="text-primary" aria-hidden="true" />
-          <h1 className="text-base font-semibold">Agentic Coffee Tracker</h1>
+        <div className="container relative flex h-16 items-center gap-3 overflow-hidden">
+          <div className="bg-primary/10 text-primary relative flex size-10 shrink-0 items-center justify-center rounded-xl border">
+            <Coffee className="size-6" aria-hidden="true" />
+            <Bean
+              className="bg-background absolute -right-1 -bottom-1 size-4 rounded-full"
+              aria-hidden="true"
+            />
+          </div>
+          <div className="min-w-0">
+            <h1 className="font-display truncate text-lg leading-tight font-semibold">
+              Coffee Bean Tracker
+            </h1>
+            <p className="text-muted-foreground hidden text-[11px] sm:block">
+              Your taste, remembered.
+            </p>
+          </div>
+          <div
+            className="pointer-events-none absolute top-0 right-4 h-full w-32 opacity-40"
+            aria-hidden="true"
+          >
+            <Bean className="text-primary/20 absolute top-1 right-10 size-10 rotate-12" />
+            <Bean className="text-primary/15 absolute right-0 bottom-0 size-7 -rotate-12" />
+            <div className="bg-primary/10 absolute top-3 right-3 size-16 rounded-full blur-xl" />
+          </div>
         </div>
         {!online && (
           <div
@@ -95,13 +95,8 @@ function Shell() {
         )}
         {syncNotice && (
           <div
-            role="status"
-            className={cn(
-              'px-4 py-1 text-center text-xs',
-              sync.state === 'error' || sync.state === 'needs-upgrade'
-                ? 'bg-destructive text-white'
-                : 'bg-accent text-accent-foreground',
-            )}
+            role="alert"
+            className="bg-destructive px-4 py-1 text-center text-xs text-white"
           >
             {syncNotice}
           </div>

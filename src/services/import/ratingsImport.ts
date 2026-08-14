@@ -547,7 +547,7 @@ export function countEnrichable(plan: ImportPlan): number {
 
 /** A ready-to-fill file, so nobody has to guess the column names. */
 export const CSV_TEMPLATE = [
-  '# Agentic Coffee Tracker — rating import template',
+  '# Coffee Bean Tracker — rating import template',
   '# One row per cup you drank. Only roaster, coffee and score are required.',
   '# score is out of 10 — accepts 8.5, 4/5, 8/10 or stars. date accepts 2025-03-14 or 3/14/2025.',
   '# A blank brew is recorded as a latte.',

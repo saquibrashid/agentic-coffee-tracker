@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test('home page loads and shows onboarding empty state', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: /agentic coffee tracker/i })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /coffee bean tracker/i })).toBeVisible();
   await expect(page.getByRole('link', { name: /add your first coffee/i })).toBeVisible();
 });
 

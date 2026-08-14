@@ -1,6 +1,6 @@
 # Deployment
 
-Agentic Coffee Tracker deploys to Azure as two services:
+Coffee Bean Tracker deploys to Azure as two services:
 
 | Service                           | Azure resource                   | azd service name |
 | --------------------------------- | -------------------------------- | ---------------- |
