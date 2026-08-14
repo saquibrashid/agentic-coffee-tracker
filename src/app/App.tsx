@@ -60,7 +60,7 @@ function Shell() {
   return (
     <div className="flex min-h-full flex-col">
       <header className="bg-background/95 sticky top-0 z-30 border-b backdrop-blur-sm">
-        <div className="container relative flex h-16 items-center gap-3 overflow-hidden">
+        <div className="relative container flex h-16 items-center gap-3 overflow-hidden">
           <div className="bg-primary/10 text-primary relative flex size-10 shrink-0 items-center justify-center rounded-xl border">
             <Coffee className="size-6" aria-hidden="true" />
             <Bean
@@ -94,10 +94,7 @@ function Shell() {
           </div>
         )}
         {syncNotice && (
-          <div
-            role="alert"
-            className="bg-destructive px-4 py-1 text-center text-xs text-white"
-          >
+          <div role="alert" className="bg-destructive px-4 py-1 text-center text-xs text-white">
             {syncNotice}
           </div>
         )}

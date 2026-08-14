@@ -9,7 +9,7 @@ async function seedBeanWithRatings(page: Page) {
   await expect(
     page
       .getByRole('heading', { level: 2 })
-      .or(page.getByText(/welcome to your coffee log/i))
+      .or(page.getByRole('link', { name: /add your first coffee/i }))
       .first(),
   ).toBeVisible();
 

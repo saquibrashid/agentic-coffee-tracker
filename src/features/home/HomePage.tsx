@@ -15,13 +15,7 @@ import {
 import { db } from '@/services/db';
 import type { CoffeeBean, Rating } from '@/types';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { RoastScale } from '@/components/ui/roast-scale';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -88,9 +82,7 @@ async function loadDashboard(): Promise<HomeDashboard | null> {
   const beans = allBeans.filter((bean) => !bean.isArchived);
   if (beans.length === 0) return null;
 
-  const recentBeans = [...beans]
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    .slice(0, 6);
+  const recentBeans = [...beans].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 6);
   const beanById = new Map(beans.map((bean) => [bean.id, bean]));
   const ratings = allRatings
     .filter((rating) => beanById.has(rating.beanId))
@@ -205,7 +197,12 @@ export function HomePage() {
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <QuickAction to="/add" icon={<Plus />} title="Add a coffee" detail="Photo, link, or manual" />
+          <QuickAction
+            to="/add"
+            icon={<Plus />}
+            title="Add a coffee"
+            detail="Photo, link, or manual"
+          />
           <QuickAction
             to="/predict"
             icon={<ScanSearch />}
@@ -269,9 +266,7 @@ export function HomePage() {
             label="Ratings logged"
             value={String(dashboard.ratings.length)}
             detail={
-              dashboard.ratings.length === 1
-                ? 'One cup remembered'
-                : 'Cups shaping your profile'
+              dashboard.ratings.length === 1 ? 'One cup remembered' : 'Cups shaping your profile'
             }
             to="/analytics"
           />
