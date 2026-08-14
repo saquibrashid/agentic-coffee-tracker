@@ -16,7 +16,9 @@ function status(overrides: Partial<SyncStatus>): SyncStatus {
 describe('app sync notices', () => {
   it('keeps routine background syncing quiet', () => {
     expect(syncMessage(status({ state: 'syncing' }))).toBeNull();
-    expect(syncMessage(status({ state: 'idle', lastSyncedAt: new Date().toISOString() }))).toBeNull();
+    expect(
+      syncMessage(status({ state: 'idle', lastSyncedAt: new Date().toISOString() })),
+    ).toBeNull();
   });
 
   it('keeps actionable failures visible', () => {
