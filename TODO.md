@@ -1,6 +1,6 @@
 # Roadmap & TODO
 
-High-level roadmap for the Agentic Coffee Tracker. Detailed work items live in [GitHub Issues](https://github.com/saquibrashid/agentic-coffee-tracker/issues); this file is the at-a-glance view.
+High-level roadmap for Coffee Bean Tracker. Detailed work items live in [GitHub Issues](https://github.com/saquibrashid/agentic-coffee-tracker/issues); this file is the at-a-glance view.
 
 ## ✅ Done
 

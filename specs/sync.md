@@ -1,6 +1,6 @@
 # Multi-Device Sync Specification
 
-This document specifies cloud sync for the Agentic Coffee Tracker: identity, server-side storage, the replication protocol, conflict policy, photo handling, and the phased delivery plan.
+This document specifies cloud sync for Coffee Bean Tracker: identity, server-side storage, the replication protocol, conflict policy, photo handling, and the phased delivery plan.
 
 It supersedes the `services/sync/` and `services/auth/` placeholders described in `architecture.md` → Future-Proofing Hooks.
 

@@ -1,10 +1,10 @@
 import 'fake-indexeddb/auto';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { db } from '@/services/db';
-import type { CoffeeBean } from '@/types';
+import type { CoffeeBean, Rating } from '@/types';
 
 import { HomePage } from './HomePage';
 
@@ -34,8 +34,21 @@ function bean(id: string, name: string, extra: Partial<CoffeeBean> = {}): Coffee
   };
 }
 
+function rating(id: string, beanId: string, score: number, ratedAt: string): Rating {
+  return {
+    id,
+    schemaVersion: 2,
+    beanId,
+    score,
+    brewType: 'drip',
+    ratedAt,
+    createdAt: ratedAt,
+    updatedAt: ratedAt,
+  };
+}
+
 beforeEach(async () => {
-  await db.beans.clear();
+  await Promise.all([db.beans.clear(), db.ratings.clear()]);
 });
 
 describe('HomePage bean cards', () => {
@@ -48,8 +61,8 @@ describe('HomePage bean cards', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText('Holler Mtn.');
-    const card = screen.getByText('Holler Mtn.').closest('a');
+    const recent = await screen.findByRole('region', { name: /recent coffees/i });
+    const card = within(recent).getByText('Holler Mtn.').closest('a');
     const image = card!.querySelector('img');
     expect(image).toHaveAttribute('src', 'data:image/webp;base64,x');
     // Decorative: the name and roaster are already read out beside it.
@@ -65,8 +78,8 @@ describe('HomePage bean cards', () => {
       </MemoryRouter>,
     );
 
-    await screen.findByText('Night Light Decaf');
-    const card = screen.getByText('Night Light Decaf').closest('a');
+    const recent = await screen.findByRole('region', { name: /recent coffees/i });
+    const card = within(recent).getByText('Night Light Decaf').closest('a');
     expect(card!.querySelector('img')).toBeNull();
     expect(card!.querySelector('[aria-hidden="true"] svg')).not.toBeNull();
   });
@@ -81,7 +94,56 @@ describe('HomePage bean cards', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('link', { name: /El Jordan/ })).toHaveAttribute('href', '/beans/b3');
+      const recent = screen.getByRole('region', { name: /recent coffees/i });
+      expect(within(recent).getByRole('link', { name: /El Jordan/ })).toHaveAttribute(
+        'href',
+        '/beans/b3',
+      );
     });
+  });
+
+  it('welcomes returning users before showing recent coffees', async () => {
+    await db.beans.add(bean('b4', 'Hair Bender'));
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const welcome = await screen.findByRole('heading', { name: /ready for the next great cup/i });
+    const recent = screen.getByRole('heading', { name: /recent coffees/i });
+    expect(welcome.compareDocumentPosition(recent)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+    expect(screen.getByRole('link', { name: /add a coffee/i })).toHaveAttribute('href', '/add');
+    expect(screen.getByRole('link', { name: /check a coffee/i })).toHaveAttribute(
+      'href',
+      '/predict',
+    );
+  });
+
+  it('features a recent rated coffee and useful history highlights', async () => {
+    await db.beans.bulkAdd([bean('b5', 'Geometry'), bean('b6', 'Founders Blend')]);
+    await db.ratings.bulkAdd([
+      rating('r1', 'b5', 9, '2026-08-10T12:00:00.000Z'),
+      rating('r2', 'b5', 8, '2026-08-11T12:00:00.000Z'),
+      rating('r3', 'b6', 6, '2026-08-09T12:00:00.000Z'),
+    ]);
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByText(/Your latest rating:/i)).toHaveTextContent('8/10');
+    expect(screen.getByText('Ratings logged').parentElement?.parentElement).toHaveTextContent('3');
+    expect(screen.getByText('Average score').parentElement?.parentElement).toHaveTextContent('7.7');
+    expect(screen.getByText('Current favorite').parentElement?.parentElement).toHaveTextContent(
+      'Geometry',
+    );
+    expect(screen.getByRole('link', { name: /current favorite/i })).toHaveAttribute(
+      'href',
+      '/for-you',
+    );
   });
 });

@@ -20,18 +20,19 @@ Every screen MUST explicitly handle five states: **loading**, **empty**, **error
 ### Sync indicator
 
 Extends the offline indicator rather than adding a second status surface. Shown
-only when the state is `syncing`, `error` or `needs-upgrade` — an idle, working
-sync is invisible on purpose, because a permanent "all good" badge trains people
-to ignore the spot where the genuine warnings appear.
+only when the state is `error` or `needs-upgrade`. Routine background syncing is
+invisible on purpose: it is normally too brief to interpret, and flashing the
+page chrome makes a healthy app feel unstable.
 
-- `syncing` → accent banner, "Syncing…"
+- `syncing` → no page-level banner; Settings and manual sync controls retain
+  contextual progress
 - `error` → destructive banner carrying the actual message, falling back to
   "Sync failed. It will retry automatically."
 - `needs-upgrade` → destructive banner, "Refresh to continue syncing — this
   version is out of date."
 
-`offline` says nothing here: it already has its own banner directly above, and
-`disabled` and `idle` say nothing at all.
+`offline` says nothing here: it already has its own banner directly above.
+`disabled` and `idle` also say nothing.
 
 ### `needs-upgrade`
 

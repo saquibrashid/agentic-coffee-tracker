@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for considering a contribution to **Agentic Coffee Tracker**! 🎉
+Thanks for considering a contribution to **Coffee Bean Tracker**! 🎉
 
 This project is in the early **specification phase**. Most contributions today are about refining specs, identifying gaps, or implementing the initial scaffold described in `specs/`.
 

@@ -2,7 +2,7 @@
   "name": "@agentic-coffee-tracker/api",
   "version": "0.1.0",
   "private": true,
-  "description": "BFF for Agentic Coffee Tracker — Azure Functions v4, Node 20, TypeScript.",
+  "description": "BFF for Coffee Bean Tracker — Azure Functions v4, Node 20, TypeScript.",
   "license": "MIT",
   "main": "dist/src/functions/*.js",
   "type": "commonjs",

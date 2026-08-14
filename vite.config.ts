@@ -132,8 +132,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'robots.txt', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Agentic Coffee Tracker',
-        short_name: 'Coffee',
+        name: 'Coffee Bean Tracker',
+        short_name: 'Bean Tracker',
         description: 'Offline-first, AI-powered coffee tracking.',
         // Manifest colours are static — they are read at install time and
         // cannot follow the theme, unlike the <meta name="theme-color"> the

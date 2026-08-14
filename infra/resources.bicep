@@ -243,7 +243,7 @@ resource openAiProject 'Microsoft.CognitiveServices/accounts/projects@2026-05-01
   identity: { type: 'SystemAssigned' }
   properties: {
     displayName: openAiProjectName
-    description: 'Foundry project for the Agentic Coffee Tracker BFF.'
+    description: 'Foundry project for the Coffee Bean Tracker BFF.'
   }
 }
 

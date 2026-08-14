@@ -1,4 +1,4 @@
-# ☕ Agentic Coffee Tracker
+# ☕ Coffee Bean Tracker
 
 > An offline-first, AI-powered coffee tracking PWA. Snap a photo of the bag, let an LLM extract the details, rate every cup, and watch your taste profile emerge.
 
