@@ -26,5 +26,8 @@ describe('app sync notices', () => {
       'Sign in again.',
     );
     expect(syncMessage(status({ state: 'needs-upgrade' }))).toMatch(/Refresh/);
+    expect(syncMessage(status({ state: 'session-expired', pendingCount: 2 }))).toBe(
+      'Sync paused. 2 local changes are safe and waiting.',
+    );
   });
 });

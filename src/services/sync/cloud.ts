@@ -7,7 +7,7 @@
  * yet seen, which defeats the merge entirely.
  */
 import { db } from '@/services/db';
-import { getAuthProvider } from '@/services/auth';
+import { getAuthProvider, hasRememberedAuthUser, refreshAuthUser } from '@/services/auth';
 import { refreshPreferences } from '@/services/preferences/compute';
 import type { CoffeeBean, OutboxEntry, PhotoBlob, Rating } from '@/types';
 import { NeedsUpgradeError, applyPulled } from './apply';
@@ -247,17 +247,19 @@ export class CloudSyncEngine implements SyncEngine {
     // *available* in this build, which on the Standard SKU is true for every
     // visitor — including one who has never signed in. Without this check the
     // engine starts on page load, calls an endpoint that requires a principal,
-    // and `#handleFailure` correctly classifies the resulting 401 as terminal:
-    // the engine halts and the app shows a permanent error to someone who
-    // never asked to sync. That is the "401s on a timer" the comment on
-    // `isSyncSupported()` warns about but is not positioned to prevent.
+    // and the server rejects every cycle with a 401. That is the "401s on a
+    // timer" the comment on `isSyncSupported()` warns about but is not
+    // positioned to prevent.
     //
     // Checked per cycle rather than cached, because sign-in state changes
     // underneath a long-lived tab — a session expires, or another tab signs
     // out. `/.auth/me` is served by the platform and is cheap next to the sync
     // round trip it is gating.
-    if (!(await getAuthProvider().getUser())) {
-      await this.#publish({ state: 'idle', lastError: undefined });
+    if (!(await refreshAuthUser())) {
+      await this.#publish({
+        state: (await hasRememberedAuthUser()) ? 'session-expired' : 'idle',
+        lastError: undefined,
+      });
       return;
     }
 
@@ -465,9 +467,13 @@ export class CloudSyncEngine implements SyncEngine {
       return;
     }
 
-    // A terminal failure will fail identically forever. Retrying a 401 in a
-    // loop burns the user's session and the endpoint's rate budget without ever
-    // converging, so the engine stops and asks for action instead.
+    if (err instanceof SyncApiError && err.status === 401) {
+      await this.#publish({ state: 'session-expired', lastError: undefined });
+      return;
+    }
+
+    // A terminal failure will fail identically forever, so the engine stops and
+    // asks for action instead.
     if (err instanceof SyncApiError && !err.isTransient) {
       this.#halted = true;
       await this.#publish({ state: 'error', lastError: err.message });

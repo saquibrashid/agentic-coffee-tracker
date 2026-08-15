@@ -1,5 +1,5 @@
 /**
- * "Will I like this?" — a pre-purchase check on a coffee the user has not tried.
+ * "Will I like this?" — a pre-tasting check on a coffee the user has not tried.
  *
  * Nothing is written to the library. That is the point of the screen: it answers
  * a question you ask while standing in a shop, and a coffee you decided against
@@ -469,7 +469,7 @@ export function PredictPage() {
       <Card>
         <CardHeader>
           <CardTitle>Will I like it?</CardTitle>
-          <CardDescription>Check a coffee against your taste before you buy it.</CardDescription>
+          <CardDescription>Check a coffee against your taste before you drink it.</CardDescription>
         </CardHeader>
         <CardContent>
           <p className="text-muted-foreground text-sm">
@@ -488,7 +488,7 @@ export function PredictPage() {
         <CardHeader>
           <CardTitle>Will I like it?</CardTitle>
           <CardDescription>
-            Check a coffee against your taste before you buy it. Nothing here is saved to your
+            Check a coffee against your taste before you drink it. Nothing here is saved to your
             library.
           </CardDescription>
         </CardHeader>

@@ -162,7 +162,7 @@ Add rating form validation: score required (1–10 step 0.5), brew type required
 
 ## 4b. Will I like it? (`/predict`)
 
-- A pre-purchase check on a coffee the user has **not** tried. Nothing on this screen is written to
+- A pre-tasting check on a coffee the user has **not** tried. Nothing on this screen is written to
   the library: a coffee they decided against must not end up in the history skewing later answers.
 - Three ways in — a bag photo (OCR + parse), a link to the product page, or typing the details — all
   of which converge on the _same editable form_ rather than each producing a verdict directly. OCR is

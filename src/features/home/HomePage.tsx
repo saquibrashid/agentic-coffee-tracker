@@ -20,6 +20,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { RoastScale } from '@/components/ui/roast-scale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BeanThumbnail } from '@/features/beans/BeanThumbnail';
+import { usePhotoObjectUrl } from '@/features/beans/usePhotoObjectUrl';
 
 interface BeanHighlight {
   bean: CoffeeBean;
@@ -58,7 +59,7 @@ function welcomeCopy(dashboard: HomeDashboard): { eyebrow: string; title: string
     return {
       eyebrow: 'Welcome back',
       title: 'Your coffee shelf has been waiting.',
-      body: 'Pick up with a recent coffee, or check something new before you buy it.',
+      body: 'Pick up with a recent coffee, or check something new before you taste it.',
     };
   }
 
@@ -119,6 +120,11 @@ async function loadDashboard(): Promise<HomeDashboard | null> {
 
 export function HomePage() {
   const dashboard = useLiveQuery(loadDashboard, []);
+  const featuredPhotoUrl = usePhotoObjectUrl(
+    dashboard?.featuredBean.photoId
+      ? { kind: 'stored', photoId: dashboard.featuredBean.photoId }
+      : undefined,
+  );
 
   if (dashboard === undefined) {
     return (
@@ -180,7 +186,7 @@ export function HomePage() {
             </Button>
             <Button asChild variant="outline">
               <Link to="/predict">
-                <ScanSearch aria-hidden="true" /> Check before buying
+                <ScanSearch aria-hidden="true" /> Check before tasting
               </Link>
             </Button>
           </div>
@@ -229,7 +235,7 @@ export function HomePage() {
           <div className="grid h-full sm:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             {featuredBean.thumbnailDataUrl ? (
               <img
-                src={featuredBean.thumbnailDataUrl}
+                src={featuredPhotoUrl ?? featuredBean.thumbnailDataUrl}
                 alt=""
                 className="h-48 w-full object-cover sm:h-full sm:min-h-64"
               />

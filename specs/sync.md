@@ -65,6 +65,7 @@ Syncing derived data would create a second source of truth that can disagree wit
 - The client reads `/.auth/me` to obtain the `clientPrincipal`.
 - SWA injects the `x-ms-client-principal` header (base64 JSON) into every linked-backend Function invocation.
 - `userId` = `clientPrincipal.userId`, a stable per-provider subject identifier. It is the Cosmos partition key.
+- A successful sign-in records `auth.lastUserId` in Dexie. A later empty `/.auth/me` response means `session-expired` only while that marker exists. Deliberate sign-out clears it and sets `auth.signedOut` before redirecting, so a stale auth response from another tab cannot restore it; starting sign-in clears that intent flag.
 
 ### Security constraint (blocking)
 
@@ -281,10 +282,11 @@ export interface AuthProvider {
 }
 
 export type SyncState =
-  | 'disabled' // signed out
+  | 'disabled' // sync unsupported in this build
   | 'idle'
   | 'syncing'
   | 'offline'
+  | 'session-expired' // local changes remain queued until reauthentication
   | 'error'
   | 'needs-upgrade'; // remote schemaVersion exceeds this build
 
@@ -341,6 +343,8 @@ The compound index `[type+recordId]` exists so enqueue can coalesce: if an entry
 | `sync.cursor`       | number, last successfully applied `seq`  |
 | `sync.lastSyncedAt` | ISO 8601                                 |
 | `sync.enabled`      | boolean, user toggle in Settings         |
+| `auth.lastUserId`   | last authenticated stable user id        |
+| `auth.signedOut`    | deliberate sign-out intent across tabs   |
 
 ---
 
@@ -397,7 +401,8 @@ No background sync when the tab is closed. `architecture.md` → Browser Support
 Reuse the queue's schedule: `min(60s * 2^attempts, 1h)`, max 8 attempts. Distinguish two failure classes:
 
 - **Transient** (network, 429, 5xx, 409 contention) — retry.
-- **Terminal** (401, 403, 400) — stop, surface in Settings, require re-auth or user action. Never retry a 401 in a loop; it burns the user's session and the endpoint's rate budget.
+- **Expired session** (401) — publish `session-expired`, keep local changes queued, and prompt reauthentication.
+- **Terminal** (403, 400) — stop, surface in Settings, and require user action.
 
 ---
 

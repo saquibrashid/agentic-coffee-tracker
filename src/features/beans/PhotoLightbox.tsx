@@ -19,7 +19,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
-import { db } from '@/services/db';
+import { usePhotoObjectUrl, type PhotoSource } from './usePhotoObjectUrl';
 
 /**
  * Where the full-size image comes from.
@@ -30,7 +30,7 @@ import { db } from '@/services/db';
  * judgement at all. So a held blob is a first-class source rather than
  * something only stored photos get.
  */
-export type PhotoSource = { kind: 'stored'; photoId: string } | { kind: 'blob'; blob: Blob };
+export type { PhotoSource } from './usePhotoObjectUrl';
 
 export interface PhotoLightboxProps {
   open: boolean;
@@ -43,7 +43,7 @@ export interface PhotoLightboxProps {
 
 export function PhotoLightbox({ open, source, fallbackDataUrl, alt, onClose }: PhotoLightboxProps) {
   const ref = useRef<HTMLDialogElement>(null);
-  const [fullUrl, setFullUrl] = useState<string | null>(null);
+  const fullUrl = usePhotoObjectUrl(source, open);
 
   useEffect(() => {
     const dialog = ref.current;
@@ -73,35 +73,6 @@ export function PhotoLightbox({ open, source, fallbackDataUrl, alt, onClose }: P
     dialog.addEventListener('click', onBackdropClick);
     return () => dialog.removeEventListener('click', onBackdropClick);
   }, [open, onClose]);
-
-  const photoId = source.kind === 'stored' ? source.photoId : undefined;
-  const blob = source.kind === 'blob' ? source.blob : undefined;
-
-  useEffect(() => {
-    if (!open) return;
-
-    let url: string | null = null;
-    let live = true;
-
-    const show = (value: Blob) => {
-      // Checked before allocating, not after: a URL created for a dialog that
-      // has already closed would have nothing left to revoke it.
-      if (!live) return;
-      url = URL.createObjectURL(value);
-      setFullUrl(url);
-    };
-
-    if (blob) show(blob);
-    else if (photoId) void db.photos.get(photoId).then((photo) => photo && show(photo.blob));
-
-    return () => {
-      live = false;
-      // Object URLs pin their blob for the life of the document. Opening a few
-      // photos without this is a leak measured in megabytes.
-      if (url) URL.revokeObjectURL(url);
-      setFullUrl(null);
-    };
-  }, [open, photoId, blob]);
 
   if (!open) return null;
 

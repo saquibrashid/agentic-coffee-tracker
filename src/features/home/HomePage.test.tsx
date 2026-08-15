@@ -1,12 +1,15 @@
 import 'fake-indexeddb/auto';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@/services/db';
-import type { CoffeeBean, Rating } from '@/types';
+import type { CoffeeBean, PhotoBlob, Rating } from '@/types';
 
 import { HomePage } from './HomePage';
+
+const createObjectURL = vi.fn(() => 'blob:featured-full-size');
+const revokeObjectURL = vi.fn();
 
 /**
  * A shelf of coffee is recognised by the bags on it long before anyone reads a
@@ -47,8 +50,27 @@ function rating(id: string, beanId: string, score: number, ratedAt: string): Rat
   };
 }
 
+function photo(id: string): PhotoBlob {
+  return {
+    id,
+    schemaVersion: 1,
+    kind: 'bag',
+    mimeType: 'image/webp',
+    blob: new Blob(['full-size'], { type: 'image/webp' }),
+    widthPx: 1600,
+    heightPx: 1200,
+    byteSize: 9,
+    createdAt: '2026-01-01T00:00:00.000Z',
+  };
+}
+
 beforeEach(async () => {
-  await Promise.all([db.beans.clear(), db.ratings.clear()]);
+  vi.restoreAllMocks();
+  globalThis.URL.createObjectURL = createObjectURL;
+  globalThis.URL.revokeObjectURL = revokeObjectURL;
+  createObjectURL.mockClear();
+  revokeObjectURL.mockClear();
+  await Promise.all([db.beans.clear(), db.ratings.clear(), db.photos.clear()]);
 });
 
 describe('HomePage bean cards', () => {
@@ -82,6 +104,55 @@ describe('HomePage bean cards', () => {
     const card = within(recent).getByText('Night Light Decaf').closest('a');
     expect(card!.querySelector('img')).toBeNull();
     expect(card!.querySelector('[aria-hidden="true"] svg')).not.toBeNull();
+  });
+
+  it('sharpens the featured coffee with its full stored photo only', async () => {
+    await db.photos.add(photo('p1'));
+    await db.beans.add(
+      bean('b-photo', 'Hair Bender', {
+        photoId: 'p1',
+        thumbnailDataUrl: 'data:image/webp;base64,thumb',
+      }),
+    );
+
+    const { unmount } = render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const featured = await screen.findByRole('region', { name: /your coffee right now/i });
+    const featuredImage = featured.querySelector('img');
+    expect(featuredImage).toHaveAttribute('src', 'data:image/webp;base64,thumb');
+    await waitFor(() => expect(featuredImage).toHaveAttribute('src', 'blob:featured-full-size'));
+
+    const recent = screen.getByRole('region', { name: /recent coffees/i });
+    expect(recent.querySelector('img')).toHaveAttribute('src', 'data:image/webp;base64,thumb');
+    expect(createObjectURL).toHaveBeenCalledOnce();
+
+    unmount();
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:featured-full-size');
+  });
+
+  it('keeps the featured thumbnail when its stored photo is missing', async () => {
+    await db.beans.add(
+      bean('b-missing-photo', 'Night Light', {
+        photoId: 'missing',
+        thumbnailDataUrl: 'data:image/webp;base64,thumb',
+      }),
+    );
+
+    render(
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>,
+    );
+
+    const featured = await screen.findByRole('region', { name: /your coffee right now/i });
+    await waitFor(() =>
+      expect(featured.querySelector('img')).toHaveAttribute('src', 'data:image/webp;base64,thumb'),
+    );
+    expect(createObjectURL).not.toHaveBeenCalled();
   });
 
   it('still links each card to the coffee', async () => {

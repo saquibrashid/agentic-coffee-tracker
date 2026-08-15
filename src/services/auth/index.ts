@@ -50,5 +50,6 @@ export function resetAuthProviderForTests(): void {
 
 export { LocalOnlyAuthProvider } from './localOnly';
 export { SwaAuthProvider, CONFIGURED_PROVIDERS } from './swa';
-export { useAuthUser } from './useAuthUser';
+export { refreshAuthUser, resetAuthUserForTests, useAuthUser } from './useAuthUser';
+export { allowAuthUser, forgetAuthUser, hasRememberedAuthUser, rememberAuthUser } from './session';
 export type { AuthProvider, AuthProviderId, AuthUser } from './types';

@@ -62,6 +62,12 @@ describe('describeSync', () => {
     );
   });
 
+  it('explains that an expired session leaves changes waiting', () => {
+    expect(describeSync(status({ state: 'session-expired', pendingCount: 2 }), NOW)).toBe(
+      'Sign in again to sync 2 pending changes.',
+    );
+  });
+
   it('surfaces the actual error when there is one', () => {
     expect(describeSync(status({ state: 'error', lastError: 'Sign-in expired' }), NOW)).toBe(
       'Sign-in expired',
