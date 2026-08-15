@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { HomePage } from '@/features/home/HomePage';
 import { useSyncStatus } from '@/services/sync/useSyncStatus';
 import { cn } from '@/lib/utils';
+import { HeaderAccountControl, ReauthenticateButton } from './AccountControl';
 import { syncMessage } from './syncNotice';
 
 function useOnlineStatus(): boolean {
@@ -60,7 +61,7 @@ function Shell() {
   return (
     <div className="flex min-h-full flex-col">
       <header className="bg-background/95 sticky top-0 z-30 border-b backdrop-blur-sm">
-        <div className="relative container flex h-16 items-center gap-3 overflow-hidden">
+        <div className="relative container flex h-16 items-center gap-2 overflow-visible sm:gap-3">
           <div className="bg-primary/10 text-primary relative flex size-10 shrink-0 items-center justify-center rounded-xl border">
             <Coffee className="size-6" aria-hidden="true" />
             <Bean
@@ -68,7 +69,7 @@ function Shell() {
               aria-hidden="true"
             />
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <h1 className="font-display truncate text-lg leading-tight font-semibold">
               Coffee Bean Tracker
             </h1>
@@ -77,13 +78,14 @@ function Shell() {
             </p>
           </div>
           <div
-            className="pointer-events-none absolute top-0 right-4 h-full w-32 opacity-40"
+            className="pointer-events-none absolute top-0 right-14 hidden h-full w-24 opacity-30 min-[390px]:block sm:right-16 sm:w-32 sm:opacity-40"
             aria-hidden="true"
           >
             <Bean className="text-primary/20 absolute top-1 right-10 size-10 rotate-12" />
             <Bean className="text-primary/15 absolute right-0 bottom-0 size-7 -rotate-12" />
             <div className="bg-primary/10 absolute top-3 right-3 size-16 rounded-full blur-xl" />
           </div>
+          <HeaderAccountControl />
         </div>
         {!online && (
           <div
@@ -94,8 +96,17 @@ function Shell() {
           </div>
         )}
         {syncNotice && (
-          <div role="alert" className="bg-destructive px-4 py-1 text-center text-xs text-white">
+          <div
+            role="alert"
+            className={cn(
+              'px-4 py-1 text-center text-xs',
+              sync.state === 'session-expired'
+                ? 'bg-accent text-accent-foreground'
+                : 'bg-destructive text-white',
+            )}
+          >
             {syncNotice}
+            {sync.state === 'session-expired' && <ReauthenticateButton />}
           </div>
         )}
       </header>

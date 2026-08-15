@@ -15,6 +15,8 @@ export type SyncState =
   | 'syncing'
   /** Cannot reach the server; local data is unaffected. */
   | 'offline'
+  /** A previously authenticated session ended; local changes remain queued. */
+  | 'session-expired'
   /** The last cycle failed. See `lastError`. */
   | 'error'
   /**

@@ -10,6 +10,12 @@ export function syncMessage(status: SyncStatus): string | null {
       return status.lastError ?? 'Sync failed. It will retry automatically.';
     case 'needs-upgrade':
       return 'Refresh to continue syncing — this version is out of date.';
+    case 'session-expired':
+      return status.pendingCount > 0
+        ? `Sync paused. ${status.pendingCount} local ${
+            status.pendingCount === 1 ? 'change is' : 'changes are'
+          } safe and waiting.`
+        : 'Sync paused. Sign in again to keep your devices up to date.';
     default:
       return null;
   }

@@ -29,9 +29,12 @@ vi.mock('@/services/preferences/compute', () => ({ refreshPreferences: vi.fn() }
 // in this file. `signedInUser` is a mutable seam so the signed-out path — where
 // the engine must not reach the network at all — can be exercised too.
 let signedInUser: { userId: string } | null = { userId: 'user-a' };
+let rememberedUser = false;
 
 vi.mock('@/services/auth', () => ({
   getAuthProvider: () => ({ getUser: () => Promise.resolve(signedInUser) }),
+  refreshAuthUser: () => Promise.resolve(signedInUser),
+  hasRememberedAuthUser: () => Promise.resolve(rememberedUser),
 }));
 
 vi.mock('./photos', async () => {
@@ -90,6 +93,7 @@ let engine: CloudSyncEngine;
 beforeEach(async () => {
   vi.clearAllMocks();
   signedInUser = { userId: 'user-a' };
+  rememberedUser = false;
   await Promise.all([db.beans.clear(), db.ratings.clear(), db.photos.clear(), db.outbox.clear()]);
   await db.meta.clear();
   pull.mockResolvedValue(emptyPull());
@@ -127,6 +131,14 @@ describe('when nobody is signed in', () => {
 
     expect(engine.status().state).toBe('idle');
     expect(engine.status().lastError).toBeUndefined();
+  });
+
+  it('asks a previously signed-in user to authenticate again', async () => {
+    rememberedUser = true;
+
+    await engine.sync();
+
+    expect(engine.status()).toMatchObject({ state: 'session-expired', pendingCount: 0 });
   });
 
   it('does not halt, so signing in starts syncing without a reload', async () => {
@@ -428,14 +440,13 @@ describe('failure handling', () => {
     expect(pull).toHaveBeenCalledTimes(8);
   });
 
-  it('stops immediately on an expired session rather than retrying forever', async () => {
+  it('reports an API 401 as an expired session', async () => {
     pull.mockRejectedValue(new SyncApiError({ status: 401, message: 'unauthorized' }));
 
     await engine.sync();
-    await engine.sync();
 
     expect(pull).toHaveBeenCalledTimes(1);
-    expect(engine.status()).toMatchObject({ state: 'error', lastError: 'unauthorized' });
+    expect(engine.status()).toMatchObject({ state: 'session-expired' });
   });
 
   it('stops on a rejected request this build will never get right', async () => {

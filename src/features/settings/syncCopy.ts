@@ -26,6 +26,12 @@ export function describeSync(status: SyncStatus, relativeTo: number = Date.now()
       return 'Syncing…';
     case 'offline':
       return 'Offline — will sync when reconnected.';
+    case 'session-expired':
+      return status.pendingCount > 0
+        ? `Sign in again to sync ${status.pendingCount} pending ${
+            status.pendingCount === 1 ? 'change' : 'changes'
+          }.`
+        : 'Sign in again to resume sync.';
     case 'needs-upgrade':
       return 'This version is out of date. Refresh to continue syncing.';
     case 'error':
