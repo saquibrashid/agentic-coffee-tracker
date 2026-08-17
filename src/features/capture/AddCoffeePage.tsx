@@ -19,6 +19,7 @@ import { EmptyPageError, enrichFromUrl } from '@/services/enrich';
 import { attachPhotoFromUrl } from '@/services/enrich/photo';
 import { isSchemaError } from '@/services/ai';
 import { isCameraSupported } from '@/services/camera';
+import { usePasteImage } from '@/hooks/usePasteImage';
 import { CameraCapture } from './CameraCapture';
 import { ConfirmForm } from './ConfirmForm';
 import type { CoffeeBean } from '@/types';
@@ -120,6 +121,10 @@ export function AddCoffeePage() {
   async function handleFile(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
     if (!file) return;
+    await readImageFile(file);
+  }
+
+  async function readImageFile(file: File) {
     setError(null);
     setStage('processing');
 
@@ -231,6 +236,10 @@ export function AddCoffeePage() {
     }
   }
 
+  // Only while the page is showing its input controls: once the user is
+  // confirming details, a paste belongs to the field they are typing in.
+  usePasteImage((file) => void readImageFile(file), stage === 'idle' && !cameraOpen);
+
   return (
     <Card>
       <CardHeader>
@@ -269,6 +278,9 @@ export function AddCoffeePage() {
                   onChange={(e) => void handleFile(e)}
                   className="file:bg-primary file:text-primary-foreground block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2 file:text-sm file:font-medium"
                 />
+                <p className="text-muted-foreground mt-2 text-sm">
+                  You can also paste an image straight from your clipboard.
+                </p>
                 {error && (
                   <p role="alert" className="text-destructive mt-3 text-sm">
                     {error}
