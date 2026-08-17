@@ -167,7 +167,7 @@ export interface UserPreferences {
 
 export interface RankedItem<T> {
   value: T;
-  weightedScore: number; // see algorithm below
+  weightedScore: number; // 1-10; the average shrunk toward the user's baseline
   count: number;
   averageScore: number;
 }
@@ -175,17 +175,38 @@ export interface RankedItem<T> {
 
 ### Ranking algorithm
 
-For each candidate value `v` (e.g. an origin country):
+For each candidate value `v` (e.g. an origin country), shrink its own average
+toward the user's overall average:
 
 ```
-weightedScore(v) = Σ over ratings r where bean(r) has v of:
-                   (r.score - 5)            // center around neutral
-                   * recencyWeight(r.ratedAt)
-                   * (1 / numAttributes)    // dilute multi-origin blends
+baseline      = mean(r.score) over all ratings
+average(v)    = mean(r.score) over ratings whose bean has v
+count(v)      = number of those ratings
+
+weightedScore(v) = (count(v) * average(v) + K * baseline) / (count(v) + K)
 ```
 
-- `recencyWeight(t) = 0.5 ^ (ageDays / 180)` — 6-month half-life.
-- Rank descending; keep top 10 per category.
+- `K = PRIOR_STRENGTH = 5` — at 5 observations the ranked score sits halfway
+  between the baseline and what `v` actually scored.
+- Rank descending by `weightedScore`, ties broken by `count`; keep top 5.
+
+Shrinkage can only pull a value _toward_ the baseline, never past it, so a value
+the user scores below their own average can never outrank one they score above
+it — however often they drink it. This is what makes the list an ordering by
+preference rather than by frequency (issue #199).
+
+`weightedScore` therefore shares the 1–10 scale with `averageScore`. It is not a
+score multiplied by a count; an earlier implementation used
+`average * log2(1 + count)`, which ranked partly by how often a value appeared
+and put a note averaging 6.5 across 8 cups above one averaging 9.0 across 2.
+
+Not yet implemented, and deliberately left out for now:
+
+- **Recency weighting** (`0.5 ^ (ageDays / 180)`). Worth adding, but it changes
+  what the number means, so it should land with UI that says the ranking is
+  time-weighted.
+- **Diluting multi-origin blends** by `1 / numAttributes`. See #199 on whether a
+  blend belongs in the origins ranking at all.
 
 ---
 

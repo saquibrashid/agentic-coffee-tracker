@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The taste map is ordered by how much you liked something, not how often you
+  bought it.** The lists ranked each value by its average score multiplied by a
+  term that grew with the number of ratings — a number never shown — so a note
+  averaging 6.5 across eight cups sat above one averaging 9.0 across two while
+  the page displayed both scores side by side and appeared to sort them wrongly.
+  Popularity can no longer promote something you rate below your own average.
+  Values are now shrunk toward that average instead, which still hedges a single
+  enthusiastic cup without letting volume overrule the score. The "Your current
+  signature" sentence inherited the same fault and named leaders you rate poorly;
+  it now only cites what genuinely runs above your average, and says nothing at
+  all when nothing does. A new **Recurring disappointment** insight names what
+  repeatedly lets you down, which the profile previously had no way to tell you.
+
 - **Pasted and scraped descriptions are no longer thrown away.** Text you paste,
   a scraped product page and an imported PDF all go through the same extraction
   prompt, which described its input as OCR of a bag label and told the model not

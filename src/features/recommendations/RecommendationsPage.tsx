@@ -31,6 +31,7 @@ import {
   refreshPreferences,
 } from '@/services/preferences/compute';
 import { buildTasteInsights, getProfileStrength } from '@/services/preferences/insights';
+import { MAX_SCORE } from '@/services/ratings/scale';
 import {
   generateRecommendations,
   getCachedRecommendations,
@@ -49,13 +50,13 @@ function PreferencePanel({
   title,
   icon,
   items,
+  baseline,
 }: {
   title: string;
   icon: ReactNode;
   items: RankedItem<string>[];
+  baseline: number;
 }) {
-  const maxWeight = Math.max(...items.map((item) => item.weightedScore), 1);
-
   return (
     <div className="bg-muted/45 rounded-lg border p-4">
       <div className="mb-3 flex items-center gap-2">
@@ -68,24 +69,29 @@ function PreferencePanel({
         <p className="text-muted-foreground text-xs">Not enough labeled history yet.</p>
       ) : (
         <ol className="space-y-3">
-          {items.slice(0, 3).map((item) => (
-            <li key={item.value}>
-              <div className="mb-1 flex items-baseline justify-between gap-2">
-                <span className="truncate text-sm font-medium">{display(item.value)}</span>
-                <span className="text-muted-foreground shrink-0 text-xs">
-                  {item.averageScore.toFixed(1)} · {item.count}
-                </span>
-              </div>
-              <div className="bg-background h-1.5 overflow-hidden rounded-full">
-                <div
-                  className="bg-primary h-full rounded-full"
-                  style={{
-                    width: `${Math.max(12, (item.weightedScore / maxWeight) * 100)}%`,
-                  }}
-                />
-              </div>
-            </li>
-          ))}
+          {items.slice(0, 3).map((item) => {
+            // Below the user's own average, so leading a "favourites" list with
+            // it would be a lie. Say so rather than drawing an identical bar.
+            const belowBaseline = item.weightedScore < baseline;
+            return (
+              <li key={item.value}>
+                <div className="mb-1 flex items-baseline justify-between gap-2">
+                  <span className="truncate text-sm font-medium">{display(item.value)}</span>
+                  <span className="text-muted-foreground shrink-0 text-xs">
+                    {item.averageScore.toFixed(1)} · {item.count}
+                  </span>
+                </div>
+                <div className="bg-background h-1.5 overflow-hidden rounded-full">
+                  <div
+                    className={`h-full rounded-full ${belowBaseline ? 'bg-muted-foreground/50' : 'bg-primary'}`}
+                    style={{
+                      width: `${Math.max(8, (item.weightedScore / MAX_SCORE) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </li>
+            );
+          })}
         </ol>
       )}
     </div>
@@ -326,7 +332,9 @@ export function RecommendationsPage() {
                   Your taste map
                 </h3>
                 <p className="text-muted-foreground text-xs">
-                  Bar length balances score with repeat evidence; numbers show average and ratings.
+                  Ranked by how far above your own {preferences.averageScore.toFixed(1)} average
+                  each runs, held back where there are few ratings. Numbers show raw average and
+                  cups; a grey bar is below your average.
                 </p>
               </div>
             </div>
@@ -335,31 +343,37 @@ export function RecommendationsPage() {
                 title="Origins"
                 icon={<Globe2 aria-hidden="true" />}
                 items={preferences.favoriteOrigins}
+                baseline={preferences.averageScore}
               />
               <PreferencePanel
                 title="Roasters"
                 icon={<Coffee aria-hidden="true" />}
                 items={preferences.favoriteRoasters}
+                baseline={preferences.averageScore}
               />
               <PreferencePanel
                 title="Flavor notes"
                 icon={<Sparkles aria-hidden="true" />}
                 items={preferences.favoriteFlavors}
+                baseline={preferences.averageScore}
               />
               <PreferencePanel
                 title="Roast levels"
                 icon={<Flame aria-hidden="true" />}
                 items={preferences.favoriteRoastLevels}
+                baseline={preferences.averageScore}
               />
               <PreferencePanel
                 title="Brew methods"
                 icon={<Compass aria-hidden="true" />}
                 items={preferences.favoriteBrewTypes}
+                baseline={preferences.averageScore}
               />
               <PreferencePanel
                 title="Processes"
                 icon={<Sprout aria-hidden="true" />}
                 items={preferences.favoriteProcesses}
+                baseline={preferences.averageScore}
               />
             </div>
           </section>

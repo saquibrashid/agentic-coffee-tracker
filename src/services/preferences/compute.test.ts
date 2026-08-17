@@ -40,23 +40,63 @@ describe('computePreferencesFrom', () => {
     expect(prefs.id).toBe('singleton');
   });
 
-  it('ranks origins by evidence, not just by best single score', () => {
+  it('never lets volume promote a value the user rates below their own average', () => {
+    // The reported bug (#199): "dark chocolate" led the flavour list at 6.5
+    // across 8 cups while "chocolate" sat below it at 9.0 across 2, because the
+    // old formula multiplied the score by a count term.
     const beans = [
-      bean('a', { origins: [{ country: 'Ethiopia' }] }),
-      bean('b', { origins: [{ country: 'Ethiopia' }] }),
-      bean('c', { origins: [{ country: 'Brazil' }] }),
+      ...Array.from({ length: 8 }, (_, i) => bean(`d${i}`, { tastingNotes: ['dark chocolate'] })),
+      ...Array.from({ length: 2 }, (_, i) => bean(`c${i}`, { tastingNotes: ['chocolate'] })),
     ];
     const ratings = [
-      rating('a', 4),
-      rating('b', 4),
-      rating('c', 5), // higher average, but only one cup
+      ...Array.from({ length: 8 }, (_, i) => rating(`d${i}`, 6.5)),
+      ...Array.from({ length: 2 }, (_, i) => rating(`c${i}`, 9)),
+    ];
+
+    const prefs = computePreferencesFrom(beans, ratings);
+    const [first, second] = prefs.favoriteFlavors;
+
+    expect(first?.value).toBe('chocolate');
+    expect(second?.value).toBe('dark chocolate');
+    // The one below the 7.0 baseline stays below it however many cups back it.
+    expect(second?.weightedScore).toBeLessThan(prefs.averageScore);
+    expect(first?.weightedScore).toBeGreaterThan(prefs.averageScore);
+  });
+
+  it('still holds back a single top-marks cup', () => {
+    // Shrinkage has to keep the other half of the bargain: one perfect cup is
+    // not yet a preference, so it must not leap over a well-evidenced value that
+    // also runs above the baseline.
+    const beans = [
+      ...Array.from({ length: 6 }, (_, i) => bean(`c${i}`, { tastingNotes: ['citrus'] })),
+      bean('j', { tastingNotes: ['juniper'] }),
+      ...Array.from({ length: 10 }, (_, i) => bean(`f${i}`)),
+    ];
+    const ratings = [
+      ...Array.from({ length: 6 }, (_, i) => rating(`c${i}`, 9)),
+      rating('j', 10),
+      ...Array.from({ length: 10 }, (_, i) => rating(`f${i}`, 6)),
     ];
 
     const prefs = computePreferencesFrom(beans, ratings);
 
-    expect(prefs.favoriteOrigins[0]?.value).toBe('Ethiopia');
-    expect(prefs.favoriteOrigins[0]?.count).toBe(2);
-    expect(prefs.favoriteOrigins[0]?.averageScore).toBe(4);
+    expect(prefs.favoriteFlavors[0]?.value).toBe('citrus');
+    expect(prefs.favoriteFlavors[1]?.value).toBe('juniper');
+    // Both are genuinely liked; the ordering is about how much is known.
+    expect(prefs.favoriteFlavors[1]?.averageScore).toBeGreaterThan(
+      prefs.favoriteFlavors[0]?.averageScore ?? 0,
+    );
+  });
+
+  it('reports the shrunk score on the same 1-10 scale as the average', () => {
+    const beans = [bean('a', { origins: [{ country: 'Peru' }] })];
+    const prefs = computePreferencesFrom(beans, [rating('a', 10)]);
+    const peru = prefs.favoriteOrigins[0];
+
+    // One cup at 10 against a baseline of 10 stays 10; the point is that the
+    // field is a score, not a score times a count.
+    expect(peru?.weightedScore).toBeCloseTo(10, 5);
+    expect(peru?.weightedScore).toBeLessThanOrEqual(10);
   });
 
   it('counts a multi-origin blend towards every country', () => {
