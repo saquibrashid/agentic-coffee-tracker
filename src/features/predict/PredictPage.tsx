@@ -5,14 +5,16 @@
  * a question you ask while standing in a shop, and a coffee you decided against
  * must not end up in the history skewing every later prediction.
  *
- * The three inputs (photo, link, typing) all converge on the same editable form
- * rather than each producing a verdict directly. A bag photo is read with OCR
- * and is often imperfect, so the user gets to correct it before the prediction
- * is drawn — and the correction costs nothing, because the estimate is local.
+ * The inputs (photo, camera, paste, link, typing) all converge on the same
+ * editable form rather than each producing a verdict directly. A bag photo is
+ * read with OCR and is often imperfect, so the user gets to correct it before
+ * the prediction is drawn — and the correction costs nothing, because the
+ * estimate is local.
  */
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
+  Camera,
   CheckCircle2,
   HelpCircle,
   Image,
@@ -32,6 +34,9 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSchemaError } from '@/services/ai';
 import { extractBeanFromPhoto, PipelineUnavailableError } from '@/services/ai/pipeline';
+import { isCameraSupported } from '@/services/camera';
+import { CameraCapture } from '@/features/capture/CameraCapture';
+import { usePasteImage } from '@/hooks/usePasteImage';
 import { EmptyPageError, enrichFromUrl } from '@/services/enrich';
 import { dataUrlToBlob, resizeDataUrl } from '@/services/image/imagePipeline';
 import { canPredict, loadPredictionIndex, MIN_RATINGS_FOR_PREDICTION } from '@/services/predict';
@@ -326,6 +331,10 @@ export function PredictPage() {
   const [source, setSource] = useState<CheckSource | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
+  // Read once on mount rather than on every render: the answer cannot change
+  // during a visit, and it decides whether a control exists at all.
+  const [cameraAvailable] = useState(() => isCameraSupported());
 
   function startSession(nextSource: CheckSource | null, kind: BusyKind): number {
     const requestId = requestRef.current + 1;
@@ -356,14 +365,18 @@ export function PredictPage() {
     return err instanceof Error ? err.message : fallback;
   }
 
-  async function handlePhoto(event: ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const requestId = startSession(null, 'photo');
+  /**
+   * Everything after "we have an image": preview it, read the label, fill the form.
+   *
+   * Three entry points converge here — a chosen file, a frame from the in-app
+   * camera, and a pasted screenshot — so there is one reading path to reason
+   * about. Unlike Add a coffee, nothing is written to the library: a coffee the
+   * user decides against must not skew later predictions.
+   */
+  async function processPhoto(dataUrl: string, name: string, requestId: number) {
     try {
-      const dataUrl = await readFileAsDataUrl(file);
       if (requestId !== requestRef.current) return;
-      setSource({ kind: 'photo', previewUrl: dataUrl, name: file.name || 'Coffee bag' });
+      setSource({ kind: 'photo', previewUrl: dataUrl, name });
       const resized = await resizeDataUrl(dataUrl, 1600);
       if (requestId !== requestRef.current) return;
       setStage('reading');
@@ -386,10 +399,42 @@ export function PredictPage() {
       setError(describeFailure(err, 'Something went wrong reading that photo.'));
     } finally {
       if (requestId === requestRef.current) setBusy(null);
-      // Let the same file be chosen again after a failure.
-      event.target.value = '';
     }
   }
+
+  async function readImageFile(file: File, fallbackName: string) {
+    const requestId = startSession(null, 'photo');
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      await processPhoto(dataUrl, file.name || fallbackName, requestId);
+    } catch (err) {
+      if (requestId !== requestRef.current) return;
+      setError(describeFailure(err, 'Something went wrong reading that photo.'));
+      setBusy(null);
+    }
+  }
+
+  async function handlePhoto(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      await readImageFile(file, 'Coffee bag');
+    } finally {
+      // Let the same file be chosen again after a failure.
+      input.value = '';
+    }
+  }
+
+  async function handleCameraCapture(dataUrl: string) {
+    setCameraOpen(false);
+    const requestId = startSession(null, 'photo');
+    await processPhoto(dataUrl, 'Coffee bag', requestId);
+  }
+
+  // Paste is off while the camera is open or a read is running, so a stray
+  // Ctrl+V cannot cancel the work already in flight.
+  usePasteImage((file) => void readImageFile(file, 'Pasted image'), busy === null && !cameraOpen);
 
   async function handleLink(event: FormEvent) {
     event.preventDefault();
@@ -445,6 +490,7 @@ export function PredictPage() {
     setSource(null);
     setError(null);
     setNotice(null);
+    setCameraOpen(false);
     if (focus) {
       requestAnimationFrame(() => {
         photoInputRef.current?.focus();
@@ -495,19 +541,43 @@ export function PredictPage() {
 
         <CardContent className="space-y-5">
           <div>
-            <label htmlFor="predict-photo" className="mb-2 block text-sm font-medium">
-              Photo of the bag
-            </label>
-            <input
-              ref={photoInputRef}
-              id="predict-photo"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              disabled={busy !== null}
-              onChange={(e) => void handlePhoto(e)}
-              className="file:bg-primary file:text-primary-foreground block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2 file:text-sm file:font-medium"
-            />
+            {cameraOpen ? (
+              <CameraCapture
+                onCapture={(dataUrl) => void handleCameraCapture(dataUrl)}
+                onCancel={() => setCameraOpen(false)}
+              />
+            ) : (
+              <>
+                {cameraAvailable && (
+                  <div className="mb-4">
+                    <Button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => setCameraOpen(true)}
+                    >
+                      <Camera aria-hidden="true" className="mr-2 h-4 w-4" />
+                      Take a photo
+                    </Button>
+                  </div>
+                )}
+
+                <label htmlFor="predict-photo" className="mb-2 block text-sm font-medium">
+                  {cameraAvailable ? 'Or choose a photo of the bag' : 'Photo of the bag'}
+                </label>
+                <input
+                  ref={photoInputRef}
+                  id="predict-photo"
+                  type="file"
+                  accept="image/*"
+                  disabled={busy !== null}
+                  onChange={(e) => void handlePhoto(e)}
+                  className="file:bg-primary file:text-primary-foreground block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2 file:text-sm file:font-medium"
+                />
+                <p className="text-muted-foreground mt-2 text-sm">
+                  You can also paste an image straight from your clipboard.
+                </p>
+              </>
+            )}
           </div>
 
           <form onSubmit={(e) => void handleLink(e)} className="border-t pt-4">

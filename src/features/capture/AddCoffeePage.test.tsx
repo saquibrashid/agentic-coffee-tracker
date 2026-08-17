@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -152,6 +152,53 @@ describe('AddCoffeePage camera', () => {
     await userEvent.click(screen.getByRole('button', { name: /cancel/i }));
 
     expect(screen.getByRole('button', { name: /take a photo/i })).toBeInTheDocument();
+    expect(await db.beans.count()).toBe(0);
+  });
+});
+
+/**
+ * Paste parity (issue #194): a screenshot of a product page is the fastest
+ * thing a user already has, and making them save it to disk first is a step the
+ * app can simply remove.
+ */
+describe('AddCoffeePage paste', () => {
+  function pasteImage(file: File) {
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', {
+      value: { items: [{ kind: 'file', type: file.type, getAsFile: () => file }], files: [file] },
+    });
+    act(() => {
+      document.dispatchEvent(event);
+    });
+    return event;
+  }
+
+  it('saves a pasted image through the same pipeline an upload uses', async () => {
+    render(<AddCoffeePage />);
+
+    pasteImage(new File(['image'], 'screenshot.png', { type: 'image/png' }));
+
+    await waitFor(async () => {
+      expect(await db.photos.count()).toBe(1);
+      expect(await db.beans.count()).toBe(1);
+    });
+    const bean = (await db.beans.toArray())[0];
+    expect(bean?.source).toBe('photo-ocr');
+    expect(mocks.resizeDataUrl).toHaveBeenCalledWith(expect.stringContaining('data:'), 1600);
+  });
+
+  it('leaves a text paste to the link field', async () => {
+    render(<AddCoffeePage />);
+
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', {
+      value: { items: [{ kind: 'string', type: 'text/plain', getAsFile: () => null }], files: [] },
+    });
+    act(() => {
+      document.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(false);
     expect(await db.beans.count()).toBe(0);
   });
 });

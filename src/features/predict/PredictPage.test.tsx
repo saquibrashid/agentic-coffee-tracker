@@ -1,7 +1,7 @@
 import 'fake-indexeddb/auto';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@/services/db';
 import type { CoffeeBean, Rating } from '@/types';
@@ -201,5 +201,150 @@ describe('PredictPage check sessions', () => {
       expect(screen.getByDisplayValue('Onyx')).toBeInTheDocument();
       expect(screen.queryByDisplayValue('Storyville')).not.toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * Camera and paste parity with "Add a coffee" (issues #194, #195).
+ *
+ * Checking a coffee and adding one are the same gesture at different moments,
+ * so an input that exists on one screen and not the other reads as a bug. These
+ * pin that the extra inputs reuse the single reading path rather than growing a
+ * second, weaker one — and that nothing is written to the library on the way.
+ */
+describe('PredictPage camera and paste', () => {
+  const stop = vi.fn();
+
+  function useCamera(available: boolean) {
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: available
+        ? { getUserMedia: vi.fn(() => Promise.resolve({ getTracks: () => [{ stop }] })) }
+        : undefined,
+    });
+  }
+
+  function pasteImage(file: File) {
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', {
+      value: { items: [{ kind: 'file', type: file.type, getAsFile: () => file }], files: [file] },
+    });
+    act(() => {
+      document.dispatchEvent(event);
+    });
+    return event;
+  }
+
+  beforeEach(() => {
+    useCamera(true);
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue(undefined);
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+      drawImage: vi.fn(),
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toDataURL').mockReturnValue(
+      'data:image/jpeg;base64,frame',
+    );
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoWidth', {
+      configurable: true,
+      value: 640,
+    });
+    Object.defineProperty(HTMLVideoElement.prototype, 'videoHeight', {
+      configurable: true,
+      value: 480,
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: undefined });
+  });
+
+  it('offers an in-app camera when the device has one', async () => {
+    render(<PredictPage />);
+
+    expect(await screen.findByRole('button', { name: /take a photo/i })).toBeInTheDocument();
+  });
+
+  it('hides the camera button where it could only ever fail', async () => {
+    useCamera(false);
+    render(<PredictPage />);
+
+    expect(await screen.findByLabelText(/photo of the bag/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /take a photo/i })).not.toBeInTheDocument();
+  });
+
+  it('no longer suppresses the photo library on iOS', async () => {
+    // `capture="environment"` made iOS Safari drop the "Photo Library" choice.
+    // With a real camera button there is no reason to take that choice away.
+    render(<PredictPage />);
+
+    expect(await screen.findByLabelText(/photo of the bag/i)).not.toHaveAttribute('capture');
+  });
+
+  it('reads a captured frame through the same path an upload uses', async () => {
+    mocks.extractBeanFromPhoto.mockResolvedValue({
+      parsed,
+      rawText: 'Storyville Epilogue',
+      model: 'test',
+      needsReview: false,
+      usedMock: false,
+    });
+    const user = userEvent.setup();
+    render(<PredictPage />);
+
+    await user.click(await screen.findByRole('button', { name: /take a photo/i }));
+    await screen.findByRole('status');
+    await user.click(screen.getByRole('button', { name: /take photo/i }));
+
+    expect(await screen.findByDisplayValue('Storyville')).toBeInTheDocument();
+    expect(mocks.extractBeanFromPhoto).toHaveBeenCalledTimes(1);
+    // The check screen deliberately saves nothing: a coffee the user rejects
+    // must not end up skewing later predictions.
+    expect(await db.photos.count()).toBe(0);
+  });
+
+  it('returns to the input controls when the user backs out of the camera', async () => {
+    const user = userEvent.setup();
+    render(<PredictPage />);
+
+    await user.click(await screen.findByRole('button', { name: /take a photo/i }));
+    await screen.findByRole('status');
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(screen.getByRole('button', { name: /take a photo/i })).toBeInTheDocument();
+  });
+
+  it('reads a pasted screenshot', async () => {
+    mocks.extractBeanFromPhoto.mockResolvedValue({
+      parsed,
+      rawText: 'Storyville Epilogue',
+      model: 'test',
+      needsReview: false,
+      usedMock: false,
+    });
+    render(<PredictPage />);
+    await screen.findByLabelText(/photo of the bag/i);
+
+    pasteImage(new File(['image'], 'screenshot.png', { type: 'image/png' }));
+
+    expect(await screen.findByDisplayValue('Storyville')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: /selected coffee bag: screenshot.png/i })).toBeVisible();
+    expect(await db.photos.count()).toBe(0);
+  });
+
+  it('leaves a text paste to the link field', async () => {
+    render(<PredictPage />);
+    await screen.findByLabelText(/photo of the bag/i);
+
+    const event = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'clipboardData', {
+      value: { items: [{ kind: 'string', type: 'text/plain', getAsFile: () => null }], files: [] },
+    });
+    act(() => {
+      document.dispatchEvent(event);
+    });
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(mocks.extractBeanFromPhoto).not.toHaveBeenCalled();
   });
 });

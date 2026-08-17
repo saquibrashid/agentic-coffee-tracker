@@ -192,6 +192,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Paste an image to add or check a coffee.** A screenshot of a product page is
+  usually the fastest thing to hand, and both screens made you save it to disk
+  and then find it again. Ctrl+V (⌘V) on either screen now reads the image
+  straight from the clipboard. A paste carrying no image is left alone, so
+  pasting a link into the link field still works.
+
+- **"Will I like it?" can now take a photo.** Adding a coffee had an in-app
+  camera; checking one only had a file picker marked `capture="environment"`,
+  which on iOS Safari opens the camera but removes the "Photo Library" choice
+  and on a desktop does nothing at all — so the screen you use standing in a
+  shop was the one that could not use a webcam and could not use an existing
+  photo. Both screens now offer the same camera, file picker and paste. Nothing
+  is saved to your library from a check, as before.
+
 - **Home shows the bag.** The library has led with each coffee's photo for a
   while; home's recent list was still text alone, so the two grids of the same
   coffees looked unrelated and the one you land on first was the harder to scan.
