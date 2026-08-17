@@ -358,6 +358,35 @@ Knobs, in order of impact:
 
 > **Note:** `/api/search` needs no search-API key. It asks the model for the roaster's storefront domain and then queries that store's own product search, so its only cost is the model call.
 
+### Budget alerts
+
+The estimate above is what a normal month looks like. The bill worth worrying about is the abnormal one — a retry loop, a runaway client, or a bulk re-shoot spending Azure OpenAI tokens for days before anyone opens the portal. `infra/budget.bicep` provisions two Azure Consumption budgets and an action group to catch that:
+
+| Budget              | Watches                                     | Default |
+| ------------------- | ------------------------------------------- | ------- |
+| `budget-<token>`    | the whole resource group                    | $25/mo  |
+| `budget-ai-<token>` | the Vision, OpenAI and image accounts alone | $15/mo  |
+
+Both alert at 50%, 80% and 100% of actual spend, and at 100% of _forecast_. The forecast alert is the one that gives useful warning; the actual-cost alerts only confirm the money is gone. The second, narrower budget exists so an alert says **where** the money went — a single group-wide number tells you something is wrong but not what, and the AI accounts are the only resources here whose cost has no ceiling of its own.
+
+Nothing is provisioned until you name a destination:
+
+```bash
+azd env set BUDGET_CONTACT_EMAILS you@example.com
+azd env set MONTHLY_BUDGET_AMOUNT 25       # optional
+azd env set AI_MONTHLY_BUDGET_AMOUNT 15    # optional
+azd up
+```
+
+That gate is deliberate. A budget whose alerts go nowhere is not a control, and provisioning one by default would leave the template claiming a protection it does not provide. Set several addresses by separating them with commas.
+
+Two limits worth being clear about:
+
+- **A budget alerts; it does not cap.** Azure will not stop the spend when a threshold trips. If you want an actual ceiling, the effective place for it is the application — a per-user or per-day quota on AI calls refuses the request before it is billed, which is both cheaper and more surgical than anything at the billing layer.
+- **Consumption budgets need a pay-as-you-go, EA or MCA subscription.** They are not available on sponsored, free-trial or CSP subscriptions, where the deployment of these two resources will fail. Leave `BUDGET_CONTACT_EMAILS` empty on those.
+
+Pick the amount from evidence rather than instinct: run the deployment for a month, read the actual figure in Cost analysis, and set the budget somewhat above it. A budget set below normal spend trains you to ignore the alerts.
+
 ## CI/CD
 
 `.github/workflows/deploy.yml` runs `azd provision` + `azd deploy` on every push to `main`, then smoke-tests `/api/health`. It authenticates with OIDC federated credentials — no long-lived secrets.

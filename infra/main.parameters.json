@@ -46,6 +46,15 @@
     },
     "syncRecordQuota": {
       "value": "${SYNC_RECORD_QUOTA=20000}"
+    },
+    "budgetContactEmails": {
+      "value": "${BUDGET_CONTACT_EMAILS=}"
+    },
+    "monthlyBudgetAmount": {
+      "value": "${MONTHLY_BUDGET_AMOUNT=25}"
+    },
+    "aiMonthlyBudgetAmount": {
+      "value": "${AI_MONTHLY_BUDGET_AMOUNT=15}"
     }
   }
 }

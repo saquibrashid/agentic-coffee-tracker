@@ -255,6 +255,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checking by photo always did, so the two ways in look alike; nothing is saved
   to your library either way.
 
+- **Budget alerts on the Azure deployment.** Almost everything the template
+  provisions is billed by use, and the metered parts are driven by whatever
+  users happen to do, so a retry loop could spend for days before anyone
+  thought to open the portal. There are now two consumption budgets: one over
+  the whole resource group, and a tighter one filtered to the AI accounts,
+  which is the only spend here with no ceiling of its own. Both alert at 50%,
+  80% and 100% of actual and at 100% of forecast — the forecast alert being the
+  only one that warns rather than reports. Nothing is provisioned until
+  `BUDGET_CONTACT_EMAILS` names a destination, because a budget whose alerts go
+  nowhere would be a protection the template claims but does not provide. Note
+  that a budget alerts and does not cap; a real ceiling belongs in the
+  application, as a quota that refuses the call before it is billed.
+
 - **Paste an image to add or check a coffee.** A screenshot of a product page is
   usually the fastest thing to hand, and both screens made you save it to disk
   and then find it again. Ctrl+V (⌘V) on either screen now reads the image

@@ -59,6 +59,18 @@ param openAiProjectName string = 'coffee-tracker'
 @description('Static Web App SKU. Standard is required for linked backends.')
 param staticWebAppSkuName string
 
+@description('Monthly cost ceiling for this resource group, in the billing account currency, as a positive integer. Alerts only; Azure will not stop the spend.')
+param monthlyBudgetAmount string = '25'
+
+@description('Monthly cost ceiling for the Vision and OpenAI accounts alone, as a positive integer. Deliberately below the group ceiling so it trips first: AI spend is the only cost here with no upper bound of its own.')
+param aiMonthlyBudgetAmount string = '15'
+
+@description('Comma-separated addresses that receive budget alerts. Empty (the default) creates no budget at all, because a budget nobody hears from is not a control.')
+param budgetContactEmails string = ''
+
+@description('First day of the month the budgets start tracking, as yyyy-MM-01.')
+param budgetStartDate string
+
 var useLinkedBackend = staticWebAppSkuName == 'Standard'
 
 var abbrev = {
@@ -898,6 +910,32 @@ resource availabilityTest 'Microsoft.Insights/webtests@2022-06-15' = {
       SSLCheck: true
       SSLCertRemainingLifetimeCheck: 7
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Cost alerting — see budget.bicep for why there are two budgets and why
+// neither of them caps anything.
+// ---------------------------------------------------------------------------
+
+// The image account's id is composed rather than read back from the module.
+// Referencing the outputs of a conditional module inside an array expression
+// runs into the same BCP422 short-circuit problem documented in
+// imageAccount.bicep; resourceId() is a pure string function and is safe to
+// evaluate whether or not the account exists.
+var imageAccountId = resourceId('Microsoft.CognitiveServices/accounts', '${abbrev.openAi}-img')
+
+module budget 'budget.bicep' = if (!empty(trim(budgetContactEmails))) {
+  name: 'budget'
+  params: {
+    resourceToken: resourceToken
+    amount: int(monthlyBudgetAmount)
+    aiAmount: int(aiMonthlyBudgetAmount)
+    startDate: budgetStartDate
+    contactEmails: budgetContactEmails
+    aiResourceIds: provisionImageAccount
+      ? [openAi.id, vision.id, imageAccountId]
+      : [openAi.id, vision.id]
   }
 }
 

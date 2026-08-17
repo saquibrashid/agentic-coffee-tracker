@@ -56,6 +56,18 @@ param syncRecordQuota string = '20000'
 @description('Static Web App SKU. Standard adds linked backends (same-origin /api) but is not free.')
 param staticWebAppSkuName string = 'Free'
 
+@description('Monthly cost ceiling for this deployment, in the billing account currency, as a positive integer. Alerts only — Azure does not stop the spend when a budget is exceeded. Passed as a string because azd substitutes parameter values textually; an unparseable value fails the deploy, which for a control of this kind is better than silently deploying a wrong number.')
+param monthlyBudgetAmount string = '25'
+
+@description('Monthly cost ceiling for the AI accounts alone, as a positive integer. Below the overall ceiling on purpose, so that a runaway AI bill is reported as such rather than as a vague overspend.')
+param aiMonthlyBudgetAmount string = '15'
+
+@description('Comma-separated addresses that receive budget alerts. Empty (the default) provisions no budget: an unread alert is not a control, so this template asks for a destination before it claims to have one.')
+param budgetContactEmails string = ''
+
+@description('First day of the month the budgets begin tracking. Defaults to the current month; utcNow() is only legal in a parameter default, which is why this is a parameter at all.')
+param budgetStartDate string = utcNow('yyyy-MM-01')
+
 var resourceToken = toLower(uniqueString(subscription().id, environmentName, location))
 var tags = { 'azd-env-name': environmentName }
 
@@ -86,6 +98,10 @@ module resources 'resources.bicep' = {
     syncAllowlist: syncAllowlist
     syncRecordQuota: syncRecordQuota
     staticWebAppSkuName: staticWebAppSkuName
+    monthlyBudgetAmount: monthlyBudgetAmount
+    aiMonthlyBudgetAmount: aiMonthlyBudgetAmount
+    budgetContactEmails: budgetContactEmails
+    budgetStartDate: budgetStartDate
   }
 }
 
