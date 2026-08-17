@@ -34,6 +34,7 @@ import {
   type AnalyticsRange,
   type CategoryMetric,
 } from '@/services/analytics/compute';
+import { MAX_SCORE } from '@/services/ratings/scale';
 
 const RANGE_OPTIONS: { value: AnalyticsRange; label: string }[] = [
   { value: '30d', label: 'Last 30 days' },
@@ -84,16 +85,24 @@ function MetricCard({
   );
 }
 
+/** How many rows a breakdown shows before the user asks for the rest. */
+const BREAKDOWN_PREVIEW = 8;
+
 function RankedBreakdown({
   title,
   description,
   items,
+  baseline,
 }: {
   title: string;
   description: string;
   items: CategoryMetric[];
+  /** The user's overall average in this range. Divides praise from complaint. */
+  baseline: number;
 }) {
-  const maxCount = Math.max(...items.map((item) => item.count), 1);
+  const [expanded, setExpanded] = useState(false);
+  const visible = expanded ? items : items.slice(0, BREAKDOWN_PREVIEW);
+  const hidden = items.length - visible.length;
 
   return (
     <Card>
@@ -105,24 +114,47 @@ function RankedBreakdown({
         {items.length === 0 ? (
           <p className="text-muted-foreground text-sm">Not enough tagged ratings in this view.</p>
         ) : (
-          <ol className="space-y-3">
-            {items.map((item) => (
-              <li key={item.value}>
-                <div className="mb-1 flex items-baseline justify-between gap-3">
-                  <span className="truncate text-sm font-medium">{label(item.value)}</span>
-                  <span className="text-muted-foreground shrink-0 text-xs">
-                    {item.averageScore.toFixed(1)} avg · {item.count}
-                  </span>
-                </div>
-                <div className="bg-muted h-2 overflow-hidden rounded-full">
-                  <div
-                    className="bg-primary h-full rounded-full"
-                    style={{ width: `${Math.max(8, (item.count / maxCount) * 100)}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ol>
+          <>
+            <ol className="space-y-3">
+              {visible.map((item) => {
+                const liked = item.weightedScore > baseline;
+                return (
+                  <li key={item.value}>
+                    <div className="mb-1 flex items-baseline justify-between gap-3">
+                      <span className="truncate text-sm font-medium">{label(item.value)}</span>
+                      <span className="text-muted-foreground shrink-0 text-xs">
+                        {item.averageScore.toFixed(1)} avg · {item.count}{' '}
+                        {item.count === 1 ? 'rating' : 'ratings'}
+                        {item.beanCount < item.count
+                          ? ` from ${item.beanCount} ${item.beanCount === 1 ? 'coffee' : 'coffees'}`
+                          : ''}
+                      </span>
+                    </div>
+                    <div className="bg-muted h-2 overflow-hidden rounded-full">
+                      <div
+                        className={`h-full rounded-full ${liked ? 'bg-primary' : 'bg-muted-foreground/50'}`}
+                        style={{ width: `${Math.max(4, (item.weightedScore / MAX_SCORE) * 100)}%` }}
+                      />
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+            <p className="text-muted-foreground mt-4 text-xs">
+              Ordered by score, held back where there are few ratings, so one great cup cannot top
+              the list on its own. A grey bar is below your {baseline.toFixed(1)} average.
+            </p>
+            {hidden > 0 || expanded ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-1 h-auto px-0 text-xs"
+                onClick={() => setExpanded((open) => !open)}
+              >
+                {expanded ? 'Show fewer' : `Show all ${items.length}`}
+              </Button>
+            ) : null}
+          </>
         )}
       </CardContent>
     </Card>
@@ -377,28 +409,33 @@ export function AnalyticsPage() {
           >
             <RankedBreakdown
               title="Brew methods"
-              description="Ranked by average score; bar length shows sample size."
+              description="Which way of making coffee earns your best scores."
               items={data.brewMethods}
+              baseline={data.baseline}
             />
             <RankedBreakdown
               title="Origins"
-              description="Countries associated with your highest-rated cups."
+              description="Countries associated with your highest-rated coffees."
               items={data.topOrigins}
+              baseline={data.baseline}
             />
             <RankedBreakdown
               title="Roast levels"
               description="Which parts of the roast spectrum work best for you."
               items={data.roastLevels}
+              baseline={data.baseline}
             />
             <RankedBreakdown
               title="Roasters"
               description="Averages use ratings, not the number of bags."
               items={data.topRoasters}
+              baseline={data.baseline}
             />
             <RankedBreakdown
               title="Flavor notes"
               description="Notes on coffees that earned your strongest ratings."
               items={data.topFlavors}
+              baseline={data.baseline}
             />
           </section>
         </>

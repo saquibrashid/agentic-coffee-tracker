@@ -198,7 +198,24 @@ preference rather than by frequency (issue #199).
 `weightedScore` therefore shares the 1–10 scale with `averageScore`. It is not a
 score multiplied by a count; an earlier implementation used
 `average * log2(1 + count)`, which ranked partly by how often a value appeared
-and put a note averaging 6.5 across 8 cups above one averaging 9.0 across 2.
+and put a note averaging 6.5 across 8 ratings above one averaging 9.0 across 2.
+
+The rule lives in `services/ratings/shrink` because **Analytics answers the same
+question from the same ratings** and must agree with the taste map. Until
+issue #202 each screen had its own arithmetic — Analytics sorted by the raw
+average and drew its bars from the rating count — so the two could order the
+same history differently and both look authoritative. Its panels now carry:
+
+- `count` — **ratings**, not cups and not distinct coffees.
+- `beanCount` — how many different coffees those ratings came from. Shown when it
+  is lower, because "9.0 from 6 ratings" reads like six coffees agreeing when it
+  may be one coffee rated six times, which is far weaker evidence.
+- `weightedScore` — what the list is ordered by _and_ what the bar length is drawn
+  from, so the ordering the user sees matches the lengths they see.
+
+Analytics returns every value rather than a top slice; the screen previews eight
+and can expand. "Is that the full list?" is a question the page can only answer
+if it knows what it is hiding.
 
 Not yet implemented, and deliberately left out for now:
 

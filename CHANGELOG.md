@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Analytics ranks by score, counts ratings, and admits what it is hiding.**
+  The breakdown panels sorted by raw average, printed that average, and then
+  drew the bar from something else entirely — the number of ratings — so every
+  note on your single best coffee tied at the top with a full-length bar, and
+  the bars contradicted the order they were in. Bars are now drawn from the
+  score the list is sorted by, and that score is held back where few ratings
+  stand behind it, using the same rule as the taste map on "For you" rather than
+  arithmetic of its own; the two screens could previously order the same history
+  differently and both look authoritative. Bars below your own average are drawn
+  grey so the weak end of the list is visible rather than merely short. The bare
+  number beside each score now says what it counts — ratings, not cups — and
+  names how many different coffees they came from when that is fewer, because
+  "9.0 from 6 ratings" reads like six coffees agreeing when it may be one coffee
+  rated six times. Each panel showed a silent top slice and now says how many
+  values it is holding back, with a control to show them all.
+
 - **"Will I like it?" can tell two coffees apart again.** Asking about a dark
   roast and a light roast from the same roaster and origin returned the same
   score for both. Three things caused it. The estimate was being snapped onto the
@@ -39,7 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the page displayed both scores side by side and appeared to sort them wrongly.
   Popularity can no longer promote something you rate below your own average.
   Values are now shrunk toward that average instead, which still hedges a single
-  enthusiastic cup without letting volume overrule the score. The "Your current
+  enthusiastic rating without letting volume overrule the score. The "Your current
   signature" sentence inherited the same fault and named leaders you rate poorly;
   it now only cites what genuinely runs above your average, and says nothing at
   all when nothing does. A new **Recurring disappointment** insight names what

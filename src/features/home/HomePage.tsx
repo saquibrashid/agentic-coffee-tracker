@@ -272,7 +272,9 @@ export function HomePage() {
             label="Ratings logged"
             value={String(dashboard.ratings.length)}
             detail={
-              dashboard.ratings.length === 1 ? 'One cup remembered' : 'Cups shaping your profile'
+              dashboard.ratings.length === 1
+                ? 'One rating remembered'
+                : 'Ratings shaping your profile'
             }
             to="/analytics"
           />

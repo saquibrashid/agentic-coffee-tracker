@@ -334,7 +334,7 @@ export function RecommendationsPage() {
                 <p className="text-muted-foreground text-xs">
                   Ranked by how far above your own {preferences.averageScore.toFixed(1)} average
                   each runs, held back where there are few ratings. Numbers show raw average and
-                  cups; a grey bar is below your average.
+                  ratings; a grey bar is below your average.
                 </p>
               </div>
             </div>

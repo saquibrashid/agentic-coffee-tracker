@@ -92,4 +92,88 @@ describe('computeAnalyticsFrom', () => {
     expect(result.insights).toEqual([]);
     expect(result.activity).toHaveLength(13);
   });
+
+  describe('category ranking (#202)', () => {
+    // The user's own report: "flavor notes shows all flavors with a 9 rating".
+    // Every note on their single best coffee tied at the top, because the sort
+    // was on the raw average and a note rated once scores whatever that one
+    // coffee scored.
+    // Both notes sit above the user's own average, so the only thing separating
+    // them is how much evidence stands behind each. (Shrinkage deliberately
+    // never moves a value across the baseline, so a comparison spanning it
+    // would be testing something else.)
+    const beans = [
+      bean('lucky', { tastingNotes: ['jasmine'] }),
+      bean('proven', { tastingNotes: ['chocolate'] }),
+      bean('filler', { tastingNotes: ['ash'] }),
+    ];
+    const ratings = [
+      rating('r1', 'lucky', 10, '2026-08-01T00:00:00.000Z'),
+      ...Array.from({ length: 6 }, (_, i) =>
+        rating(`c${i}`, 'proven', 8.5, `2026-08-0${i + 1}T06:00:00.000Z`),
+      ),
+      ...Array.from({ length: 6 }, (_, i) =>
+        rating(`f${i}`, 'filler', 4, `2026-08-0${i + 1}T12:00:00.000Z`),
+      ),
+    ];
+
+    it('holds back a note backed by a single rating', () => {
+      const result = computeAnalyticsFrom(beans, ratings, 'all', now);
+      const [first, second] = result.topFlavors;
+
+      // Jasmine has the better raw average and still loses, because one rating
+      // is not evidence that the user likes jasmine.
+      expect(first?.value).toBe('chocolate');
+      expect(second?.value).toBe('jasmine');
+      expect(second!.averageScore).toBeGreaterThan(first!.averageScore);
+      expect(second!.weightedScore).toBeLessThan(first!.weightedScore);
+    });
+
+    it('ranks by the same score the bars are drawn from', () => {
+      const result = computeAnalyticsFrom(beans, ratings, 'all', now);
+      const scores = result.topFlavors.map((item) => item.weightedScore);
+
+      expect(scores).toEqual([...scores].sort((a, b) => b - a));
+    });
+
+    it('reports how many coffees the ratings came from, not just how many there were', () => {
+      // "9.0 avg from 6 ratings" reads like six coffees agreeing. Here it is
+      // one coffee rated six times, which is a far weaker claim.
+      const result = computeAnalyticsFrom(beans, ratings, 'all', now);
+      const chocolate = result.topFlavors.find((item) => item.value === 'chocolate');
+
+      expect(chocolate).toMatchObject({ count: 6, beanCount: 1 });
+    });
+
+    it('returns every value so the screen can say what it is hiding', () => {
+      const many = Array.from({ length: 12 }, (_, i) =>
+        bean(`b${i}`, { tastingNotes: [`note-${i}`] }),
+      );
+      const each = many.map((b, i) => rating(`r${i}`, b.id, 7, '2026-08-01T00:00:00.000Z'));
+
+      const result = computeAnalyticsFrom(many, each, 'all', now);
+
+      expect(result.topFlavors).toHaveLength(12);
+    });
+
+    it('shrinks toward the user own average, so a bad note cannot be promoted by volume', () => {
+      const disliked = [
+        bean('good', { tastingNotes: ['toffee'] }),
+        bean('bad', { tastingNotes: ['ash'] }),
+      ];
+      const mixed = [
+        rating('g1', 'good', 9, '2026-08-01T00:00:00.000Z'),
+        rating('g2', 'good', 9, '2026-08-02T00:00:00.000Z'),
+        ...Array.from({ length: 8 }, (_, i) =>
+          rating(`a${i}`, 'bad', 4, `2026-08-0${(i % 8) + 1}T06:00:00.000Z`),
+        ),
+      ];
+
+      const result = computeAnalyticsFrom(disliked, mixed, 'all', now);
+      const ash = result.topFlavors.find((item) => item.value === 'ash');
+
+      expect(result.topFlavors[0]?.value).toBe('toffee');
+      expect(ash!.weightedScore).toBeLessThan(result.baseline);
+    });
+  });
 });

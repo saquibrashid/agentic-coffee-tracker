@@ -1,13 +1,24 @@
 import { db } from '@/services/db';
-import { MAX_SCORE, MIN_SCORE } from '@/services/ratings/scale';
+import { MAX_SCORE, MIN_SCORE, NEUTRAL_SCORE } from '@/services/ratings/scale';
+import { shrinkToBaseline } from '@/services/ratings/shrink';
 import type { CoffeeBean, Rating } from '@/types';
 
 export type AnalyticsRange = '30d' | '90d' | '1y' | 'all';
 
 export interface CategoryMetric {
   value: string;
+  /** Number of ratings — not cups, and not distinct coffees. */
   count: number;
+  /** How many different coffees those ratings came from. */
+  beanCount: number;
   averageScore: number;
+  /**
+   * `averageScore` pulled toward the user's overall average by how little
+   * evidence stands behind it. What the list is ordered by, and what the bars
+   * are drawn from, so that the ordering the user sees matches the length they
+   * see. Shares the 1–10 scale with `averageScore`.
+   */
+  weightedScore: number;
 }
 
 export interface ActivityPoint {
@@ -23,6 +34,12 @@ export interface AnalyticsSummary {
   ratedBeans: number;
   totalRatings: number;
   averageScore: number;
+  /**
+   * The score that divides praise from complaint: the user's own average over
+   * this range, or the middle of the scale when there is nothing to average.
+   * Every category ranking is shrunk toward it.
+   */
+  baseline: number;
   averageScoreChange: number | null;
   topRoasters: CategoryMetric[];
   topOrigins: CategoryMetric[];
@@ -38,6 +55,7 @@ export interface AnalyticsSummary {
 interface Accumulator {
   count: number;
   total: number;
+  beanIds: Set<string>;
 }
 
 const RANGE_DAYS: Record<Exclude<AnalyticsRange, 'all'>, number> = {
@@ -57,24 +75,41 @@ function average(ratings: Rating[]): number {
     : ratings.reduce((total, rating) => total + rating.score, 0) / ratings.length;
 }
 
-function add(map: Map<string, Accumulator>, value: string | undefined, score: number): void {
+function add(
+  map: Map<string, Accumulator>,
+  value: string | undefined,
+  score: number,
+  beanId: string,
+): void {
   const clean = value?.trim();
   if (!clean) return;
-  const current = map.get(clean) ?? { count: 0, total: 0 };
+  const current = map.get(clean) ?? { count: 0, total: 0, beanIds: new Set<string>() };
   current.count += 1;
   current.total += score;
+  current.beanIds.add(beanId);
   map.set(clean, current);
 }
 
-function metrics(map: Map<string, Accumulator>, limit = 8): CategoryMetric[] {
+/**
+ * Orders a category by how much the user liked it, best first.
+ *
+ * Returns every value rather than a top slice. The screen decides how many to
+ * show, because "is that the whole list?" is a question the user can only
+ * answer if the page knows what it is hiding (issue #202).
+ */
+function metrics(map: Map<string, Accumulator>, baseline: number): CategoryMetric[] {
   return Array.from(map.entries())
-    .map(([value, item]) => ({
-      value,
-      count: item.count,
-      averageScore: item.total / item.count,
-    }))
-    .sort((a, b) => b.averageScore - a.averageScore || b.count - a.count)
-    .slice(0, limit);
+    .map(([value, item]) => {
+      const averageScore = item.total / item.count;
+      return {
+        value,
+        count: item.count,
+        beanCount: item.beanIds.size,
+        averageScore,
+        weightedScore: shrinkToBaseline(item.count, averageScore, baseline),
+      };
+    })
+    .sort((a, b) => b.weightedScore - a.weightedScore || b.count - a.count);
 }
 
 function startOfMonth(date: Date): Date {
@@ -116,7 +151,7 @@ function activitySeries(
     const date = new Date(ratingTime(rating));
     const bucket = weekly ? startOfWeek(date) : startOfMonth(date);
     if (bucket < start || bucket > end) continue;
-    add(grouped, bucketKey(bucket, weekly), rating.score);
+    add(grouped, bucketKey(bucket, weekly), rating.score, rating.beanId);
   }
 
   const activity: ActivityPoint[] = [];
@@ -169,7 +204,7 @@ function buildInsights(
   const origin = summary.topOrigins[0];
   if (origin) {
     insights.push(
-      `${origin.value} leads your origins with a ${origin.averageScore.toFixed(1)} average from ${origin.count} ${origin.count === 1 ? 'cup' : 'cups'}.`,
+      `${origin.value} leads your origins with a ${origin.averageScore.toFixed(1)} average from ${origin.count} ${origin.count === 1 ? 'rating' : 'ratings'}.`,
     );
   }
 
@@ -219,20 +254,26 @@ export function computeAnalyticsFrom(
   const roasts = new Map<string, Accumulator>();
 
   for (const rating of scopedRatings) {
-    add(brews, rating.brewType, rating.score);
+    add(brews, rating.brewType, rating.score, rating.beanId);
     const bean = beanById.get(rating.beanId);
     if (!bean) continue;
-    add(roasters, bean.roaster || 'Unknown roaster', rating.score);
+    add(roasters, bean.roaster || 'Unknown roaster', rating.score, rating.beanId);
     if (bean.roastLevel && bean.roastLevel !== 'unknown') {
-      add(roasts, bean.roastLevel, rating.score);
+      add(roasts, bean.roastLevel, rating.score, rating.beanId);
     }
-    for (const origin of bean.origins ?? []) add(origins, origin.country, rating.score);
+    for (const origin of bean.origins ?? []) {
+      add(origins, origin.country, rating.score, rating.beanId);
+    }
     for (const flavor of new Set((bean.tastingNotes ?? []).map((note) => note.toLowerCase()))) {
-      add(flavors, flavor, rating.score);
+      add(flavors, flavor, rating.score, rating.beanId);
     }
   }
 
   const averageScore = average(scopedRatings);
+  // The baseline every category is shrunk toward. With no ratings in range
+  // there is no "your average" to speak of, so fall back to the middle of the
+  // scale rather than to 0, which is not a score anyone can give.
+  const baseline = scopedRatings.length > 0 ? averageScore : NEUTRAL_SCORE;
   const previousAverage = average(previousRatings);
   const averageScoreChange =
     days !== null && previousRatings.length > 0 ? averageScore - previousAverage : null;
@@ -244,12 +285,13 @@ export function computeAnalyticsFrom(
     ratedBeans: new Set(scopedRatings.map((rating) => rating.beanId)).size,
     totalRatings: scopedRatings.length,
     averageScore,
+    baseline,
     averageScoreChange,
-    topRoasters: metrics(roasters, 6),
-    topOrigins: metrics(origins, 6),
-    topFlavors: metrics(flavors, 8),
-    brewMethods: metrics(brews, 8),
-    roastLevels: metrics(roasts, 5),
+    topRoasters: metrics(roasters, baseline),
+    topOrigins: metrics(origins, baseline),
+    topFlavors: metrics(flavors, baseline),
+    brewMethods: metrics(brews, baseline),
+    roastLevels: metrics(roasts, baseline),
     scoreHistogram: Array.from({ length: MAX_SCORE - MIN_SCORE + 1 }, (_, index) => {
       const score = MIN_SCORE + index;
       return {
