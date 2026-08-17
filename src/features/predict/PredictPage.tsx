@@ -520,7 +520,7 @@ export function PredictPage() {
         <CardContent>
           <p className="text-muted-foreground text-sm">
             This works by comparing a coffee against what you have already rated, so it needs a
-            little history first. Rate at least {MIN_RATINGS_FOR_PREDICTION} cups — you have{' '}
+            little history first. Log at least {MIN_RATINGS_FOR_PREDICTION} ratings — you have{' '}
             {index.totalRatings} — or bulk-import your existing notes from Settings.
           </p>
         </CardContent>

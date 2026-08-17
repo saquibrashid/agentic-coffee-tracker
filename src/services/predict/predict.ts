@@ -441,20 +441,24 @@ export function predict(candidate: Candidate, index: PredictionIndex): Predictio
 
 /** Human-readable justification for one piece of evidence. */
 export function explain(evidence: Evidence): string {
-  const cups = `${evidence.count} ${evidence.count === 1 ? 'cup' : 'cups'}`;
+  // "ratings", not "cups". The number counts rating records, and one bag rated
+  // twice is two of them however many cups were actually poured from it — so
+  // "cups" overstates the history in one direction and understates the
+  // drinking in the other.
+  const ratings = `${evidence.count} ${evidence.count === 1 ? 'rating' : 'ratings'}`;
   const average = evidence.averageScore.toFixed(1);
   switch (evidence.kind) {
     case 'roaster':
-      return `You have rated ${cups} from ${evidence.label} at ${average}/${MAX_SCORE}.`;
+      return `You have ${ratings} from ${evidence.label} averaging ${average}/${MAX_SCORE}.`;
     case 'origin':
-      return `Coffees from ${evidence.label} average ${average}/${MAX_SCORE} across ${cups}.`;
+      return `Coffees from ${evidence.label} average ${average}/${MAX_SCORE} across ${ratings}.`;
     case 'process':
-      return `${evidence.label} process averages ${average}/${MAX_SCORE} across ${cups}.`;
+      return `${evidence.label} process averages ${average}/${MAX_SCORE} across ${ratings}.`;
     case 'roastLevel':
       return evidence.approximate
-        ? `You have not rated this roast level, but the nearest you have — ${evidence.label} — averages ${average}/${MAX_SCORE} across ${cups}.`
-        : `${evidence.label} roasts average ${average}/${MAX_SCORE} across ${cups}.`;
+        ? `You have not rated this roast level, but the nearest you have — ${evidence.label} — averages ${average}/${MAX_SCORE} across ${ratings}.`
+        : `${evidence.label} roasts average ${average}/${MAX_SCORE} across ${ratings}.`;
     case 'flavour':
-      return `Coffees noting "${evidence.label}" average ${average}/${MAX_SCORE} across ${cups}.`;
+      return `Coffees noting "${evidence.label}" average ${average}/${MAX_SCORE} across ${ratings}.`;
   }
 }

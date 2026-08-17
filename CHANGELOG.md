@@ -25,10 +25,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verdict resting on one attribute no longer looks as certain as one resting on
   five.
 
+- **"Will I like it?" counts ratings, not cups.** Every explanation on the screen
+  read "across 7 cups", but the number counts rating records: one bag rated twice
+  is two of them however many cups were actually poured from it, and a bag rated
+  once could be a fortnight's drinking. The unit overstated the history in one
+  direction and understated the drinking in the other, so the wording now says
+  what the arithmetic actually measures.
+
 - **The taste map is ordered by how much you liked something, not how often you
   bought it.** The lists ranked each value by its average score multiplied by a
   term that grew with the number of ratings — a number never shown — so a note
-  averaging 6.5 across eight cups sat above one averaging 9.0 across two while
+  averaging 6.5 across eight ratings sat above one averaging 9.0 across two while
   the page displayed both scores side by side and appeared to sort them wrongly.
   Popularity can no longer promote something you rate below your own average.
   Values are now shrunk toward that average instead, which still hedges a single

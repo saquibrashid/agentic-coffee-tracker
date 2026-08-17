@@ -233,10 +233,10 @@ w(a) = kindWeight(a) * log2(1 + count(a)) * informativeness(a) * proximity(a)
 - `kindWeight` — origin 1, process 0.9, roaster 0.85, roast level 0.8,
   flavour 0.35. Flavour notes are marketing copy, so they are individually weak
   and only the four most informative count.
-- `log2(1 + count)` — the tenth cup of something adds far less than the second.
+- `log2(1 + count)` — the tenth rating of something adds far less than the second.
 - `informativeness = log2(1 + total/count) / log2(1 + total)`, normalised to 1
   for a value seen once. **Volume of evidence and value of evidence are not the
-  same thing.** An attribute present in nearly every cup necessarily averages
+  same thing.** An attribute present in nearly every rating necessarily averages
   close to the baseline, so it distinguishes nothing — yet without this term its
   count gave it the largest weight of any attribute and pulled every verdict back
   to the middle, which is how two very different coffees returned the same score

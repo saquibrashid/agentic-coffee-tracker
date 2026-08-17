@@ -339,10 +339,25 @@ describe('explain', () => {
   it('cites the real numbers behind a match', () => {
     expect(
       explain({ kind: 'origin', label: 'Ethiopia', count: 7, averageScore: 4.57, delta: 0.4 }),
-    ).toBe('Coffees from Ethiopia average 4.6/10 across 7 cups.');
+    ).toBe('Coffees from Ethiopia average 4.6/10 across 7 ratings.');
     expect(explain({ kind: 'roaster', label: 'Onyx', count: 1, averageScore: 10, delta: 1 })).toBe(
-      'You have rated 1 cup from Onyx at 10.0/10.',
+      'You have 1 rating from Onyx averaging 10.0/10.',
     );
+  });
+
+  it('counts ratings rather than cups', () => {
+    // #202: one bag rated twice is two ratings however many cups came out of
+    // it, so "cups" was claiming a drinking history the app never recorded.
+    const said = explain({
+      kind: 'flavour',
+      label: 'chocolate',
+      count: 2,
+      averageScore: 9,
+      delta: 2,
+    });
+
+    expect(said).toContain('2 ratings');
+    expect(said).not.toContain('cup');
   });
 
   it('does not claim the user has rated a roast level they have not', () => {
@@ -356,7 +371,7 @@ describe('explain', () => {
         approximate: true,
       }),
     ).toBe(
-      'You have not rated this roast level, but the nearest you have — medium-dark — averages 6.0/10 across 4 cups.',
+      'You have not rated this roast level, but the nearest you have — medium-dark — averages 6.0/10 across 4 ratings.',
     );
   });
 });
