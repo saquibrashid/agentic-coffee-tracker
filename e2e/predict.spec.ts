@@ -13,9 +13,9 @@ import { test, expect, type Page } from '@playwright/test';
 const HEADER = 'roaster,coffee,score,brew,date,notes,roast,process,origin,tasting notes';
 
 /**
- * Ten cups: five loved Ethiopian naturals, five disliked Brazilian washes. Every
- * row is fully described so the import queues no background lookups, which would
- * otherwise fire network calls the preview server cannot answer.
+ * Ten ratings: five loved Ethiopian naturals, five disliked Brazilian washes.
+ * Every row is fully described so the import queues no background lookups, which
+ * would otherwise fire network calls the preview server cannot answer.
  */
 const CSV = [
   HEADER,
@@ -59,7 +59,7 @@ test.describe('will I like it?', () => {
     await page.goto('/predict');
 
     await expect(page.getByRole('heading', { name: 'Will I like it?' })).toBeVisible();
-    await expect(page.getByText(/Rate at least 3 cups/)).toBeVisible();
+    await expect(page.getByText(/Log at least 3 ratings/)).toBeVisible();
     await expect(page.locator('#predict-origin')).toHaveCount(0);
   });
 
@@ -72,7 +72,9 @@ test.describe('will I like it?', () => {
 
     const prediction = page.getByTestId('prediction');
     await expect(prediction).toContainText('This looks like your kind of coffee.');
-    await expect(prediction).toContainText('Coffees from Ethiopia average 10.0/10 across 5 cups.');
+    await expect(prediction).toContainText(
+      'Coffees from Ethiopia average 10.0/10 across 5 ratings.',
+    );
 
     const score = Number(await page.getByTestId('prediction-score').innerText());
     expect(score).toBeGreaterThan(8.4);
