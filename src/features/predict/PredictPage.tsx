@@ -38,6 +38,7 @@ import { isCameraSupported } from '@/services/camera';
 import { CameraCapture } from '@/features/capture/CameraCapture';
 import { usePasteImage } from '@/hooks/usePasteImage';
 import { EmptyPageError, enrichFromUrl } from '@/services/enrich';
+import { previewImageFromUrl } from '@/services/enrich/photo';
 import { dataUrlToBlob, resizeDataUrl } from '@/services/image/imagePipeline';
 import { canPredict, loadPredictionIndex, MIN_RATINGS_FOR_PREDICTION } from '@/services/predict';
 import {
@@ -78,6 +79,11 @@ const VERDICT_STYLES: Record<Verdict, { className: string; Icon: typeof ThumbsUp
 };
 
 interface FormState {
+  /**
+   * The coffee's own name. Carried purely as a label — see `handlePredict`,
+   * which deliberately does not feed it to the estimate.
+   */
+  name: string;
   roaster: string;
   origin: string;
   process: Process | '';
@@ -86,6 +92,7 @@ interface FormState {
 }
 
 const EMPTY_FORM: FormState = {
+  name: '',
   roaster: '',
   origin: '',
   process: '',
@@ -97,7 +104,8 @@ type BusyKind = 'photo' | 'link';
 type ProcessingStage = 'preparing' | 'reading' | 'interpreting';
 
 type CheckSource =
-  { kind: 'photo'; previewUrl: string; name: string } | { kind: 'link'; url: string; host: string };
+  | { kind: 'photo'; previewUrl: string; name: string }
+  | { kind: 'link'; url: string; host: string; previewUrl?: string };
 
 const STAGE_COPY: Record<
   BusyKind,
@@ -207,13 +215,23 @@ function ProcessingPanel({
   );
 }
 
-function SourcePreview({ source }: { source: CheckSource }) {
+function SourcePreview({ source, title }: { source: CheckSource; title?: string | null }) {
+  // A link's picture arrives as a data URL from `/api/image`, never as the
+  // roaster's own URL: `img-src` is 'self' data: blob:, so pointing an <img> at
+  // a third-party host would be blocked outright (build-config/csp.ts).
+  const previewUrl = source.previewUrl;
+  const caption = source.kind === 'photo' ? source.name : source.host;
+
   return (
     <div className="bg-muted/45 overflow-hidden rounded-lg border">
-      {source.kind === 'photo' ? (
+      {previewUrl ? (
         <img
-          src={source.previewUrl}
-          alt={`Selected coffee bag: ${source.name}`}
+          src={previewUrl}
+          alt={
+            source.kind === 'photo'
+              ? `Selected coffee bag: ${source.name}`
+              : `Coffee bag pictured on ${source.host}`
+          }
           className="max-h-72 w-full object-contain"
         />
       ) : (
@@ -231,18 +249,31 @@ function SourcePreview({ source }: { source: CheckSource }) {
           <p className="text-meta text-muted-foreground">
             {source.kind === 'photo' ? 'Selected photo' : 'Source page'}
           </p>
-          <p className="truncate text-sm font-medium">
-            {source.kind === 'photo' ? source.name : source.host}
-          </p>
+          <p className="truncate text-sm font-medium">{title ?? caption}</p>
+          {title ? <p className="text-muted-foreground truncate text-xs">{caption}</p> : null}
         </div>
       </div>
     </div>
   );
 }
 
+/**
+ * What to call the coffee on screen: its own name and roaster when known.
+ *
+ * Returns null rather than a placeholder, so callers fall back to their own
+ * generic copy instead of titling the card "Untitled coffee".
+ */
+function coffeeTitle(form: Pick<FormState, 'name' | 'roaster'>): string | null {
+  const name = form.name.trim();
+  const roaster = form.roaster.trim();
+  if (name && roaster) return `${name} — ${roaster}`;
+  return name || roaster || null;
+}
+
 /** Folds a parsed bag or product page into the form the user can correct. */
 function formFromParsed(parsed: ParsedBean): FormState {
   return {
+    name: parsed.name ?? '',
     roaster: parsed.roaster ?? '',
     origin: parsed.origins
       .map((o) => o.country)
@@ -277,7 +308,7 @@ function EvidenceList({ title, items }: { title: string; items: Evidence[] }) {
   );
 }
 
-function VerdictCard({ prediction }: { prediction: Prediction }) {
+function VerdictCard({ prediction, title }: { prediction: Prediction; title?: string | null }) {
   const { className, Icon } = VERDICT_STYLES[prediction.verdict];
   const confidence = Math.round(prediction.confidence * 100);
 
@@ -286,7 +317,13 @@ function VerdictCard({ prediction }: { prediction: Prediction }) {
       <div className="flex items-start gap-3">
         <Icon className="mt-0.5 shrink-0" aria-hidden="true" />
         <div>
-          <p className="font-medium">{prediction.headline}</p>
+          {/* Naming the coffee matters when several are checked from the same
+              roaster in a row: without it every verdict card looks alike and
+              there is nothing to say which one is being answered (#197). */}
+          {title ? <p className="font-medium">{title}</p> : null}
+          <p className={title ? 'text-muted-foreground text-sm' : 'font-medium'}>
+            {prediction.headline}
+          </p>
           <p className="text-muted-foreground text-sm">
             Predicted <strong data-testid="prediction-score">{prediction.score.toFixed(1)}</strong>/
             {MAX_SCORE} · {confidence}% confidence
@@ -455,6 +492,17 @@ export function PredictPage() {
       setForm(formFromParsed(enriched.parsed));
       setPrediction(null);
       setNotice('Read from that page. Correct anything below, then check the verdict.');
+
+      // The picture is cosmetic, so it is fetched after the fields are already
+      // on screen and its failure is swallowed: a roaster that blocks us must
+      // not cost the user the verdict they came for. Nothing is written to
+      // `db.photos` — this screen never saves the coffee it was asked about.
+      if (enriched.imageUrl) {
+        const previewUrl = await previewImageFromUrl(enriched.imageUrl);
+        if (previewUrl && requestId === requestRef.current) {
+          setSource({ ...nextSource, previewUrl });
+        }
+      }
     } catch (err) {
       if (requestId !== requestRef.current) return;
       setError(describeFailure(err, 'Could not read that link.'));
@@ -499,6 +547,9 @@ export function PredictPage() {
     }
   }
 
+  // `name` is deliberately absent: it is a label, not evidence, so a name on
+  // its own leaves the predictor with nothing to work from and the button
+  // should stay disabled.
   const hasAnyDetail =
     form.roaster.trim() !== '' ||
     form.origin.trim() !== '' ||
@@ -627,9 +678,21 @@ export function PredictPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {source && <SourcePreview source={source} />}
+          {source && <SourcePreview source={source} title={coffeeTitle(form)} />}
           <form onSubmit={handlePredict} className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <Label htmlFor="predict-name" className="mb-1 block">
+                  Coffee name
+                </Label>
+                <Input
+                  id="predict-name"
+                  placeholder="Konga"
+                  value={form.name}
+                  onChange={(e) => update({ name: e.target.value })}
+                  disabled={busy !== null}
+                />
+              </div>
               <div>
                 <Label htmlFor="predict-roaster" className="mb-1 block">
                   Roaster
@@ -717,7 +780,7 @@ export function PredictPage() {
 
           {prediction && (
             <div className="space-y-3">
-              <VerdictCard prediction={prediction} />
+              <VerdictCard prediction={prediction} title={coffeeTitle(form)} />
               <Button type="button" variant="outline" onClick={() => reset({ focus: true })}>
                 <RotateCcw aria-hidden="true" /> Check another coffee
               </Button>

@@ -244,6 +244,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **"Will I like it?" names the coffee and shows its picture.** Checking several
+  coffees from the same roaster in a row produced a run of verdict cards that
+  looked identical, with nothing on them to say which coffee was being answered.
+  The card is now titled with the coffee's own name and roaster, and a name read
+  off a bag or a product page is kept rather than discarded. The name is a label
+  and nothing more — it is never fed into the estimate, because a product name is
+  marketing copy carrying no signal about taste, and on its own it will not
+  enable the button. Checking by link also shows the coffee's picture now, as
+  checking by photo always did, so the two ways in look alike; nothing is saved
+  to your library either way.
+
 - **Paste an image to add or check a coffee.** A screenshot of a product page is
   usually the fastest thing to hand, and both screens made you save it to disk
   and then find it again. Ctrl+V (⌘V) on either screen now reads the image

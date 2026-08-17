@@ -183,6 +183,17 @@ Add rating form validation: score required (1–10 step 0.5), brew type required
   points at bulk import, rather than showing a confident-looking number derived from noise.
 - Editing any field clears the verdict on screen, which would otherwise describe a different coffee
   than the one in the form.
+- **The coffee is named.** The verdict card is titled "Konga — Irving Farm", falling back to the
+  roaster alone and then to the generic headline. Checking several coffees from one roaster in a row
+  otherwise produced a run of identical-looking cards with nothing to say which was being answered
+  (issue #197). The name is a **label, not evidence**: it is never fed to `predict()` — a product
+  name is marketing copy carrying no taste signal — and on its own it does not enable the button.
+- **The coffee's picture is shown for a link as well as a photo**, so the two ways in look alike.
+  It is fetched through `/api/image` and rendered as a data URL, never as the roaster's own URL:
+  `img-src` is `'self' data: blob:`, so a third-party host would be blocked outright. It goes
+  through `previewImageFromUrl`, which stores nothing — this screen must not write to `db.photos`.
+  The fetch happens after the fields are already on screen and its failure is swallowed back to the
+  gradient placeholder, because a roaster that blocks us must not cost the user their verdict.
 
 ---
 

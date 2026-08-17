@@ -46,12 +46,13 @@ async function seedHistory(page: Page) {
 
 async function fillCoffee(
   page: Page,
-  values: { origin: string; process: string; roast: string; roaster?: string },
+  values: { origin: string; process: string; roast: string; roaster?: string; name?: string },
 ) {
   await page.fill('#predict-origin', values.origin);
   await page.selectOption('#predict-process', values.process);
   await page.selectOption('#predict-roast', values.roast);
   if (values.roaster) await page.fill('#predict-roaster', values.roaster);
+  if (values.name) await page.fill('#predict-name', values.name);
 }
 
 test.describe('will I like it?', () => {
@@ -78,6 +79,51 @@ test.describe('will I like it?', () => {
 
     const score = Number(await page.getByTestId('prediction-score').innerText());
     expect(score).toBeGreaterThan(8.4);
+  });
+
+  test('names the coffee it is answering about', async ({ page }) => {
+    // #197: checking several coffees from one roaster in a row produced a run
+    // of identical-looking verdict cards with nothing to say which was which.
+    await seedHistory(page);
+
+    await page.goto('/predict');
+    await fillCoffee(page, {
+      origin: 'Ethiopia',
+      process: 'natural',
+      roast: 'light',
+      roaster: 'Irving Farm',
+      name: 'Konga',
+    });
+    await page.getByRole('button', { name: 'Will I like it?' }).click();
+
+    await expect(page.getByTestId('prediction')).toContainText('Konga — Irving Farm');
+  });
+
+  test('falls back to the roaster when the coffee has no name', async ({ page }) => {
+    await seedHistory(page);
+
+    await page.goto('/predict');
+    await fillCoffee(page, {
+      origin: 'Ethiopia',
+      process: 'natural',
+      roast: 'light',
+      roaster: 'Irving Farm',
+    });
+    await page.getByRole('button', { name: 'Will I like it?' }).click();
+
+    const prediction = page.getByTestId('prediction');
+    await expect(prediction).toContainText('Irving Farm');
+    await expect(prediction).toContainText('This looks like your kind of coffee.');
+  });
+
+  test('a name alone is not enough to ask for a verdict', async ({ page }) => {
+    // The name is a label, not evidence, so it must not enable the button.
+    await seedHistory(page);
+
+    await page.goto('/predict');
+    await page.fill('#predict-name', 'Konga');
+
+    await expect(page.getByRole('button', { name: 'Will I like it?' })).toBeDisabled();
   });
 
   test('warns off a coffee matching what the user dislikes', async ({ page }) => {

@@ -171,8 +171,34 @@ export async function preparePhotoFromUrl(imageUrl: string): Promise<StagedPhoto
   }
 }
 
-/** Optional provenance for a photo about to be written. */
-export interface CommitOptions {
+/**
+ * Fetches `imageUrl` and returns it as a data URL for display only.
+ *
+ * Two reasons this exists rather than pointing an `<img>` at the roaster's own
+ * URL. The content security policy allows `img-src 'self' data: blob:`, so a
+ * third-party host would simply be blocked; and going through `/api/image`
+ * keeps the user's browsing off the roaster's logs. Nothing is written to the
+ * photo store, which is what makes it safe on the "Will I like it?" screen —
+ * that screen must not save the coffee it was asked about.
+ *
+ * Sized for a preview, not for keeping: `preparePhotoFromUrl` is still the way
+ * in when the image is going to be stored.
+ *
+ * Returns `null` when the image could not be used, which callers should treat
+ * as "no picture this time" rather than an error.
+ */
+export async function previewImageFromUrl(imageUrl: string, maxPx = 800): Promise<string | null> {
+  try {
+    const { dataUrl } = await fetchImage({ url: imageUrl });
+    const resized = await resizeDataUrl(dataUrl, maxPx);
+    return resized.dataUrl;
+  } catch (err) {
+    console.warn('Could not load preview image', imageUrl, err);
+    return null;
+  }
+}
+
+/** Optional provenance for a photo about to be written. */ export interface CommitOptions {
   /** Defaults to `bag`: everything that comes through here is a picture of one. */
   kind?: PhotoKind;
   /** The photo this one was generated from. Only meaningful for `bag-studio`. */

@@ -10,6 +10,7 @@ import {
   comparePhotoResolution,
   getPhotoDimensions,
   preparePhotoFromUrl,
+  previewImageFromUrl,
   releasePhotoIfOrphaned,
   UPGRADE_AREA_RATIO,
 } from './photo';
@@ -207,6 +208,28 @@ describe('preparePhotoFromUrl', () => {
   it('returns null when the download fails', async () => {
     fetchImage.mockRejectedValue(new ApiError('not an image', 415));
     await expect(preparePhotoFromUrl('https://onyx.example/bad.svg')).resolves.toBeNull();
+  });
+});
+
+describe('previewImageFromUrl', () => {
+  it('returns a data URL and writes nothing', async () => {
+    // #197: "Will I like it?" shows the roaster's picture but must not save
+    // the coffee it was asked about. A data URL is also the only thing the
+    // content security policy will render — img-src is 'self' data: blob:, so
+    // the roaster's own URL would be blocked.
+    fetchImage.mockResolvedValue(imageResponse('data:image/jpeg;base64,abc'));
+
+    const preview = await previewImageFromUrl('https://onyx.example/bag.jpg');
+
+    expect(preview).toBe('data:image/jpeg;base64,abc');
+    expect(pipeline.resizeDataUrl).toHaveBeenCalledWith('data:image/jpeg;base64,abc', 800);
+    await expect(db.photos.count()).resolves.toBe(0);
+  });
+
+  it('returns null rather than failing the check it decorates', async () => {
+    fetchImage.mockRejectedValue(new ApiError('blocked', 403));
+
+    await expect(previewImageFromUrl('https://onyx.example/bag.jpg')).resolves.toBeNull();
   });
 });
 
