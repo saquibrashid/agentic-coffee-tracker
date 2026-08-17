@@ -222,6 +222,117 @@ describe('predict', () => {
     expect(result.score).toBe(5.5);
     expect(result.confidence).toBe(0);
   });
+
+  it('tells two coffees apart instead of rounding them together', () => {
+    // #200: the user compared a dark roast and a light roast from the same
+    // roaster and origin and got the same 7.5 for both. The estimate was being
+    // snapped onto the half-steps a rating form offers, which is a resolution
+    // the arithmetic does not have to give up.
+    const liked = history(3, 8.3, {
+      origins: [{ country: 'Ethiopia' }],
+      process: 'washed',
+      roastLevel: 'light',
+      tastingNotes: ['molasses'],
+    });
+    const meh = history(8, 6.5, {
+      origins: [{ country: 'Colombia' }],
+      process: 'washed',
+      roastLevel: 'medium',
+      tastingNotes: ['dark chocolate'],
+    });
+    const index = buildIndex([...liked.beans, ...meh.beans], [...liked.ratings, ...meh.ratings]);
+
+    const dark = predict(
+      {
+        roaster: 'Onyx Coffee Lab',
+        origins: [{ country: 'Ethiopia' }],
+        process: 'washed',
+        roastLevel: 'dark',
+        tastingNotes: ['dark chocolate'],
+      },
+      index,
+    );
+    const light = predict(
+      {
+        roaster: 'Onyx Coffee Lab',
+        origins: [{ country: 'Ethiopia' }],
+        process: 'washed',
+        roastLevel: 'light',
+        tastingNotes: ['molasses'],
+      },
+      index,
+    );
+
+    expect(light.score).toBeGreaterThan(dark.score);
+  });
+
+  it('does not let an attribute shared by everything drown out the rest', () => {
+    // Every coffee is washed, so "washed" averages exactly the baseline and can
+    // distinguish nothing — yet by sheer count it used to carry the largest
+    // single weight of any attribute and pull every verdict back to the middle.
+    const loved = history(4, 10, { origins: [{ country: 'Ethiopia' }], process: 'washed' });
+    const hated = history(12, 5, { origins: [{ country: 'Brazil' }], process: 'washed' });
+    const index = buildIndex(
+      [...loved.beans, ...hated.beans],
+      [...loved.ratings, ...hated.ratings],
+    );
+
+    const withProcess = predict({ origins: [{ country: 'Ethiopia' }], process: 'washed' }, index);
+    const withoutProcess = predict({ origins: [{ country: 'Ethiopia' }] }, index);
+
+    // Naming a process the user drinks in every single cup tells us nothing new,
+    // so it should barely move the estimate. Before, it dragged it most of the
+    // way from Ethiopia's 10 back toward the 6.25 baseline.
+    expect(Math.abs(withProcess.score - withoutProcess.score)).toBeLessThan(0.5);
+    expect(withProcess.score).toBeGreaterThan(index.baseline + 1);
+  });
+
+  it('treats roast level as a scale, not as unrelated labels', () => {
+    // A candidate roast the user has never rated used to count as no evidence at
+    // all, even with plenty of history one step along the scale.
+    const dislikedDark = history(6, 3, { roastLevel: 'medium-dark' });
+    const likedLight = history(6, 9, { roastLevel: 'light' });
+    const index = buildIndex(
+      [...dislikedDark.beans, ...likedLight.beans],
+      [...dislikedDark.ratings, ...likedLight.ratings],
+    );
+
+    const result = predict({ roastLevel: 'dark' }, index);
+    const roast = [...result.supporting, ...result.detracting].find((e) => e.kind === 'roastLevel');
+
+    expect(roast?.label).toBe('medium-dark');
+    expect(roast?.approximate).toBe(true);
+    expect(result.score).toBeLessThan(index.baseline);
+    // The value itself is still not one the user has rated.
+    expect(result.unknowns).not.toContain('dark');
+  });
+
+  it('is less confident about a coffee it barely recognises', () => {
+    const { beans, ratings } = history(12, 8, {
+      origins: [{ country: 'Ethiopia' }],
+      process: 'washed',
+      roastLevel: 'light',
+      tastingNotes: ['jasmine'],
+      roaster: 'Onyx Coffee Lab',
+    });
+    const index = buildIndex(beans, ratings);
+
+    const wellKnown = predict(
+      {
+        roaster: 'Onyx Coffee Lab',
+        origins: [{ country: 'Ethiopia' }],
+        process: 'washed',
+        roastLevel: 'light',
+        tastingNotes: ['jasmine'],
+      },
+      index,
+    );
+    const barelyKnown = predict({ origins: [{ country: 'Ethiopia' }] }, index);
+
+    // Both rest on attributes averaging 8, so the scores agree; only the amount
+    // of the coffee that was actually recognised differs.
+    expect(barelyKnown.confidence).toBeLessThan(wellKnown.confidence / 2);
+  });
 });
 
 describe('explain', () => {
@@ -231,6 +342,21 @@ describe('explain', () => {
     ).toBe('Coffees from Ethiopia average 4.6/10 across 7 cups.');
     expect(explain({ kind: 'roaster', label: 'Onyx', count: 1, averageScore: 10, delta: 1 })).toBe(
       'You have rated 1 cup from Onyx at 10.0/10.',
+    );
+  });
+
+  it('does not claim the user has rated a roast level they have not', () => {
+    expect(
+      explain({
+        kind: 'roastLevel',
+        label: 'medium-dark',
+        count: 4,
+        averageScore: 6,
+        delta: -1,
+        approximate: true,
+      }),
+    ).toBe(
+      'You have not rated this roast level, but the nearest you have — medium-dark — averages 6.0/10 across 4 cups.',
     );
   });
 });

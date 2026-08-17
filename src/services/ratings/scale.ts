@@ -34,6 +34,21 @@ export function clampScore(score: number): number {
 }
 
 /**
+ * Clamps into range *without* snapping to a legal step.
+ *
+ * A rating is a choice a person makes, so it has to land on a selectable value.
+ * An estimate is not: the predictor's whole job is to say a coffee looks like a
+ * 7.4 rather than a 7.7, and forcing its output onto half-steps collapsed those
+ * two answers onto the same 7.5. That is how visibly different coffees came back
+ * with identical verdicts (#200). Use this for computed estimates, and
+ * `clampScore` for anything that has to be a real, selectable rating.
+ */
+export function clampToScale(score: number): number {
+  if (!Number.isFinite(score)) return NEUTRAL_SCORE;
+  return Math.min(MAX_SCORE, Math.max(MIN_SCORE, score));
+}
+
+/**
  * Converts a score recorded on the old 1–5 scale.
  *
  * Doubling is used rather than a linear remap of the endpoints (which would

@@ -5,6 +5,7 @@ import {
   MIN_SCORE,
   SCORE_CHOICES,
   clampScore,
+  clampToScale,
   formatOutOf,
   formatScore,
   isValidScore,
@@ -57,6 +58,21 @@ describe('clampScore and roundToStep', () => {
   it('snaps to the nearest half', () => {
     expect(roundToStep(8.24)).toBe(8);
     expect(roundToStep(8.26)).toBe(8.5);
+  });
+});
+
+describe('clampToScale', () => {
+  it('bounds a value without snapping it to a step', () => {
+    // The distinction that matters: an estimate is allowed a precision a
+    // human-entered rating is not (#200).
+    expect(clampToScale(7.41)).toBe(7.41);
+    expect(clampToScale(7.71)).toBe(7.71);
+    expect(clampToScale(-4)).toBe(MIN_SCORE);
+    expect(clampToScale(99)).toBe(MAX_SCORE);
+  });
+
+  it('falls back to neutral rather than passing a non-number through', () => {
+    expect(clampToScale(Number.NaN)).toBe(5.5);
   });
 });
 

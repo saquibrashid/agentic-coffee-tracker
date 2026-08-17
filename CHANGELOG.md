@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **"Will I like it?" can tell two coffees apart again.** Asking about a dark
+  roast and a light roast from the same roaster and origin returned the same
+  score for both. Three things caused it. The estimate was being snapped onto the
+  half-steps the rating form offers, so 7.4 and 7.7 both printed as 7.5 — a
+  rating has to be a value you could pick, but an estimate does not. Whatever you
+  drink most carried the largest weight of any attribute despite averaging, by
+  definition, your overall average, so it dragged every verdict toward the middle;
+  evidence is now weighted by how far an attribute actually distinguishes coffees,
+  not merely by how often it appears. And a roast level you had never rated
+  counted as nothing at all, even with plenty of history one step away on what is
+  a scale rather than a set of unrelated labels; the nearest level now stands in,
+  discounted by distance and labelled as the approximation it is. Confidence is
+  additionally scaled by how much of the coffee was actually recognised, so a
+  verdict resting on one attribute no longer looks as certain as one resting on
+  five.
+
 - **The taste map is ordered by how much you liked something, not how often you
   bought it.** The lists ranked each value by its average score multiplied by a
   term that grew with the number of ratings — a number never shown — so a note

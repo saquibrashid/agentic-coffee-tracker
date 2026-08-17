@@ -210,6 +210,80 @@ Not yet implemented, and deliberately left out for now:
 
 ---
 
+## Prediction ("Will I like it?")
+
+A verdict on a coffee the user has _not_ rated. Computed locally and
+deterministically from their own history — never a model call — so it works
+offline and can show its working.
+
+```
+baseline   = mean(r.score) over all ratings
+average(a) = mean(r.score) over ratings whose bean carries attribute a
+count(a)   = number of those ratings
+
+score = (SUM w(a) * average(a) + K * baseline) / (SUM w(a) + K)     K = 2.5
+```
+
+### Attribute weight
+
+```
+w(a) = kindWeight(a) * log2(1 + count(a)) * informativeness(a) * proximity(a)
+```
+
+- `kindWeight` — origin 1, process 0.9, roaster 0.85, roast level 0.8,
+  flavour 0.35. Flavour notes are marketing copy, so they are individually weak
+  and only the four most informative count.
+- `log2(1 + count)` — the tenth cup of something adds far less than the second.
+- `informativeness = log2(1 + total/count) / log2(1 + total)`, normalised to 1
+  for a value seen once. **Volume of evidence and value of evidence are not the
+  same thing.** An attribute present in nearly every cup necessarily averages
+  close to the baseline, so it distinguishes nothing — yet without this term its
+  count gave it the largest weight of any attribute and pulled every verdict back
+  to the middle, which is how two very different coffees returned the same score
+  (issue #200).
+- `proximity` — roast level only; see below.
+
+The weights are then rescaled so their sum is unchanged by `informativeness`.
+That term decides how evidence is _shared out_ between attributes, not how much
+evidence there is; without the rescale it would also shrink the pool and pull
+estimates further toward the baseline, the opposite of the intent.
+
+### Roast level is ordinal
+
+`light | medium-light | medium | medium-dark | dark` is a scale, not a set of
+unrelated labels. An exact match wins outright; otherwise the nearest level the
+user has actually rated stands in, weighted by distance
+(`[1, 0.6, 0.3, 0.12, 0.04]`) and flagged `approximate` so the explanation says
+so rather than implying they have rated that level. Previously a roast the user
+had never rated counted as no evidence at all, even with plenty of history one
+step along the scale.
+
+### Confidence
+
+```
+confidence = evidence * history * coverage
+
+evidence = SUM w(a) / (SUM w(a) + K)
+history  = min(1, totalRatings / 10)
+coverage = matchedKinds / 5
+```
+
+`coverage` is what stops a verdict resting on a single recognised attribute
+presenting itself with the assurance of one resting on all five. Attributes the
+bag never mentioned, and values with no history behind them, are dropped from the
+average silently — so they have to be paid for in confidence instead.
+
+Below `MIN_CONFIDENCE = 0.25` the verdict is always `unsure`, whatever the score.
+
+### Resolution
+
+The estimate is clamped into 1–10 and rounded to **one decimal**, via
+`clampToScale`, _not_ `clampScore`. A rating is a choice a person makes, so it
+must land on a selectable half-step; an estimate is not, and snapping it to
+halves collapsed genuinely different answers onto the same number.
+
+---
+
 ## Photo (blob)
 
 Stored in a separate IndexedDB object store to keep main records small.
