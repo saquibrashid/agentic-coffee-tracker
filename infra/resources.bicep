@@ -33,10 +33,10 @@ param syncRecordQuota string = '20000'
 @description('SKU for the Azure AI Vision account. F0 is free (5,000 transactions/month) but a subscription may only hold one F0 Computer Vision account — use S1 for a second environment.')
 param visionSkuName string = 'F0'
 
-@description('Model deployed for bag parsing. Must support strict structured outputs, which /api/parse relies on. Note that the gpt-5 family rejects the `temperature` parameter the BFF sends, so switching to it needs a code change.')
-param openAiModelName string = 'gpt-4o'
+@description('Model deployed for bag parsing. Must support strict structured outputs (used by /api/parse and /api/recommend), the `temperature` parameter the BFF always sends, and the hosted `web_search` tool used by /api/search. Measured on the real prompts: gpt-5.4-mini matches gpt-4o on field accuracy at ~2.6x lower cost and ~20% lower median latency. The gpt-5.6 line still rejects `temperature`, so adopting it would need a code change - see docs/deployment.md.')
+param openAiModelName string = 'gpt-5.4-mini'
 
-param openAiModelVersion string = '2024-11-20'
+param openAiModelVersion string = '2026-03-17'
 
 @description('Thousands of tokens per minute for the model deployment.')
 param openAiCapacity int = 10

@@ -189,6 +189,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Coffee scans now run on `gpt-5.4-mini`, at roughly a third of the cost.**
+  The model behind parsing, recommendations and search had been `gpt-4o` since
+  the app was built, chosen when every cheaper option failed for a concrete
+  reason. Those reasons expired. Re-measured against the real prompt and schema
+  on eight bag texts — label fragments, noisy OCR, a datasheet, a scraped
+  product page and roaster prose — `gpt-5.4-mini` matches `gpt-4o` field for
+  field (95.3%) while costing about $0.001 per scan instead of $0.0026, and
+  answering roughly 20% faster on the one call you actually wait for. Nothing
+  about the app changes except the bill and the wait. The comparison is kept in
+  `scripts/model-eval/` so the next model is a re-run rather than a fresh
+  argument, and `docs/deployment.md` now records why each rejected candidate was
+  rejected — including `gpt-5.6-luna`, which is more accurate by half a point
+  and rejects the `temperature` parameter every call sends.
+
 - **A coffee's page is now four cards, and its tools stay out of the way.** The
   page was one long card with six headings in it, most of them forms: an
   enrichment panel, a photo panel and a rating form, all permanently open, all

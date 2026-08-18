@@ -27,7 +27,7 @@ to the Function App keeps working.
 
 ## AI services are provisioned for you
 
-`azd provision` creates an Azure AI Vision account and an Azure AI Foundry account with a `gpt-4o`
+`azd provision` creates an Azure AI Vision account and an Azure AI Foundry account with a `gpt-5.4-mini`
 deployment, so `/api/ocr`, `/api/parse`, and `/api/recommend` are **live on a first deploy** with no
 manual setup. Two things to know:
 
@@ -96,18 +96,34 @@ endpoint, keys, and model deployments are all preserved, and no application code
 Avoid the **Standard agent** setup when adding to this resource: it provisions customer-owned Cosmos
 DB, AI Search, and Storage, which carry real idle cost. A plain account plus project does not.
 
-### Why `gpt-4o` and not a smaller model
+### Why `gpt-5.4-mini`
 
-Worth recording, because the obvious cheaper choices all fail:
+The model was `gpt-4o` until August 2026. It was re-tested against the catalog (issue #223) and
+replaced, because a candidate finally matched it on accuracy while costing substantially less.
 
-| Model                        | Why not                                                                                                                    |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| `gpt-4o-mini` (`2024-07-18`) | Deployment is rejected with `ServiceModelDeprecating`.                                                                     |
-| `gpt-4.1-mini`               | No `GlobalStandard` quota — only the batch tiers.                                                                          |
-| `gpt-5-mini`                 | Rejects `temperature`, and `parse.ts`/`recommend.ts` send `temperature: 0` for determinism. Usable only with code changes. |
+Re-run the comparison with `scripts/model-eval/` before changing this again. It drives the real
+`PARSE_SYSTEM_PROMPT` and `PARSED_BEAN_SCHEMA` against eight bag texts — label fragments, noisy OCR,
+a datasheet, a scraped product page and roaster prose — and scores field by field.
 
-`gpt-4o` (`2024-11-20`) deploys cleanly, needs no code change, and costs a fraction of a cent per
-scan.
+| Model                         | Result                                                                                                                                                                                                                                                           |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gpt-5.4-mini` (`2026-03-17`) | **Adopted.** 95.3% field accuracy — identical to `gpt-4o` — at ~$0.00099 per parse vs ~$0.00259, and a 1531 ms median vs 1955 ms. Accepts `temperature` and strict schemas, and runs the hosted `web_search` tool, so it is a config change with no code change. |
+| `gpt-5.6-luna` (`2026-07-09`) | Best accuracy measured (95.8%) but **rejects `temperature`**, which `callResponses` always sends. Also the slowest (2284 ms median) and ~1.5x the cost of `gpt-5.4-mini`. Adopting it means making `temperature` optional per model — not worth it for +0.5%.    |
+| `DeepSeek-V4-Flash`           | In the catalog, but quota is **0** in every region checked (`eastus`, `eastus2`, `westus`, `westus3`, `swedencentral`). Deployment fails with `InsufficientQuota`. Needs a quota request before it can even be measured.                                         |
+| `gpt-4o-mini` (`2024-07-18`)  | Deployment is rejected with `ServiceModelDeprecating`.                                                                                                                                                                                                           |
+| `gpt-4.1-mini`                | No `GlobalStandard` quota — only the batch tiers.                                                                                                                                                                                                                |
+| `gpt-5-mini`                  | Rejects `temperature`, and `parse.ts`/`recommend.ts` send `temperature: 0` for determinism. Usable only with code changes.                                                                                                                                       |
+
+Two things are worth knowing before trusting a future re-run:
+
+- **Published capability tables are not evidence.** `gpt-5.6-luna` is widely documented as supporting
+  `temperature`; it returns `400 Unsupported parameter: 'temperature' is not supported with this
+model`. Probe the deployment, do not read about it.
+- **Accuracy alone does not decide it.** `gpt-5.4-mini` invents slightly more than `gpt-4o` on text
+  that supports nothing — it guessed a `dark` roast for an espresso blend that never states one.
+  Invented fields land in the library looking like fact, so the eval scores them as wrong and
+  `scripts/model-eval/invention.mjs` prints them. This was accepted because the confirm step puts
+  every parse in front of the user before it is saved.
 
 ## One-time setup
 
@@ -124,7 +140,7 @@ Optional — bring your own AI resources instead of the provisioned ones:
 azd env set AZURE_VISION_ENDPOINT   https://<your-vision>.cognitiveservices.azure.com/
 azd env set AZURE_VISION_KEY        <key>
 azd env set AZURE_OPENAI_ENDPOINT   https://<your-openai>.openai.azure.com/
-azd env set AZURE_OPENAI_DEPLOYMENT gpt-4o
+azd env set AZURE_OPENAI_DEPLOYMENT gpt-5.4-mini
 azd env set AZURE_OPENAI_KEY        <key>
 ```
 
@@ -342,7 +358,7 @@ Rough monthly estimate for personal usage (US East, pay-as-you-go, USD). Prices 
 | Storage                        | Standard_LRS, a few MB deployment package                       | ~$0.10       |
 | Key Vault                      | $0.03 per 10k operations                                        | <$0.01       |
 | Azure AI Vision                | `F0`: 5,000 transactions/month free                             | $0           |
-| Azure OpenAI (`gpt-4o`)        | Pay-per-token; a bag scan is ~1k tokens                         | ~$0.50       |
+| Azure OpenAI (`gpt-5.4-mini`)  | Pay-per-token; a bag scan is ~1k tokens, ~$0.001 each           | ~$0.20       |
 | Cosmos DB (sync)               | Serverless; `Standard` SKU only. ~$0.25/1M RUs, $0.25/GB-month  | ~$0.02       |
 | Photo Blob Storage (sync)      | Hot LRS; `Standard` SKU only. $0.02/GB-month, 500 MB user quota | ~$0.01       |
 | **Total**                      |                                                                 | **~$27**     |
