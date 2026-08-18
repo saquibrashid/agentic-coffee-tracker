@@ -195,6 +195,9 @@ test.describe('Web enrichment', () => {
     // Headless WebKit cannot store a Blob in IndexedDB ("Error preparing
     // Blob/File data to be stored in object store"), which is the same reason
     // the bag-capture suite skips it. The photo path is identical for both.
+    // Real iOS Safari handles this fine — verified by hand on a device in #100 —
+    // so this is an automation limitation, not an app defect. Re-check with
+    // `node scripts/webkit-blob-probe.mjs` after a Playwright upgrade.
     test.skip(browserName === 'webkit', 'Blob storage in IndexedDB is flaky in headless WebKit.');
     await stubEnrichmentApi(page, { imageUrl: 'https://mockroaster.example/bag.png' });
     await page.goto('/add');
@@ -218,6 +221,7 @@ test.describe('Web enrichment', () => {
     page,
     browserName,
   }) => {
+    // Same headless-WebKit Blob limitation as above; real iOS Safari is fine (#100).
     test.skip(browserName === 'webkit', 'Blob storage in IndexedDB is flaky in headless WebKit.');
     // No image on the import, so the saved coffee has no picture and the panel
     // has a real gap to offer.

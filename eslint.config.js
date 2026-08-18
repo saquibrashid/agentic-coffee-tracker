@@ -87,4 +87,11 @@ export default tseslint.config(
       globals: { ...globals.node },
     },
   },
+  {
+    // Its page.evaluate() body runs inside the browser, not Node.
+    files: ['scripts/webkit-blob-probe.mjs'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
 );
