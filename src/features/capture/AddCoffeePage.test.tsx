@@ -1,6 +1,7 @@
 import 'fake-indexeddb/auto';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { db } from '@/services/db';
@@ -31,6 +32,29 @@ vi.mock('@/services/image/imagePipeline', () => ({
 }));
 
 const { AddCoffeePage } = await import('./AddCoffeePage');
+
+/**
+ * A Router is not optional here, even for the tests that never navigate.
+ *
+ * Completing a capture moves the page to its confirm step, which renders
+ * `ConfirmForm`, which calls `useNavigate` so it can send the user to the
+ * coffee it just saved. Rendered bare, that call throws "useNavigate() may be
+ * used only in the context of a <Router> component" — and it throws *after* the
+ * assertions below have already passed, because they wait on the database
+ * writes rather than on the confirm step that follows them. The result was an
+ * unhandled error attributed to no test at all, appearing only when the timing
+ * happened to line up (issue #210).
+ *
+ * The page is a route in the real app, so a bare render was reproducing a
+ * situation that cannot occur in production.
+ */
+function renderPage() {
+  return render(
+    <MemoryRouter>
+      <AddCoffeePage />
+    </MemoryRouter>,
+  );
+}
 
 const stop = vi.fn();
 
@@ -86,7 +110,7 @@ afterEach(() => {
 
 describe('AddCoffeePage camera', () => {
   it('offers an in-app camera when the device has one', () => {
-    render(<AddCoffeePage />);
+    renderPage();
 
     expect(screen.getByRole('button', { name: /take a photo/i })).toBeInTheDocument();
   });
@@ -96,7 +120,7 @@ describe('AddCoffeePage camera', () => {
     // worse than no button.
     useCamera(false);
 
-    render(<AddCoffeePage />);
+    renderPage();
 
     expect(screen.queryByRole('button', { name: /take a photo/i })).not.toBeInTheDocument();
     expect(screen.getByLabelText(/photo of the coffee bag/i)).toBeInTheDocument();
@@ -106,13 +130,13 @@ describe('AddCoffeePage camera', () => {
     // `capture="environment"` made iOS Safari drop the "Photo Library" choice
     // entirely, so an existing photo of a bag could not be used. With a real
     // camera button there is no reason to keep taking that choice away.
-    render(<AddCoffeePage />);
+    renderPage();
 
     expect(screen.getByLabelText(/choose a photo/i)).not.toHaveAttribute('capture');
   });
 
   it('saves a captured frame through the same pipeline an upload uses', async () => {
-    render(<AddCoffeePage />);
+    renderPage();
 
     await userEvent.click(screen.getByRole('button', { name: /take a photo/i }));
     await screen.findByRole('status');
@@ -129,10 +153,17 @@ describe('AddCoffeePage camera', () => {
     expect(bean?.thumbnailDataUrl).toBe('data:image/jpeg;base64,thumb');
     // The frame went through the shared resize rather than being stored raw.
     expect(mocks.resizeDataUrl).toHaveBeenCalledWith('data:image/jpeg;base64,frame', 1600);
+
+    // The capture ends on the confirm step. Waiting for it is what keeps that
+    // render inside the test: the assertions above are satisfied by the
+    // database writes, which land first, so without this the confirm step
+    // rendered after the test had finished and any error it raised belonged to
+    // nobody.
+    expect(await screen.findByRole('button', { name: 'Save coffee' })).toBeInTheDocument();
   });
 
   it('queues the capture for sync like any other photo', async () => {
-    render(<AddCoffeePage />);
+    renderPage();
 
     await userEvent.click(screen.getByRole('button', { name: /take a photo/i }));
     await screen.findByRole('status');
@@ -142,10 +173,12 @@ describe('AddCoffeePage camera', () => {
       const queued = await db.outbox.toArray();
       expect(queued.map((entry) => entry.type).sort()).toEqual(['bean', 'photo']);
     });
+
+    expect(await screen.findByRole('button', { name: 'Save coffee' })).toBeInTheDocument();
   });
 
   it('returns to the upload form when the user cancels the camera', async () => {
-    render(<AddCoffeePage />);
+    renderPage();
 
     await userEvent.click(screen.getByRole('button', { name: /take a photo/i }));
     await screen.findByRole('status');
@@ -174,7 +207,7 @@ describe('AddCoffeePage paste', () => {
   }
 
   it('saves a pasted image through the same pipeline an upload uses', async () => {
-    render(<AddCoffeePage />);
+    renderPage();
 
     pasteImage(new File(['image'], 'screenshot.png', { type: 'image/png' }));
 
@@ -185,10 +218,12 @@ describe('AddCoffeePage paste', () => {
     const bean = (await db.beans.toArray())[0];
     expect(bean?.source).toBe('photo-ocr');
     expect(mocks.resizeDataUrl).toHaveBeenCalledWith(expect.stringContaining('data:'), 1600);
+
+    expect(await screen.findByRole('button', { name: 'Save coffee' })).toBeInTheDocument();
   });
 
   it('leaves a text paste to the link field', async () => {
-    render(<AddCoffeePage />);
+    renderPage();
 
     const event = new Event('paste', { bubbles: true, cancelable: true });
     Object.defineProperty(event, 'clipboardData', {

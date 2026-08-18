@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A test could fail the build after every test had already passed.** The
+  capture tests rendered the add-coffee page without a router, then waited on
+  the database writes — which land _before_ the page moves to its confirm step.
+  The test resolved, the confirm step rendered afterwards, and its
+  `useNavigate()` call threw into nobody's hands: an unattributed error printed
+  below a green summary, on the runs where the timing happened to line up. The
+  page is a route in the real app, so the bare render staged a situation that
+  cannot occur in production. The tests now render inside a router and assert
+  they reached the confirm step, which makes the step they were already
+  triggering an intentional, awaited part of the test. Separately, a theme test
+  claiming to cover "storage is unavailable" passed `undefined`, which is
+  precisely the value that makes JavaScript apply the default argument — it had
+  always exercised the default path and passed only while `localStorage`
+  happened to be empty. It now passes `null`, and shared teardown clears storage
+  so one test file's leftovers can no longer decide another file's result.
+
 - **Analytics ranks by score, counts ratings, and admits what it is hiding.**
   The breakdown panels sorted by raw average, printed that average, and then
   drew the bar from something else entirely — the number of ratings — so every

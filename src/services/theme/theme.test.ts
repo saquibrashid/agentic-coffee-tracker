@@ -66,7 +66,10 @@ describe('readStoredPreference', () => {
   });
 
   it('returns system when storage is unavailable', () => {
-    expect(readStoredPreference(undefined)).toBe('system');
+    // `null`, not `undefined`: a default parameter is applied precisely when
+    // the argument is `undefined`, so passing that would read real
+    // `localStorage` and assert nothing about this branch.
+    expect(readStoredPreference(null)).toBe('system');
   });
 
   it('survives storage that throws', () => {
@@ -88,7 +91,10 @@ describe('writeStoredPreference', () => {
   });
 
   it('does not throw when storage is unavailable', () => {
-    expect(() => writeStoredPreference('dark', undefined)).not.toThrow();
+    // See `readStoredPreference` above for why this is `null` and not
+    // `undefined`. This one would have passed either way, but only by writing
+    // a stray key into the real `localStorage` that other test files then read.
+    expect(() => writeStoredPreference('dark', null)).not.toThrow();
   });
 });
 

@@ -67,9 +67,15 @@ function safeStorage(): Storage | undefined {
  * Storage access is wrapped because `localStorage` *throws* rather than
  * returning null in Safari private mode and when cookies are blocked. A theme
  * preference is never worth breaking the app over.
+ *
+ * `storage` accepts `null` as well as `undefined`, and the difference matters:
+ * `undefined` means "not supplied, go and find it", because that is what a
+ * default parameter does. Only `null` can say "there is no storage" — so it is
+ * the only way to reach the branch below from a caller, and passing `undefined`
+ * to test it silently tests the opposite.
  */
 export function readStoredPreference(
-  storage: Storage | undefined = safeStorage(),
+  storage: Storage | null | undefined = safeStorage(),
 ): ThemePreference {
   if (!storage) return 'system';
   try {
@@ -81,7 +87,7 @@ export function readStoredPreference(
 
 export function writeStoredPreference(
   preference: ThemePreference,
-  storage: Storage | undefined = safeStorage(),
+  storage: Storage | null | undefined = safeStorage(),
 ): void {
   if (!storage) return;
   try {
