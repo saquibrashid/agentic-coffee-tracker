@@ -274,6 +274,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **The enrichment path now says what it is doing, in a vocabulary Foundry can
+  read.** Every model call, tool call, and `/api/search` request emits an
+  OpenTelemetry span in the GenAI semantic conventions, so questions we could
+  previously only guess at — how often search finds nothing, which step spends
+  the tokens, how much of the domain-guessing ladder is wasted — are now
+  queries, with the KQL written down in `specs/observability.md`. That first
+  number is the one `#208` needed and did not have: it recommended an agent
+  fallback only where the pipeline fails, without knowing how often that is.
+  Auto-instrumentation is deliberately off, so the volume stays proportional to
+  what is being asked rather than to how hard the ladder worked, and expected
+  failures (three of four guessed roaster domains do not exist) are recorded as
+  outcomes on successful spans rather than as errors that would drown a
+  failure-rate alert. Nothing is required to enable it in production — the
+  Function App already has the connection string — and without one the spans
+  are created and go nowhere.
+
 - **An agentic enrichment path, measured against the pipeline and left switched
   off.** `POST /api/agent-enrich` (behind `AGENT_ENRICH_ENABLED`) lets the model
   choose the order of the enrichment steps instead of following the fixed

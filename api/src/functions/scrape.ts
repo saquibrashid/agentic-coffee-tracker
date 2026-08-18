@@ -10,6 +10,7 @@ import { enforceRateLimit } from '../lib/rateLimitHttp.js';
 import { extractImageUrl } from '../lib/extractImage.js';
 import { readPageText } from '../lib/pageText.js';
 import { safeFetch, UnsafeUrlError } from '../lib/safeFetch.js';
+import { COFFEE, withToolSpan } from '../lib/telemetry.js';
 
 interface ScrapeRequest {
   url?: unknown;
@@ -92,24 +93,39 @@ app.http('scrape', {
         });
       }
 
-      const res = await safeFetch(body.url);
-      if (res.status !== 200) {
-        return errorResponse(ctx, 502, `Fetch returned ${res.status}`);
-      }
+      return await withToolSpan('fetch_page', {}, async (span) => {
+        const res = await safeFetch(body.url as string);
+        if (res.status !== 200) {
+          span.setAttribute(COFFEE.toolOutcome, `http-${res.status}`);
+          return errorResponse(ctx, 502, `Fetch returned ${res.status}`);
+        }
 
-      const imageUrl = extractImageUrl(res.body, res.finalUrl);
-      const page = readPageText(res.body, res.finalUrl);
-      if (page.recoveredFromEmbedded) {
-        ctx.log('recovered product from embedded page data', { url: res.finalUrl });
-      }
-      const productImageUrl = imageUrl ?? page.imageUrl;
+        const imageUrl = extractImageUrl(res.body, res.finalUrl);
+        const page = readPageText(res.body, res.finalUrl);
+        if (page.recoveredFromEmbedded) {
+          ctx.log('recovered product from embedded page data', { url: res.finalUrl });
+        }
+        const productImageUrl = imageUrl ?? page.imageUrl;
 
-      return json(200, {
-        extracted: { rawText: page.text },
-        // The URL after redirects, so the recorded source is where the text
-        // actually came from rather than where we started looking.
-        sourceUrl: res.finalUrl,
-        ...(productImageUrl ? { imageUrl: productImageUrl } : {}),
+        // The client raises EmptyPageError on empty text, and that is the second
+        // of the two terminal enrichment failures. Recording the length rather
+        // than a boolean also surfaces the near-misses: a page yielding 40
+        // characters technically succeeded and will still parse to nothing.
+        span.setAttribute(COFFEE.pageBytes, page.text.length);
+        span.setAttribute('coffee.page.recovered_from_embedded', page.recoveredFromEmbedded);
+        span.setAttribute('coffee.page.has_image', productImageUrl !== undefined);
+        span.setAttribute(
+          COFFEE.toolOutcome,
+          page.text.trim().length === 0 ? 'empty-page' : 'found',
+        );
+
+        return json(200, {
+          extracted: { rawText: page.text },
+          // The URL after redirects, so the recorded source is where the text
+          // actually came from rather than where we started looking.
+          sourceUrl: res.finalUrl,
+          ...(productImageUrl ? { imageUrl: productImageUrl } : {}),
+        });
       });
     } catch (err) {
       if (err instanceof UnsafeUrlError) return errorResponse(ctx, 400, err.message, err);
