@@ -279,8 +279,10 @@ extra turns cheap. Neither is true today.
 
 ## 9. Open questions
 
-- Does Marketplace-billed Claude usage attribute to a `ResourceId` the AI
-  budget in `infra/budget.bicep` can filter on? (§4 — blocking for Claude.)
+- ~~Does Marketplace-billed Claude usage attribute to a `ResourceId` the AI
+  budget in `infra/budget.bicep` can filter on? (§4 — blocking for Claude.)~~
+  **Partly answered by §10 for Foundry agents** (tokens meter on the same
+  `oai-*` account), still open for Marketplace-billed Claude.
 - ~~What replaces per-step unit tests when the model picks the path?~~
   **Answered by §8.** Both: `agent.test.ts` scripts the model to assert on the
   things that must hold whatever path it picks (budgets, domain pinning,
@@ -294,3 +296,127 @@ extra turns cheap. Neither is true today.
 - Entra ID with RBAC is the recommended auth; the BFF uses Key Vault API keys
   today. The Function App already has a user-assigned managed identity, so the
   plumbing exists — is this worth doing independently of any agent work?
+
+---
+
+## 10. Spike: Foundry Agent Service and the prompt-agent shortcut
+
+Tracks [#228](https://github.com/saquibrashid/agentic-coffee-tracker/issues/228).
+Run against the live `rg-coffee-dev` resources; all spike agents were deleted
+afterwards.
+
+### 10.1 The issue's premise was out of date
+
+The issue says we are on "a bare Azure OpenAI resource... there is no Foundry
+project and no Agent Service anywhere in it." That is wrong, and it was wrong
+before the issue was filed. The account is `kind: AIServices` with
+`allowProjectManagement: true`, and `infra/resources.bicep` already deploys a
+**Foundry project** (`coffee-tracker`) under it — added so the Foundry portal
+would show the resource at all.
+
+The Agent Service API answers on that project today, on `api-version=v1` — not
+a preview version — with **zero infrastructure changes**. So "getting to Agent
+Service" is not the multi-week migration the issue costed. It is a code change.
+
+### 10.2 The shortcut exists
+
+A **prompt agent** can be single-turn, tool-less, and bound to a strict JSON
+schema. Created with `POST {project}/agents` (the definition goes in a
+`definition` wrapper; `kind: prompt`), it comes back versioned
+(`spike-parse-agent:1`), with its own managed identity, advertising
+`protocols: ["responses"]`.
+
+It is then invoked **statelessly** — no conversation, no threads, no runs:
+
+```http
+POST https://<account>.services.ai.azure.com/api/projects/<project>/openai/v1/responses
+{ "agent_reference": { "type": "agent_reference", "name": "..." },
+  "input": [{ "role": "user", "content": "..." }] }
+```
+
+So "reach the Foundry tooling" really is separable from "adopt the agentic
+execution model". Those were two gates being treated as one.
+
+### 10.3 What it costs: ~200ms, and no extra tokens
+
+Interleaved, 3s apart, n=10 each, same model and same prompt:
+
+| Path                                        | p50        | max    |
+| ------------------------------------------- | ---------- | ------ |
+| `agent_reference` on the project endpoint   | **1594ms** | 3947ms |
+| `model` direct on the same project endpoint | **1385ms** | 6034ms |
+
+**~+200ms, about 15%, on the parse step only.** Tokens were identical (109 vs 110) — the agent's instructions replace the ones we send inline rather than
+adding to them.
+
+Two measurements worth keeping for the trap they set:
+
+- **The legacy path costs seven times more.** Driving the same agent through
+  Assistants-style `threads`/`runs` measured p50 3204ms against 1756ms — about
+  **+1.4s**. If the spike had stopped there it would have concluded the
+  shortcut was unaffordable. `agent_reference` on the Responses primitive is
+  the path that matters; threads and runs are the retiring API.
+- **Comparing across endpoints inverts the result.** Against the legacy
+  `openai.azure.com` host, the agent looked _faster_ (p50 1409ms vs 2366ms,
+  with 7–21s outliers on the direct side). That was the endpoint, not the
+  agent: `services.ai.azure.com` was quicker and far more consistent for both.
+  The honest comparison holds the endpoint fixed, and it shows a small penalty
+  rather than a gain.
+
+### 10.4 Billing attributes where the budget can see it
+
+§9 listed this as blocking. For Foundry agents it is largely answered: tokens
+spent through the prompt agent metered as `TokenTransaction` on the **same
+`oai-*` account resource** that `infra/budget.bicep` filters on by `ResourceId`.
+
+Caveat worth stating plainly: a Monitor metric resource is not the same thing
+as the `ResourceId` on a cost meter, and Microsoft does not document the latter
+for agent traffic. This is evidence, not proof. Proof needs a cost export after
+billing ingestion. (Also noted: no budget is currently deployed at all —
+`budgetContactEmails` is empty, which `main.bicep` treats as "provision no
+budget" on purpose.)
+
+### 10.5 Why not to do it yet
+
+The shortcut is cheap, so the reason to wait is not latency. It is that
+**Optimizer — the entire point — is not yet something this repo can adopt on
+its own terms**:
+
+- **Preview, explicitly not for production**, no SLA, and a documented HTTP 400
+  meaning "subscription not on allow list — contact your Microsoft
+  representative". Availability is not guaranteed to us.
+- **Prompt-agent optimization runs start in the portal.** Everything else here
+  is version-controlled and deployed by CI. An optimizer that rewrites the
+  production prompt through a portal wizard, with no artifact in the repo, is a
+  change to how the project is operated, not just what it runs.
+- **Agents are not ARM resources** at this API version, so the agent definition
+  cannot live in Bicep alongside everything else. It would be a deploy-time
+  script or a click.
+- **Pricing is undocumented** and the mechanism is inherently expensive:
+  the eval model runs once per task per candidate, on top of the agent model.
+- `gpt-5.4-mini` is not listed as a supported _optimization_ model, though it
+  can be the agent's model.
+- Auth becomes Entra-only, which is the right direction but couples this to the
+  Key Vault API-key change still open in §9.
+
+And the prerequisite #228 named itself still stands: Optimizer improves a
+system against an eval set, which only pays if the system is failing.
+`specs/observability.md` now produces that number, but it needs live traffic
+before it says anything.
+
+### 10.6 Recommendation
+
+**Do not migrate now. Revisit when Optimizer leaves preview, or when
+`coffee.enrich.outcome` shows a failure rate worth optimizing against.**
+
+Nothing about waiting is expensive, which is the useful finding: the migration
+is roughly a **half-day** — swap one call site in `api/src/lib/openai.ts` to
+send `agent_reference` against the project endpoint, move that call from an API
+key to the Function App's existing user-assigned identity with the
+`Foundry Agent Consumer` role, and create the agent at deploy time. It does not
+have to be planned for in advance, and it does not constrain anything built
+between now and then.
+
+The offline-first constraint in §5 is untouched by the narrow version: a parse
+agent sees the same page text the BFF already sends. It is only the _library_
+that cannot leave the device.
