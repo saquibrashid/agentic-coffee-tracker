@@ -25,6 +25,7 @@ import {
   callResponses,
   type OpenAiConfig,
   type ResponsesTool,
+  type TokenUsage,
   type UrlCitation,
 } from './openai.js';
 import { rankHits, type RankableHit } from './productSearch.js';
@@ -144,6 +145,13 @@ export async function searchWeb(
   name: string,
   max: number,
   ctx: WebSearchLogger,
+  /**
+   * Optional sink for what the call cost. A callback rather than an extra
+   * return value because the six existing call sites and their tests care only
+   * about the hits, and the cost comparison in `specs/agentic-backend.md` §7 is
+   * not worth changing all of them for.
+   */
+  onUsage?: (usage: TokenUsage) => void,
 ): Promise<RankableHit[]> {
   let citations: UrlCitation[];
   try {
@@ -159,6 +167,7 @@ export async function searchWeb(
       timeoutMs: 45_000,
     });
     citations = result.citations;
+    onUsage?.(result.usage);
   } catch (err) {
     ctx.warn('web search failed', { error: err instanceof Error ? err.message : String(err) });
     return [];

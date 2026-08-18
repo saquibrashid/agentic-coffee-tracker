@@ -45,6 +45,12 @@ manual setup. Two things to know:
   `WEB_SEARCH_ENABLED=false` on the Function App to switch it off without a redeploy. Coffees found
   by the free path never reach it.
 
+- **`AGENT_ENRICH_ENABLED` is off, and should stay off.** It exposes
+  `POST /api/agent-enrich`, an experimental agentic enrichment loop kept as a measuring instrument
+  rather than a feature. Unset, the route returns 404 and costs nothing. It was measured against the
+  pipeline and lost on latency and cost at equal accuracy — see `specs/agentic-backend.md` §8 before
+  turning it on, because it spends roughly 1.8× the tokens per enrichment.
+
 Every AI parameter also accepts a bring-your-own value (`visionEndpoint`/`visionKey`,
 `openAiEndpoint`/`openAiKey`/`openAiDeployment`). Set one and the provisioned account is bypassed in
 favour of yours.
