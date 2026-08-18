@@ -51,6 +51,6 @@ Build a **web‑based, offline‑first, AI‑powered coffee tracking application
 - `ui.md` — screens and flows
 - `ux-states.md` — loading/empty/error/offline/success states per screen
 - `ai.md` — OCR, LLM, web search, preference modeling, agent behaviors
-- `agentic-backend.md` — investigation (#208): options for a tool-using backend, costs, risks, proposed experiment
+- `agentic-backend.md` — investigation (#208, #228): options for a tool-using backend, the measured experiment, and the Foundry Agent Service spike
 - `observability.md` — OpenTelemetry GenAI spans on the AI paths, attributes, and the KQL to read them
 - `copilot.md` — generation responsibilities (defers to the above)
