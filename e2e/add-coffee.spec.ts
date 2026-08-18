@@ -5,7 +5,11 @@ const onePixelPngBase64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAAE0lEQVR42mNk+M9QzwAEYgJ/k9QxGQAAAABJRU5ErkJggg==';
 
 test.describe('Add a coffee', () => {
-  // Canvas processing of inline data URLs is flaky in headless WebKit.
+  // Canvas processing of inline data URLs is flaky in headless WebKit, and the
+  // resulting Blob cannot be stored in IndexedDB there either. Real iOS Safari
+  // handles both — verified by hand on a device in #100 — so this is an
+  // automation limitation, not an app defect. Re-check with
+  // `node scripts/webkit-blob-probe.mjs` after a Playwright upgrade.
   test.skip(({ browserName }) => browserName === 'webkit', 'Flaky in headless WebKit.');
 
   test('capture a bag photo and confirm the extracted details', async ({ page }) => {
