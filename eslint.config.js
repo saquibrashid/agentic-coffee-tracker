@@ -73,6 +73,21 @@ export default tseslint.config(
     },
   },
   {
+    /*
+     * The BFF is Node, not React. The shared config applies the React rules to
+     * every `.ts` file, and `react-hooks/rules-of-hooks` keys off the name
+     * alone — so calling any `use*` function there (`useAzureMonitor`, for one)
+     * is reported as a misplaced hook. Turning the plugin off is the honest
+     * fix; a per-call disable comment would just have to be repeated.
+     */
+    files: ['api/**/*.ts'],
+    rules: {
+      'react-hooks/rules-of-hooks': 'off',
+      'react-hooks/exhaustive-deps': 'off',
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+  {
     // shadcn/ui primitives intentionally co-export variant helpers.
     files: ['src/components/ui/**/*.{ts,tsx}'],
     rules: {

@@ -13,6 +13,8 @@
  * so they never sit in the deployed configuration in plaintext.
  */
 
+import { recordUsage, withModelSpan } from './telemetry.js';
+
 export interface OpenAiConfig {
   endpoint: string;
   key: string;
@@ -260,34 +262,41 @@ export async function callResponsesTurn(
   request: TurnRequest,
 ): Promise<TurnResult> {
   const model = request.model || config.deployment;
-  const res = await fetch(`${config.endpoint}/openai/v1/responses`, {
-    method: 'POST',
-    headers: { 'api-key': config.key, 'Content-Type': 'application/json' },
-    signal: AbortSignal.timeout(request.timeoutMs ?? 30_000),
-    body: JSON.stringify({
-      model,
-      input: request.input,
-      ...(request.format ? { text: { format: request.format } } : {}),
-      ...(request.tools ? { tools: request.tools } : {}),
-      ...(request.toolChoice ? { tool_choice: request.toolChoice } : {}),
-      temperature: request.temperature ?? 0,
-      // Bag text and taste history are the user's data; don't leave copies in
-      // the service-side response store.
-      store: false,
-    }),
-  });
+  // Every model call in the BFF reaches the service through here, including the
+  // agent loop's turns, so one span here covers all of them and none can be
+  // added later that quietly escapes measurement.
+  return withModelSpan(model, async (span) => {
+    const res = await fetch(`${config.endpoint}/openai/v1/responses`, {
+      method: 'POST',
+      headers: { 'api-key': config.key, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(request.timeoutMs ?? 30_000),
+      body: JSON.stringify({
+        model,
+        input: request.input,
+        ...(request.format ? { text: { format: request.format } } : {}),
+        ...(request.tools ? { tools: request.tools } : {}),
+        ...(request.toolChoice ? { tool_choice: request.toolChoice } : {}),
+        temperature: request.temperature ?? 0,
+        // Bag text and taste history are the user's data; don't leave copies in
+        // the service-side response store.
+        store: false,
+      }),
+    });
 
-  if (!res.ok) throw new OpenAiError(res.status, await res.text());
-  const data: unknown = await res.json();
-  const payload = data as { output?: ConversationItem[] };
-  return {
-    text: extractOutputText(data),
-    model,
-    citations: extractUrlCitations(data),
-    toolCalls: extractToolCalls(data),
-    usage: extractUsage(data),
-    outputItems: Array.isArray(payload.output) ? payload.output : [],
-  };
+    if (!res.ok) throw new OpenAiError(res.status, await res.text());
+    const data: unknown = await res.json();
+    const payload = data as { output?: ConversationItem[] };
+    const usage = extractUsage(data);
+    recordUsage(span, usage, model);
+    return {
+      text: extractOutputText(data),
+      model,
+      citations: extractUrlCitations(data),
+      toolCalls: extractToolCalls(data),
+      usage,
+      outputItems: Array.isArray(payload.output) ? payload.output : [],
+    };
+  });
 }
 
 export async function callResponses(

@@ -44,6 +44,7 @@
  */
 
 import { PARSED_BEAN_SCHEMA, validateParsedBean, type ParsedBean } from './beanSchema.js';
+import { COFFEE, withToolSpan } from './telemetry.js';
 import {
   callResponsesTurn,
   parseJsonOutput,
@@ -530,7 +531,13 @@ export async function runEnrichAgent(
       const at = deps.now();
       let outcome: ToolOutcome;
       try {
-        outcome = await runTool(call, args, state, deps, budget, input.roaster, input.name);
+        // Same span shape the pipeline emits for its own steps, so a single
+        // query can compare the two paths rather than needing one per path.
+        outcome = await withToolSpan(call.name, {}, async (span) => {
+          const result = await runTool(call, args, state, deps, budget, input.roaster, input.name);
+          span.setAttribute(COFFEE.toolOutcome, result.ok ? 'found' : result.detail);
+          return result;
+        });
       } catch (err) {
         // A tool that throws is reported to the model rather than ending the
         // run. One unreachable store is exactly the case the pipeline already

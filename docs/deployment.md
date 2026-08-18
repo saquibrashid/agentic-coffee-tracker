@@ -332,6 +332,8 @@ A value the API cannot parse as a positive integer falls back to 20,000 rather t
 
 Application Insights is wired to the Function App via `APPLICATIONINSIGHTS_CONNECTION_STRING`; the Functions host emits requests, dependencies, traces, and exceptions with no code changes.
 
+The same connection string also turns on the app's own OpenTelemetry spans over the AI paths — model calls, tool calls, and each `/api/search` — in the GenAI semantic conventions, so token spend and enrichment outcomes are queryable and the traces are readable by Foundry Agent Insights. Nothing extra to configure; see `specs/observability.md` for the attributes and queries. Auto-instrumentation is deliberately left off so ingestion volume tracks requests rather than the number of domains a search happened to try — relevant to the budget alerts below. The host logs `telemetry: Azure Monitor OpenTelemetry started` on boot when it is active.
+
 A standard availability test (`api-health`) probes `/api/health` every 5 minutes from three regions and alerts on non-200 responses or a certificate within 7 days of expiry.
 
 Useful queries in the Log Analytics workspace:
@@ -349,6 +351,13 @@ requests
 dependencies
 | where timestamp > ago(1d) and success == false
 | project timestamp, name, target, resultCode, duration
+```
+
+```kusto
+// How often enrichment finds nothing (see specs/observability.md for more)
+dependencies
+| where name == "enrich.search" and timestamp > ago(7d)
+| summarize count() by outcome = tostring(customDimensions["coffee.enrich.outcome"])
 ```
 
 ## What this costs

@@ -16,6 +16,14 @@ import {
   type RankableHit,
 } from '../lib/productSearch.js';
 import { isWebSearchEnabled, searchWeb } from '../lib/webSearch.js';
+import {
+  COFFEE,
+  GEN_AI,
+  recordUsage,
+  withSpan,
+  withToolSpan,
+  type EnrichOutcome,
+} from '../lib/telemetry.js';
 
 interface SearchRequest {
   roaster?: unknown;
@@ -198,18 +206,38 @@ async function searchStore(
   max: number,
   ctx: InvocationContext,
 ): Promise<RankableHit[]> {
-  for (const query of buildQueryLadder(name)) {
-    const hits = await searchShopify(domain, query, max);
-    // Not a store: loosening the query cannot change that, so stop paying for it.
-    if (hits === null) return [];
+  return withToolSpan('search_roaster_store', { 'coffee.store.domain': domain }, async (span) => {
+    for (const query of buildQueryLadder(name)) {
+      let hits: RankableHit[] | null;
+      try {
+        hits = await searchShopify(domain, query, max);
+      } catch (err) {
+        // Most guessed domains do not exist — three of four is typical. Letting
+        // that surface as a span exception would mark the majority of tool
+        // spans failed and make failure-rate dashboards and alerts meaningless,
+        // for a case the caller already treats as ordinary. Record it as an
+        // outcome instead; anything else still throws.
+        if (!(err instanceof UnsafeUrlError)) throw err;
+        span.setAttribute(COFFEE.toolOutcome, 'no-such-domain');
+        return [];
+      }
+      // Not a store: loosening the query cannot change that, so stop paying for it.
+      if (hits === null) {
+        span.setAttribute(COFFEE.toolOutcome, 'not-a-store');
+        return [];
+      }
 
-    const ranked = rankHits(name, hits);
-    if (ranked.length > 0) {
-      if (query !== name) ctx.log('matched on a relaxed query', { name, query });
-      return ranked;
+      const ranked = rankHits(name, hits);
+      if (ranked.length > 0) {
+        if (query !== name) ctx.log('matched on a relaxed query', { name, query });
+        span.setAttribute(COFFEE.toolOutcome, 'found');
+        span.setAttribute('coffee.store.relaxed_query', query !== name);
+        return ranked;
+      }
     }
-  }
-  return [];
+    span.setAttribute(COFFEE.toolOutcome, 'no-match');
+    return [];
+  });
 }
 
 function mockResults(roaster: string, name: string): SearchHit[] {
@@ -235,6 +263,10 @@ app.http('search', {
       if (typeof body.roaster !== 'string' || typeof body.name !== 'string') {
         return errorResponse(ctx, 400, 'roaster and name are required');
       }
+      // Bound to locals because narrowing does not survive into the span
+      // callback below, which reads them across an await.
+      const roaster: string = body.roaster;
+      const name: string = body.name;
       const max = typeof body.max === 'number' ? body.max : 5;
 
       const limited = enforceRateLimit(req, ctx, {
@@ -244,70 +276,96 @@ app.http('search', {
       });
       if (limited) return limited;
 
-      ctx.log('search invoked', { roaster: body.roaster, name: body.name });
+      ctx.log('search invoked', { roaster, name });
 
-      // Without a model there is no way to resolve a roaster to a domain, so the
-      // endpoint degrades to its fixture like every other unconfigured endpoint.
-      if (!getOpenAiConfig()) {
-        return json(200, {
-          results: mockResults(body.roaster, body.name),
-          provider: 'mock-search',
-        });
-      }
-
-      const usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
-      const addUsage = (u: TokenUsage): void => {
-        usage.inputTokens += u.inputTokens;
-        usage.outputTokens += u.outputTokens;
-      };
-
-      const guessed = await guessRoasterDomains(body.roaster, ctx, addUsage);
-
-      // The model's answers first — it handles the cases a name cannot predict,
-      // such as a national TLD or a domain unrelated to the roaster's name —
-      // then the derived candidates, which cover the far more common case of a
-      // roaster the model simply does not recognise under that spelling.
-      const domains: string[] = [];
-      for (const domain of [...guessed, ...roasterDomainCandidates(body.roaster)]) {
-        if (!domains.includes(domain)) domains.push(domain);
-      }
-
-      let hits: RankableHit[] = [];
-      let provider = 'roaster-site';
-      for (const domain of domains.slice(0, 8)) {
-        try {
-          const found = await searchStore(domain, body.name, max, ctx);
-          if (found.length > 0) {
-            // The first store that recognises the coffee is the roaster's own.
-            // Carrying on would only add the same product from lookalike
-            // domains, at a round-trip each.
-            hits = found;
-            ctx.log('matched on store', { domain, guessed: guessed.includes(domain) });
-            break;
+      // The span that answers #208. `/api/search` returning zero results is
+      // exactly what the client raises as NoCandidatesError — `findCandidates`
+      // passes the list straight through — so the ladder's real-world failure
+      // rate is queryable from here without shipping any client telemetry.
+      return await withSpan(
+        'enrich.search',
+        { [GEN_AI.operationName]: 'invoke_workflow' },
+        async (span) => {
+          // Without a model there is no way to resolve a roaster to a domain, so the
+          // endpoint degrades to its fixture like every other unconfigured endpoint.
+          if (!getOpenAiConfig()) {
+            span.setAttribute(COFFEE.enrichOutcome, 'mock' satisfies EnrichOutcome);
+            return json(200, {
+              results: mockResults(roaster, name),
+              provider: 'mock-search',
+            });
           }
-        } catch (err) {
-          // One unreachable or non-Shopify store must not fail the whole search.
-          if (!(err instanceof UnsafeUrlError)) ctx.warn('store search failed', { domain });
-        }
-      }
 
-      // Only now, having spent nothing and found nothing, is the paid search
-      // worth it. Roasters who are not on Shopify reach the app through here.
-      if (hits.length === 0 && isWebSearchEnabled()) {
-        const config = getOpenAiConfig();
-        if (config) {
-          hits = await searchWeb(config, body.roaster, body.name, max, ctx, addUsage);
-          if (hits.length > 0) provider = 'web-search';
-        }
-      }
+          const usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+          const addUsage = (u: TokenUsage): void => {
+            usage.inputTokens += u.inputTokens;
+            usage.outputTokens += u.outputTokens;
+          };
 
-      const seen = new Set<string>();
-      const results = hits
-        .filter((h) => (seen.has(h.url) ? false : seen.add(h.url)))
-        .slice(0, max)
-        .map(({ url, title, snippet }) => ({ url, title, snippet }));
+          const guessed = await guessRoasterDomains(roaster, ctx, addUsage);
 
-      return json(200, { results, provider, usage });
+          // The model's answers first — it handles the cases a name cannot predict,
+          // such as a national TLD or a domain unrelated to the roaster's name —
+          // then the derived candidates, which cover the far more common case of a
+          // roaster the model simply does not recognise under that spelling.
+          const domains: string[] = [];
+          for (const domain of [...guessed, ...roasterDomainCandidates(roaster)]) {
+            if (!domains.includes(domain)) domains.push(domain);
+          }
+
+          let hits: RankableHit[] = [];
+          let provider = 'roaster-site';
+          let domainsTried = 0;
+          for (const domain of domains.slice(0, 8)) {
+            domainsTried += 1;
+            try {
+              const found = await searchStore(domain, name, max, ctx);
+              if (found.length > 0) {
+                // The first store that recognises the coffee is the roaster's own.
+                // Carrying on would only add the same product from lookalike
+                // domains, at a round-trip each.
+                hits = found;
+                ctx.log('matched on store', { domain, guessed: guessed.includes(domain) });
+                break;
+              }
+            } catch (err) {
+              // One unreachable or non-Shopify store must not fail the whole search.
+              if (!(err instanceof UnsafeUrlError)) ctx.warn('store search failed', { domain });
+            }
+          }
+
+          // Only now, having spent nothing and found nothing, is the paid search
+          // worth it. Roasters who are not on Shopify reach the app through here.
+          if (hits.length === 0 && isWebSearchEnabled()) {
+            const config = getOpenAiConfig();
+            if (config) {
+              hits = await withToolSpan('web_search_product', {}, async (toolSpan) => {
+                const found = await searchWeb(config, roaster, name, max, ctx, addUsage);
+                toolSpan.setAttribute(COFFEE.toolOutcome, found.length > 0 ? 'found' : 'no-match');
+                return found;
+              });
+              if (hits.length > 0) provider = 'web-search';
+            }
+          }
+
+          const seen = new Set<string>();
+          const results = hits
+            .filter((h) => (seen.has(h.url) ? false : seen.add(h.url)))
+            .slice(0, max)
+            .map(({ url, title, snippet }) => ({ url, title, snippet }));
+
+          span.setAttribute(
+            COFFEE.enrichOutcome,
+            (results.length > 0 ? 'found' : 'no-candidates') satisfies EnrichOutcome,
+          );
+          span.setAttribute(COFFEE.enrichProvider, results.length > 0 ? provider : 'none');
+          span.setAttribute(COFFEE.enrichResultCount, results.length);
+          span.setAttribute(COFFEE.enrichDomainsTried, domainsTried);
+          recordUsage(span, usage);
+
+          return json(200, { results, provider, usage });
+        },
+      );
     } catch (err) {
       return errorResponse(ctx, 500, 'Search failed', err);
     }
