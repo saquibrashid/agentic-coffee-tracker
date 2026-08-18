@@ -8,7 +8,7 @@ import { errorResponse, json, readJson } from '../lib/http.js';
 import { AI_RATE_LIMIT } from '../lib/rateLimit.js';
 import { enforceRateLimit } from '../lib/rateLimitHttp.js';
 import { safeFetch, UnsafeUrlError } from '../lib/safeFetch.js';
-import { callResponses, getOpenAiConfig, parseJsonOutput } from '../lib/openai.js';
+import { callResponses, getOpenAiConfig, parseJsonOutput, type TokenUsage } from '../lib/openai.js';
 import {
   buildQueryLadder,
   rankHits,
@@ -68,7 +68,11 @@ const DOMAIN_SYSTEM_PROMPT = [
   'If you do not recognise the roaster, reply {"domains":[]}. Do not guess.',
 ].join(' ');
 
-async function guessRoasterDomains(roaster: string, ctx: InvocationContext): Promise<string[]> {
+async function guessRoasterDomains(
+  roaster: string,
+  ctx: InvocationContext,
+  onUsage?: (usage: TokenUsage) => void,
+): Promise<string[]> {
   const config = getOpenAiConfig();
   if (!config) return [];
 
@@ -82,6 +86,7 @@ async function guessRoasterDomains(roaster: string, ctx: InvocationContext): Pro
       timeoutMs: 20_000,
     });
     content = result.text;
+    onUsage?.(result.usage);
   } catch (err) {
     ctx.warn('domain lookup failed', { error: err instanceof Error ? err.message : String(err) });
     return [];
@@ -250,7 +255,13 @@ app.http('search', {
         });
       }
 
-      const guessed = await guessRoasterDomains(body.roaster, ctx);
+      const usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
+      const addUsage = (u: TokenUsage): void => {
+        usage.inputTokens += u.inputTokens;
+        usage.outputTokens += u.outputTokens;
+      };
+
+      const guessed = await guessRoasterDomains(body.roaster, ctx, addUsage);
 
       // The model's answers first — it handles the cases a name cannot predict,
       // such as a national TLD or a domain unrelated to the roaster's name —
@@ -285,7 +296,7 @@ app.http('search', {
       if (hits.length === 0 && isWebSearchEnabled()) {
         const config = getOpenAiConfig();
         if (config) {
-          hits = await searchWeb(config, body.roaster, body.name, max, ctx);
+          hits = await searchWeb(config, body.roaster, body.name, max, ctx, addUsage);
           if (hits.length > 0) provider = 'web-search';
         }
       }
@@ -296,7 +307,7 @@ app.http('search', {
         .slice(0, max)
         .map(({ url, title, snippet }) => ({ url, title, snippet }));
 
-      return json(200, { results, provider });
+      return json(200, { results, provider, usage });
     } catch (err) {
       return errorResponse(ctx, 500, 'Search failed', err);
     }

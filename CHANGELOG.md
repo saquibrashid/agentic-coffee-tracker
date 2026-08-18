@@ -274,6 +274,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **An agentic enrichment path, measured against the pipeline and left switched
+  off.** `POST /api/agent-enrich` (behind `AGENT_ENRICH_ENABLED`) lets the model
+  choose the order of the enrichment steps instead of following the fixed
+  fallback ladder, over the same tools and returning the same strict schema, so
+  the client cannot tell the two apart. It works — 7/7 on the eval set, right
+  page every time — but at 1.8× the tokens and 1.3× the p50 latency for the same
+  accuracy, because on six of seven coffees it rediscovers the exact order the
+  pipeline already hard-codes. The pipeline stays. The loop stays too, flagged
+  off and costing nothing, because `scripts/agent-eval/` now makes the
+  comparison repeatable for the next model or the next roaster that breaks the
+  ladder. Full write-up in `specs/agentic-backend.md` §8.
+
 - **Every AI endpoint now has a spending limit.** `/api/parse`, `/api/ocr`,
   `/api/search`, `/api/recommend`, `/api/scrape` and `/api/image` accepted
   unlimited requests, and each one either spends model tokens or fetches a

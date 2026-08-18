@@ -95,6 +95,24 @@ export const AI_RATE_LIMIT: RateLimitConfig = { capacity: 60, refillPerSecond: 1
  */
 export const FETCH_RATE_LIMIT: RateLimitConfig = { capacity: 90, refillPerSecond: 1.5 };
 
+/**
+ * The budget for the agentic enrichment path.
+ *
+ * Far tighter than {@link AI_RATE_LIMIT} because the unit is different. One
+ * request to `/api/parse` is one model call with a known token count. One
+ * request to the agent is a loop: several model calls, each carrying a
+ * transcript that grows as it reads pages, plus up to two paid searches. Its
+ * own internal budget bounds a single request; this bounds how many such
+ * requests a caller may start.
+ *
+ * 10 back-to-back covers a person adding a few coffees by hand and finding one
+ * of them stubborn. It deliberately does not cover a bulk import — that path
+ * uses the pipeline, and if the agent ever takes it over this number has to be
+ * revisited alongside the measured cost per enrichment rather than raised to
+ * make an import work.
+ */
+export const AGENT_RATE_LIMIT: RateLimitConfig = { capacity: 10, refillPerSecond: 0.05 };
+
 interface Bucket {
   tokens: number;
   /** ms epoch of the last refill. */

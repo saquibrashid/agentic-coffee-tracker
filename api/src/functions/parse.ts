@@ -12,6 +12,7 @@ import {
   getOpenAiConfig,
   parseJsonOutput,
   type OpenAiConfig,
+  type TokenUsage,
 } from '../lib/openai.js';
 import { PARSE_SYSTEM_PROMPT } from '../lib/parsePrompt.js';
 import {
@@ -30,6 +31,7 @@ interface RawParseResult {
   parsed: unknown;
   model: string;
   rawContent: string;
+  usage: TokenUsage;
 }
 
 async function callAzureOpenAi(
@@ -53,6 +55,7 @@ async function callAzureOpenAi(
     parsed: parseJsonOutput(result.text),
     model: result.model,
     rawContent: result.text,
+    usage: result.usage,
   };
 }
 
@@ -84,6 +87,7 @@ app.http('parse', {
       let candidate: unknown;
       let model: string;
       let rawContent = '';
+      let usage: TokenUsage = { inputTokens: 0, outputTokens: 0 };
 
       if (openAi) {
         const result = await callAzureOpenAi(
@@ -94,6 +98,7 @@ app.http('parse', {
         candidate = result.parsed;
         model = result.model;
         rawContent = result.rawContent;
+        usage = result.usage;
       } else {
         candidate = mockParsedBean(body.ocrText);
         model = typeof body.model === 'string' ? body.model : 'mock-model';
@@ -114,7 +119,7 @@ app.http('parse', {
       }
 
       const parsed: ParsedBean = validation.value;
-      return json(200, { parsed, model, rawText: body.ocrText });
+      return json(200, { parsed, model, rawText: body.ocrText, usage });
     } catch (err) {
       return errorResponse(ctx, 500, 'Parse failed', err);
     }

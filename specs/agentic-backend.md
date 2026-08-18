@@ -199,8 +199,8 @@ the model choose the order help?"_ from _"does switching model vendor help?"_,
 which a jump straight to Claude-on-Foundry would confound.
 
 **Prerequisite, not follow-up:** a per-caller rate limit on the AI endpoints.
-`rateLimit.ts` already has the token bucket; it is not wired to `/api/parse`,
-`/api/ocr`, `/api/search` or `/api/scrape`.
+`rateLimit.ts` already has the token bucket. _(Done in `357672b` — all six AI
+endpoints now go through `enforceRateLimit`, so this no longer blocks.)_
 
 **Measure on the same fixed input set, against the current pipeline:**
 
@@ -220,12 +220,74 @@ and they should not be given up by accident.
 
 ---
 
-## 8. Open questions
+## 8. Result: the experiment was run, and the pipeline won
+
+The loop is built (`api/src/lib/agent.ts`), exposed behind `AGENT_ENRICH_ENABLED`
+at `POST /api/agent-enrich`, and measured against the live pipeline over seven
+real coffees (`scripts/agent-eval/`). Both paths ran as real HTTP requests
+against the same Functions host and the same `gpt-5.4-mini` deployment, so the
+only variable is who chooses the order of the steps.
+
+|          | succeeded | fields filled | p50    | p95     | tokens | paid searches | cost / 100 | wrong page |
+| -------- | --------- | ------------- | ------ | ------- | ------ | ------------- | ---------- | ---------- |
+| pipeline | 7/7       | 67.3%         | 3732ms | 6318ms  | 3218   | 1             | $0.34      | 0          |
+| agent    | 7/7       | 69.4%         | 4966ms | 11531ms | 5933   | 1             | $0.58      | 0          |
+
+The agent works. It found the right page for all seven, never landed on a
+marketplace listing, and filled marginally more fields. It is also ~33% slower
+at p50, ~82% slower at p95, and ~70% more expensive. On six of the seven it
+reached the answer in exactly two steps — search the store, fetch the page —
+which is the ladder the pipeline already hard-codes. Paying a model to
+rediscover a fixed order each time buys nothing.
+
+**The interesting case is the one that nearly fooled us.** Blue Bottle is the
+deliberate non-Shopify case, where the ladder's store search fails and the
+pipeline falls back to a paid web search. An early run showed the agent finishing
+it on 4163 tokens against the pipeline's 9554 — a real win on exactly the case
+the experiment existed to probe. That number was wrong. The agent's trace counted
+the tokens spent by its own turns but not the tokens the paid search tool spent
+on its behalf, and that tool is the single most expensive thing either path does.
+Counting them (`WebSearchOutcome.usage`, and a test that pins it) reverses the
+result: 12726 tokens for the agent against 9438 for the pipeline. The agent was
+never cheaper anywhere; it just had a blind spot in its own accounting, pointed
+at the largest cost.
+
+Worth recording as a general hazard: **an agent that reports its own cost will
+under-report it by exactly the amount its tools spend.** Any future comparison
+has to instrument the tools, not the loop.
+
+A second measurement lesson. The first full run had the agent failing 4 of 7,
+which looked like a decisive answer. Every one of those failures was an Azure
+`429` — the deployment's default 10K TPM cannot absorb a ~5K-token request, so
+throttling presented itself as a failure rate. The table was plausible and
+entirely wrong. Read the host log before believing a result.
+
+**Recommendation: keep the pipeline.** It is faster, cheaper, equally accurate,
+and its failures land in a named function instead of inside a model's reasoning.
+§7 named "the pipeline is better, here is the evidence" as a full result, and
+that is the result.
+
+**Keep the loop anyway, flagged off.** It costs nothing while
+`AGENT_ENRICH_ENABLED` is unset, and it is the measuring instrument for the next
+question rather than a half-built feature: the harness now compares any two
+enrichment strategies over the same cases. Two things would justify re-running
+it — a roaster class the ladder genuinely cannot handle (the Blue Bottle case
+is only _harder_, not impossible), or a model whose per-token price makes the
+extra turns cheap. Neither is true today.
+
+---
+
+## 9. Open questions
 
 - Does Marketplace-billed Claude usage attribute to a `ResourceId` the AI
   budget in `infra/budget.bicep` can filter on? (§4 — blocking for Claude.)
-- What replaces per-step unit tests when the model picks the path? Recorded
-  traces, an eval set, or assertions on the final structured output only?
+- ~~What replaces per-step unit tests when the model picks the path?~~
+  **Answered by §8.** Both: `agent.test.ts` scripts the model to assert on the
+  things that must hold whatever path it picks (budgets, domain pinning,
+  marketplace refusal, malformed tool arguments), and `scripts/agent-eval/`
+  asserts on the final structured output over a fixed case set. Neither alone is
+  enough — the unit tests cannot tell you the agent is worse than the pipeline,
+  and the eval cannot tell you _why_.
 - Should the agentic path be allowed to run offline-queued, or is it
   interactive-only? An unbounded loop behind the offline queue runner is a
   different risk profile.

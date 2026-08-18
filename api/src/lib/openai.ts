@@ -39,12 +39,25 @@ export type ResponseFormat =
  * `web_search` runs Bing inside the service, so it needs no separate Grounding
  * with Bing resource — which matters, because that resource cannot be deployed
  * on credit-based subscriptions at all.
+ *
+ * `function` is ours: the service does not run it, it asks us to and waits for
+ * the result. That is the difference the agent loop is built on — see
+ * `agent.ts`.
  */
-export type ResponsesTool = {
-  type: 'web_search';
-  /** How much retrieved page context is fed to the model. Defaults to medium. */
-  search_context_size?: 'low' | 'medium' | 'high';
-};
+export type ResponsesTool =
+  | {
+      type: 'web_search';
+      /** How much retrieved page context is fed to the model. Defaults to medium. */
+      search_context_size?: 'low' | 'medium' | 'high';
+    }
+  | {
+      type: 'function';
+      name: string;
+      description: string;
+      parameters: Record<string, unknown>;
+      /** Same guarantee as `json_schema` strict: arguments match the schema. */
+      strict?: boolean;
+    };
 
 export interface ResponsesRequest {
   system: string;
@@ -79,17 +92,104 @@ export interface ResponsesResult {
   model: string;
   /** Sources annotated on the answer, in the order they appear. */
   citations: UrlCitation[];
+  /**
+   * What the call cost. Reported by every caller so the pipeline's spend is as
+   * visible as the agent's — without it the two paths in
+   * `specs/agentic-backend.md` §7 could not be compared on cost at all.
+   */
+  usage: TokenUsage;
+}
+
+/**
+ * An item in the conversation: a message, a tool call the model made, or the
+ * result we handed back. Deliberately untyped — these are echoed back to the
+ * service verbatim, and narrowing them here would mean re-describing a wire
+ * format we do not own and would have to chase every time it grows.
+ */
+export type ConversationItem = Record<string, unknown>;
+
+export interface TurnRequest {
+  input: ConversationItem[];
+  format?: ResponseFormat;
+  temperature?: number;
+  model?: string;
+  timeoutMs?: number;
+  tools?: ResponsesTool[];
+  toolChoice?: 'auto' | 'required';
+}
+
+export interface TurnResult extends ResponsesResult {
+  /** Empty when the model answered rather than asking for a tool. */
+  toolCalls: RequestedToolCall[];
+  usage: TokenUsage;
+  /**
+   * The raw output items, for appending to the next turn's input. The service
+   * requires its own tool-call items back alongside our results.
+   */
+  outputItems: ConversationItem[];
 }
 
 interface ResponsesPayload {
   output?: {
     type?: string;
+    call_id?: string;
+    name?: string;
+    arguments?: string;
     content?: {
       type?: string;
       text?: string;
       annotations?: { type?: string; url?: string; title?: string }[];
     }[];
   }[];
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+  };
+}
+
+/**
+ * What a turn cost. The agent loop budgets on this, so it has to come from the
+ * service rather than from a local estimate: a tool-using turn silently
+ * includes whatever the tool put into context, which is exactly the spend an
+ * estimate based on our own prompt would miss.
+ */
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export function extractUsage(data: unknown): TokenUsage {
+  if (typeof data !== 'object' || data === null) return { inputTokens: 0, outputTokens: 0 };
+  const usage = (data as ResponsesPayload).usage;
+  return {
+    inputTokens: typeof usage?.input_tokens === 'number' ? usage.input_tokens : 0,
+    outputTokens: typeof usage?.output_tokens === 'number' ? usage.output_tokens : 0,
+  };
+}
+
+/** A tool call the model is waiting on us to run. */
+export interface RequestedToolCall {
+  callId: string;
+  name: string;
+  /** Raw JSON string. Left unparsed here so the caller decides what invalid means. */
+  arguments: string;
+}
+
+export function extractToolCalls(data: unknown): RequestedToolCall[] {
+  if (typeof data !== 'object' || data === null) return [];
+  const payload = data as ResponsesPayload;
+  if (!Array.isArray(payload.output)) return [];
+  return payload.output.flatMap((item) => {
+    if (item.type !== 'function_call') return [];
+    if (typeof item.call_id !== 'string' || typeof item.name !== 'string') return [];
+    return [
+      {
+        callId: item.call_id,
+        name: item.name,
+        arguments: typeof item.arguments === 'string' ? item.arguments : '{}',
+      },
+    ];
+  });
 }
 
 /**
@@ -145,10 +245,20 @@ export class OpenAiError extends Error {
   }
 }
 
-export async function callResponses(
+/**
+ * One turn of a conversation, with the input given as raw items.
+ *
+ * `callResponses` below builds a fresh system+user pair every time, which is
+ * all a single-shot completion needs. A tool loop cannot work that way: each
+ * turn has to carry the model's own previous tool calls and their results, or
+ * the model re-requests work it has already had done. This is the primitive
+ * that makes that possible; `callResponses` is now a thin wrapper over it so
+ * there is still only one place that knows how to talk to the service.
+ */
+export async function callResponsesTurn(
   config: OpenAiConfig,
-  request: ResponsesRequest,
-): Promise<ResponsesResult> {
+  request: TurnRequest,
+): Promise<TurnResult> {
   const model = request.model || config.deployment;
   const res = await fetch(`${config.endpoint}/openai/v1/responses`, {
     method: 'POST',
@@ -156,10 +266,7 @@ export async function callResponses(
     signal: AbortSignal.timeout(request.timeoutMs ?? 30_000),
     body: JSON.stringify({
       model,
-      input: [
-        { role: 'system', content: request.system },
-        { role: 'user', content: request.user },
-      ],
+      input: request.input,
       ...(request.format ? { text: { format: request.format } } : {}),
       ...(request.tools ? { tools: request.tools } : {}),
       ...(request.toolChoice ? { tool_choice: request.toolChoice } : {}),
@@ -172,7 +279,29 @@ export async function callResponses(
 
   if (!res.ok) throw new OpenAiError(res.status, await res.text());
   const data: unknown = await res.json();
-  return { text: extractOutputText(data), model, citations: extractUrlCitations(data) };
+  const payload = data as { output?: ConversationItem[] };
+  return {
+    text: extractOutputText(data),
+    model,
+    citations: extractUrlCitations(data),
+    toolCalls: extractToolCalls(data),
+    usage: extractUsage(data),
+    outputItems: Array.isArray(payload.output) ? payload.output : [],
+  };
+}
+
+export async function callResponses(
+  config: OpenAiConfig,
+  request: ResponsesRequest,
+): Promise<ResponsesResult> {
+  const { text, model, citations, usage } = await callResponsesTurn(config, {
+    ...request,
+    input: [
+      { role: 'system', content: request.system },
+      { role: 'user', content: request.user },
+    ],
+  });
+  return { text, model, citations, usage };
 }
 
 /** Parses model output that is expected to be JSON, returning undefined if it is not. */
