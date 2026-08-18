@@ -5,6 +5,8 @@ import {
   type InvocationContext,
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
+import { AI_RATE_LIMIT } from '../lib/rateLimit.js';
+import { enforceRateLimit } from '../lib/rateLimitHttp.js';
 import {
   callResponses,
   getOpenAiConfig,
@@ -67,6 +69,14 @@ app.http('parse', {
       if (typeof body.ocrText !== 'string') {
         return errorResponse(ctx, 400, 'ocrText is required');
       }
+
+      const limited = enforceRateLimit(req, ctx, {
+        name: 'parse',
+        config: AI_RATE_LIMIT,
+        message: 'Too many labels at once. Try again shortly.',
+      });
+      if (limited) return limited;
+
       ctx.log('parse invoked', { length: body.ocrText.length });
 
       const openAi = getOpenAiConfig();

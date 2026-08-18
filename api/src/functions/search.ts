@@ -5,6 +5,8 @@ import {
   type InvocationContext,
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
+import { AI_RATE_LIMIT } from '../lib/rateLimit.js';
+import { enforceRateLimit } from '../lib/rateLimitHttp.js';
 import { safeFetch, UnsafeUrlError } from '../lib/safeFetch.js';
 import { callResponses, getOpenAiConfig, parseJsonOutput } from '../lib/openai.js';
 import {
@@ -229,6 +231,14 @@ app.http('search', {
         return errorResponse(ctx, 400, 'roaster and name are required');
       }
       const max = typeof body.max === 'number' ? body.max : 5;
+
+      const limited = enforceRateLimit(req, ctx, {
+        name: 'search',
+        config: AI_RATE_LIMIT,
+        message: 'Too many lookups at once. Try again shortly.',
+      });
+      if (limited) return limited;
+
       ctx.log('search invoked', { roaster: body.roaster, name: body.name });
 
       // Without a model there is no way to resolve a roaster to a domain, so the

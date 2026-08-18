@@ -7,7 +7,8 @@ import {
 import { errorResponse, json, readJson } from '../lib/http.js';
 import { callImageEdit, getImageModelConfig, ImageModelError } from '../lib/imageModel.js';
 import { sniffImageType } from '../lib/imageType.js';
-import { consume, IMAGE_RATE_LIMIT } from '../lib/rateLimit.js';
+import { IMAGE_RATE_LIMIT } from '../lib/rateLimit.js';
+import { enforceRateLimit } from '../lib/rateLimitHttp.js';
 import { STUDIO_PHOTO_PROMPT } from '../lib/studioPrompt.js';
 
 interface StudioPhotoRequest {
@@ -44,27 +45,9 @@ const MAX_IMAGE_BYTES = 6_000_000;
 const MODEL_IMAGE_TYPES: ReadonlySet<string> = new Set(['image/jpeg', 'image/png']);
 
 /**
- * Bucket key for the rate limiter.
- *
- * These endpoints are anonymous — Static Web Apps linked backends cannot
- * forward a function key — so there is no verified identity to charge. The
- * principal header is used when the front door supplied one, purely so that one
- * user's bulk re-shoot does not spend everybody else's budget, and falls back to
- * a shared bucket otherwise. This is a cost control, not a security control;
- * `lib/rateLimit.ts` explains why that distinction is acceptable here.
+ * The bucket key derivation this endpoint used to carry inline now lives in
+ * `../lib/rateLimitHttp.js`, shared with the five other endpoints that need it.
  */
-function budgetKey(req: HttpRequest): string {
-  const header = req.headers.get('x-ms-client-principal');
-  if (!header) return 'anonymous';
-  try {
-    const raw = JSON.parse(Buffer.from(header, 'base64').toString('utf8')) as { userId?: unknown };
-    return typeof raw.userId === 'string' && raw.userId !== ''
-      ? `image:${raw.userId}`
-      : 'anonymous';
-  } catch {
-    return 'anonymous';
-  }
-}
 
 app.http('studioPhoto', {
   methods: ['POST'],
@@ -104,18 +87,12 @@ app.http('studioPhoto', {
         );
       }
 
-      const limit = consume(budgetKey(req), IMAGE_RATE_LIMIT);
-      if (!limit.allowed) {
-        ctx.warn('studio-photo rate limit', { retryAfterSeconds: limit.retryAfterSeconds });
-        return {
-          status: 429,
-          headers: {
-            'content-type': 'application/json',
-            'retry-after': String(limit.retryAfterSeconds),
-          },
-          body: JSON.stringify({ error: 'Too many photos at once. Try again shortly.' }),
-        };
-      }
+      const limited = enforceRateLimit(req, ctx, {
+        name: 'studio-photo',
+        config: IMAGE_RATE_LIMIT,
+        message: 'Too many photos at once. Try again shortly.',
+      });
+      if (limited) return limited;
 
       ctx.log('studio-photo invoked', { mimeType: sniffed, bytes: bytes.byteLength });
 

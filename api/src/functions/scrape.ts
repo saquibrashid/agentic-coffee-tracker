@@ -5,6 +5,8 @@ import {
   type InvocationContext,
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
+import { FETCH_RATE_LIMIT } from '../lib/rateLimit.js';
+import { enforceRateLimit } from '../lib/rateLimitHttp.js';
 import { extractImageUrl } from '../lib/extractImage.js';
 import { extractEmbeddedProduct } from '../lib/embeddedData.js';
 import { safeFetch, UnsafeUrlError } from '../lib/safeFetch.js';
@@ -87,6 +89,13 @@ app.http('scrape', {
       if (!isAllowed(body.url, allowlist())) {
         return errorResponse(ctx, 400, 'URL host is not in allowlist');
       }
+
+      const limited = enforceRateLimit(req, ctx, {
+        name: 'scrape',
+        config: FETCH_RATE_LIMIT,
+        message: 'Too many pages at once. Try again shortly.',
+      });
+      if (limited) return limited;
 
       ctx.log('scrape invoked', { url: body.url });
 

@@ -244,6 +244,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Every AI endpoint now has a spending limit.** `/api/parse`, `/api/ocr`,
+  `/api/search`, `/api/recommend`, `/api/scrape` and `/api/image` accepted
+  unlimited requests, and each one either spends model tokens or fetches a
+  remote page on our behalf. The token bucket already existed and already
+  guarded sync and the studio photo endpoint — the other six simply never called
+  it. They do now, each with its own budget, so an enrichment run that
+  legitimately calls search, then scrape, then parse for a single coffee cannot
+  exhaust itself a third of the way through. This is the piece the Azure budget
+  alerts could not provide: a budget reports spending after it has happened,
+  whereas a limit is the only thing that stops the request making it. `/api/scrape`
+  and `/api/image` fetch a caller-supplied URL, so unlimited they were also a
+  small open proxy. Refusals come back as `429` with a `retry-after`, which
+  enrichment and sync already knew how to wait on.
+
 - **"Will I like it?" names the coffee and shows its picture.** Checking several
   coffees from the same roaster in a row produced a run of verdict cards that
   looked identical, with nothing on them to say which coffee was being answered.

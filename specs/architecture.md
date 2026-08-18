@@ -64,7 +64,7 @@ Max payload: 8 MB. Server downscales further if needed before calling Azure Visi
 ```
 Request:  { ocrText: string, model?: string }
 Response: { parsed: <LLM Output schema>, model: string, rawText: string }
-Errors:   400 missing ocrText, 422 model output failed schema validation, 500 upstream
+Errors:   400 missing ocrText, 422 model output failed schema validation, 429 rate-limited, 500 upstream
 ```
 
 Uses Azure OpenAI **structured outputs** with the schema in `data-model.md`, sent over the
@@ -115,7 +115,7 @@ the final URL. It is a _pointer_, not the image — the client passes it to
 ```
 Request:  { url: string }
 Response: { dataUrl: string, contentType: string, byteSize: number, sourceUrl: string }
-Errors:   400 invalid/blocked URL, 415 not a supported image, 502 upstream failure
+Errors:   400 invalid/blocked URL, 415 not a supported image, 429 rate-limited, 502 upstream failure
 ```
 
 A binary proxy so the client can obtain a roaster's product photo. Two reasons it
@@ -148,7 +148,7 @@ is nobody there to choose.
 ```
 Request:  { preferences: <PreferenceSummary>, max?: number }
 Response: { recommendations: Recommendation[], model: string, reason?: 'insufficient-history' }
-Errors:   400 missing/invalid summary, 422 model output failed validation, 500 upstream
+Errors:   400 missing/invalid summary, 422 model output failed validation, 429 rate-limited, 500 upstream
 ```
 
 `PreferenceSummary` is an **anonymous** projection of `UserPreferences`: ranked
@@ -488,6 +488,7 @@ Storage quotas: request `navigator.storage.persist()` after the first save; surf
 - **User data is local while signed out.** Signing in replicates records to Cosmos DB per user; see `specs/sync.md` and `SECURITY.md`. No analytics, no third-party SDKs.
 - BFF logs request metadata only (timing, status, model name) — never OCR text, parsed JSON, or photos.
 - BFF strips EXIF from incoming images before forwarding.
+- **Every BFF endpoint that costs money to serve is rate limited per caller.** The token bucket lives in `api/src/lib/rateLimit.ts` and is applied over HTTP by `api/src/lib/rateLimitHttp.ts`; each endpoint gets its own bucket so an enrichment run — which legitimately calls search, then scrape, then parse for one coffee — cannot starve the others. Three budgets: `AI_RATE_LIMIT` for the model endpoints (`/api/parse`, `/api/ocr`, `/api/search`, `/api/recommend`), `FETCH_RATE_LIMIT` for the URL-fetching ones (`/api/scrape`, `/api/image`), and the much tighter `IMAGE_RATE_LIMIT` for `/api/studio-photo`, which generates a picture per call. Refusals are `429` with a `retry-after`. This is a **cost control, not a security control** — state is per Function instance and the principal header is unverified, but a forged identity only moves the caller to another bucket of the same size, so the ceiling holds. It is also the only thing that caps spend at the moment of the call: the Azure budgets in `infra/budget.bicep` alert after the fact and cannot stop a request.
 - CSP: generated at build time by `build-config/csp.ts` and written into `staticwebapp.config.json`. `script-src` is `'self'` plus the sha256 of the inline theme script — no `'unsafe-inline'`; `img-src` allows `data:` and `blob:` for thumbnails and IndexedDB photos; `connect-src` is `'self'` plus the photo blob endpoint (and the BFF origin, when it is a separate one). Verified by `pnpm test:e2e:csp`, which runs a production build under the real header.
 - Settings → **Reset** wipes IndexedDB, Cache Storage, and unregisters the service worker.
 - Settings → **Export then delete** option encouraged before reset.

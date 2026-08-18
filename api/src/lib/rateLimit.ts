@@ -1,5 +1,5 @@
 /**
- * A per-user request budget for the sync endpoints.
+ * A per-caller request budget for the endpoints that cost money to serve.
  *
  * This is a **cost control, not a security control**, and the distinction
  * matters for how much to trust it. The state lives in the Function worker's
@@ -60,10 +60,54 @@ export const SYNC_RATE_LIMIT: RateLimitConfig = { capacity: 120, refillPerSecond
  */
 export const IMAGE_RATE_LIMIT: RateLimitConfig = { capacity: 20, refillPerSecond: 0.1 };
 
+/**
+ * The budget for the endpoints that spend model tokens: parse, ocr, search and
+ * recommend.
+ *
+ * Sized from the shape of the work rather than from a round number. The
+ * expensive legitimate case is a bulk import, where each coffee costs roughly
+ * one search, one parse and — if it came from a photo — one OCR. 60 back-to-back
+ * therefore covers about twenty coffees imported in one go without the user
+ * ever meeting the limit, and 1/s sustained lets a longer run continue at a
+ * pace that finishes a hundred-bean library in a couple of minutes.
+ *
+ * Looser than {@link IMAGE_RATE_LIMIT} because a text completion costs orders
+ * of magnitude less than an image generation, and far tighter than
+ * {@link SYNC_RATE_LIMIT} because a Cosmos read costs a fraction of a cent and
+ * a model call does not.
+ */
+export const AI_RATE_LIMIT: RateLimitConfig = { capacity: 60, refillPerSecond: 1 };
+
+/**
+ * The budget for the endpoints that fetch a caller-supplied URL: scrape and
+ * image.
+ *
+ * These cost us no model tokens, so the thing being bounded is different: an
+ * unlimited endpoint that fetches an arbitrary address on request is a small
+ * open proxy, and the egress is ours to pay for either way. `safeFetch` already
+ * refuses private and link-local addresses, which stops it being used to reach
+ * *inside* the network; this stops it being used to hammer somewhere outside it
+ * on our behalf.
+ *
+ * Roomier than {@link AI_RATE_LIMIT} because enrichment issues two of these per
+ * coffee — the product page and then its picture — against one of each model
+ * call, so a matched budget would make the cheap endpoint the bottleneck.
+ */
+export const FETCH_RATE_LIMIT: RateLimitConfig = { capacity: 90, refillPerSecond: 1.5 };
+
 interface Bucket {
   tokens: number;
   /** ms epoch of the last refill. */
   updatedAt: number;
+  /**
+   * The capacity this bucket was last charged against, so the idle sweep can
+   * tell a full bucket from a drained one without knowing which endpoint it
+   * belongs to. Storing it beats consulting a single global capacity: the
+   * budgets differ by an order of magnitude, and a sweep that measured a
+   * 20-token image bucket against the 120-token sync capacity would never
+   * consider it full and so would never evict it.
+   */
+  capacity: number;
 }
 
 const buckets = new Map<string, Bucket>();
@@ -82,7 +126,7 @@ let sinceSweep = 0;
 
 function sweep(now: number): void {
   for (const [key, bucket] of buckets) {
-    if (bucket.tokens >= SYNC_RATE_LIMIT.capacity && now - bucket.updatedAt > IDLE_EVICTION_MS) {
+    if (bucket.tokens >= bucket.capacity && now - bucket.updatedAt > IDLE_EVICTION_MS) {
       buckets.delete(key);
     }
   }
@@ -138,7 +182,7 @@ export function consume(
   }
 
   const remaining = tokens - 1;
-  buckets.set(key, { tokens: remaining, updatedAt: now });
+  buckets.set(key, { tokens: remaining, updatedAt: now, capacity: config.capacity });
   return { allowed: true, retryAfterSeconds: 0, remaining };
 }
 

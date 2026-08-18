@@ -5,6 +5,8 @@ import {
   type InvocationContext,
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
+import { FETCH_RATE_LIMIT } from '../lib/rateLimit.js';
+import { enforceRateLimit } from '../lib/rateLimitHttp.js';
 import { ALLOWED_IMAGE_TYPES, normalizeContentType, sniffImageType } from '../lib/imageType.js';
 import { safeFetchBinary, UnsafeUrlError } from '../lib/safeFetch.js';
 
@@ -70,6 +72,13 @@ app.http('image', {
       if (typeof body.url !== 'string') {
         return errorResponse(ctx, 400, 'url is required');
       }
+
+      const limited = enforceRateLimit(req, ctx, {
+        name: 'image',
+        config: FETCH_RATE_LIMIT,
+        message: 'Too many pictures at once. Try again shortly.',
+      });
+      if (limited) return limited;
 
       ctx.log('image invoked', { url: body.url });
 

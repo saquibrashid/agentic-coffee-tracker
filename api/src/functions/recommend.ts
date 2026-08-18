@@ -5,6 +5,8 @@ import {
   type InvocationContext,
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
+import { AI_RATE_LIMIT } from '../lib/rateLimit.js';
+import { enforceRateLimit } from '../lib/rateLimitHttp.js';
 import {
   callResponses,
   getOpenAiConfig,
@@ -65,6 +67,13 @@ app.http('recommend', {
       }
       const summary = body.preferences;
       const max = typeof body.max === 'number' ? Math.min(Math.max(body.max, 1), 5) : 3;
+
+      const limited = enforceRateLimit(req, ctx, {
+        name: 'recommend',
+        config: AI_RATE_LIMIT,
+        message: 'Too many suggestions at once. Try again shortly.',
+      });
+      if (limited) return limited;
 
       // Too little history to ground anything: say so rather than inventing taste.
       if (summary.totalRatings < 3) {

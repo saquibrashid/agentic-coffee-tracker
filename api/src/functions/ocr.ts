@@ -5,6 +5,8 @@ import {
   type InvocationContext,
 } from '@azure/functions';
 import { errorResponse, json, readJson } from '../lib/http.js';
+import { AI_RATE_LIMIT } from '../lib/rateLimit.js';
+import { enforceRateLimit } from '../lib/rateLimitHttp.js';
 
 interface OcrRequest {
   imageBase64?: unknown;
@@ -49,6 +51,14 @@ app.http('ocr', {
       if (typeof body.imageBase64 !== 'string' || typeof body.mimeType !== 'string') {
         return errorResponse(ctx, 400, 'imageBase64 and mimeType are required strings');
       }
+
+      const limited = enforceRateLimit(req, ctx, {
+        name: 'ocr',
+        config: AI_RATE_LIMIT,
+        message: 'Too many photos at once. Try again shortly.',
+      });
+      if (limited) return limited;
+
       ctx.log('ocr invoked', { mimeType: body.mimeType, bytes: body.imageBase64.length });
 
       if (process.env.AZURE_VISION_ENDPOINT && process.env.AZURE_VISION_KEY) {
