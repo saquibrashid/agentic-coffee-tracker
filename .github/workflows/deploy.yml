@@ -131,9 +131,76 @@ jobs:
         if: steps.config.outputs.ready == 'true'
         run: azd provision --no-prompt
 
-      - name: Deploy application
+      - name: Deploy the API
         if: steps.config.outputs.ready == 'true'
-        run: azd deploy --no-prompt
+        run: azd deploy api --no-prompt
+
+      # The web bundle is built and uploaded here rather than by `azd deploy web`.
+      #
+      # azd publishes a `staticwebapp` service by shelling out to
+      # `npx @azure/static-web-apps-cli`, which resolves a fresh dependency tree
+      # from the registry on every run with no lockfile to pin it. On 2026-08-19
+      # a broken `@azure/identity` release — it declared a dependency on a
+      # package that was never published — made that install fail and blocked
+      # every deploy for hours, with nothing wrong in this repository (#234).
+      #
+      # The official action ships its tooling inside a container, so publishing
+      # no longer depends on the npm registry being healthy at that moment. Our
+      # own build still installs from the lockfile, which is why it was never
+      # affected.
+      - name: Build the web bundle
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          # Both are infrastructure outputs rather than hand-set values: the
+          # topology decides them, so reading them back from the environment
+          # that was just provisioned is what keeps the bundle honest about
+          # which API it talks to and whether sign-in can be trusted.
+          VITE_API_BASE_URL=$(azd env get-value VITE_API_BASE_URL 2>/dev/null || echo '')
+          VITE_AUTH_ENABLED=$(azd env get-value VITE_AUTH_ENABLED 2>/dev/null || echo 'false')
+          export VITE_API_BASE_URL VITE_AUTH_ENABLED
+          echo "Building with VITE_AUTH_ENABLED=$VITE_AUTH_ENABLED and API base '${VITE_API_BASE_URL:-<linked backend>}'"
+          pnpm build
+
+      - name: Log in to the Azure CLI
+        if: steps.config.outputs.ready == 'true'
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Read the Static Web App deployment token
+        id: swa
+        if: steps.config.outputs.ready == 'true'
+        run: |
+          SWA_NAME=$(azd env get-value SERVICE_WEB_NAME)
+          RESOURCE_GROUP=$(azd env get-value AZURE_RESOURCE_GROUP)
+          TOKEN=$(az staticwebapp secrets list \
+            --name "$SWA_NAME" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query "properties.apiKey" -o tsv)
+          if [ -z "$TOKEN" ]; then
+            echo "::error title=Deploy failed — nothing was published::Could not read the deployment token for $SWA_NAME."
+            exit 1
+          fi
+          # Masked before it is written anywhere: this token on its own is
+          # enough to publish to the live site.
+          echo "::add-mask::$TOKEN"
+          echo "token=$TOKEN" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the web bundle
+        if: steps.config.outputs.ready == 'true'
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa.outputs.token }}
+          action: upload
+          # Already built above, and the API is a separate linked Function App,
+          # so there is nothing here for the action's own build to do.
+          app_location: dist
+          api_location: ''
+          output_location: ''
+          skip_app_build: true
+          skip_api_build: true
 
       # Confirms the BFF is reachable and reports whether each integration is
       # running live or in mock mode.
