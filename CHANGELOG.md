@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A test failed at random because it typed a URL out one letter at a time.**
+  `userEvent.type()` dispatches a separate keystroke per character, and each one
+  costs a full React render plus a jsdom event — about 22ms here. The enrichment
+  test typing a 62-character product URL therefore spent well over a second of
+  its 5000ms budget on setup it was not asserting anything about, and under the
+  parallel load of 85 test files that margin ran out. The affected tests now
+  paste, which is one event no matter how long the text is and is also what a
+  person actually does with a product URL. The five worst tests dropped 3–4×
+  (1590ms to 385ms, 1304ms to 360ms), and the reasoning lives in a shared
+  `pasteInto` helper so the next test to need it does not rediscover it. Raising
+  the timeout was rejected: it would have hidden the cost rather than removed
+  it, and left every future test paying it.
+
 - **A test could fail the build after every test had already passed.** The
   capture tests rendered the add-coffee page without a router, then waited on
   the database writes — which land _before_ the page moves to its confirm step.

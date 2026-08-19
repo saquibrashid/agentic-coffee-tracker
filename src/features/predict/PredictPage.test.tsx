@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db } from '@/services/db';
 import type { CoffeeBean, Rating } from '@/types';
 import type * as EnrichModule from '@/services/enrich';
+import { pasteInto } from '@/test/interactions';
 
 const mocks = vi.hoisted(() => ({
   extractBeanFromPhoto: vi.fn(),
@@ -150,7 +151,7 @@ describe('PredictPage check sessions', () => {
     render(<PredictPage />);
 
     const url = await screen.findByLabelText(/link to the coffee/i);
-    await user.type(url, 'https://storyville.com/products/epilogue');
+    await pasteInto(user, url, 'https://storyville.com/products/epilogue');
     await user.click(screen.getByRole('button', { name: 'Read' }));
 
     expect(await screen.findByText('storyville.com')).toBeInTheDocument();
@@ -182,11 +183,11 @@ describe('PredictPage check sessions', () => {
     render(<PredictPage />);
 
     const url = await screen.findByLabelText(/link to the coffee/i);
-    await user.type(url, 'https://storyville.com/products/epilogue');
+    await pasteInto(user, url, 'https://storyville.com/products/epilogue');
     await user.click(screen.getByRole('button', { name: 'Read' }));
     await user.click(await screen.findByRole('button', { name: /cancel and start over/i }));
 
-    await user.type(url, 'https://onyxcoffeelab.com/products/geometry');
+    await pasteInto(user, url, 'https://onyxcoffeelab.com/products/geometry');
     await user.click(screen.getByRole('button', { name: 'Read' }));
     expect(await screen.findByDisplayValue('Onyx')).toBeInTheDocument();
 

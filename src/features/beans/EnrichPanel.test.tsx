@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CoffeeBean } from '@/types';
+import { pasteInto } from '@/test/interactions';
 
 /**
  * Automatic lookup finds a coffee by guessing where its roaster sells, so it
@@ -97,7 +98,8 @@ describe('EnrichPanel manual URL', () => {
     const user = userEvent.setup();
     render(<EnrichPanel bean={bean} />);
 
-    await user.type(
+    await pasteInto(
+      user,
       screen.getByLabelText(/paste the product page address/i),
       'https://www.highwirecoffee.com/products/after-hours-decaf-310g-bag',
     );
@@ -125,7 +127,7 @@ describe('EnrichPanel manual URL', () => {
     const user = userEvent.setup();
     render(<EnrichPanel bean={bean} />);
 
-    await user.type(screen.getByLabelText(/paste the product page address/i), 'after hours');
+    await pasteInto(user, screen.getByLabelText(/paste the product page address/i), 'after hours');
     await user.click(screen.getByRole('button', { name: /read page/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/does not look like a web address/i);
@@ -137,7 +139,11 @@ describe('EnrichPanel manual URL', () => {
     const user = userEvent.setup();
     render(<EnrichPanel bean={bean} />);
 
-    await user.type(screen.getByLabelText(/paste the product page address/i), 'example.com/x');
+    await pasteInto(
+      user,
+      screen.getByLabelText(/paste the product page address/i),
+      'example.com/x',
+    );
     await user.click(screen.getByRole('button', { name: /read page/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/no readable text/i);
@@ -161,7 +167,11 @@ describe('EnrichPanel details without a page', () => {
     const user = userEvent.setup();
     render(<EnrichPanel bean={bean} />);
 
-    await user.type(await openPaste(user), 'Washed Ethiopia, medium roast, citrus and cocoa.');
+    await pasteInto(
+      user,
+      await openPaste(user),
+      'Washed Ethiopia, medium roast, citrus and cocoa.',
+    );
     await user.click(screen.getByRole('button', { name: /read details/i }));
 
     await waitFor(() => expect(enrichFromText).toHaveBeenCalled());
@@ -173,7 +183,11 @@ describe('EnrichPanel details without a page', () => {
     const user = userEvent.setup();
     render(<EnrichPanel bean={bean} />);
 
-    await user.type(await openPaste(user), 'Washed Ethiopia, medium roast, citrus and cocoa.');
+    await pasteInto(
+      user,
+      await openPaste(user),
+      'Washed Ethiopia, medium roast, citrus and cocoa.',
+    );
     await user.click(screen.getByRole('button', { name: /read details/i }));
 
     expect(await screen.findByText(/from the details you supplied/i)).toBeInTheDocument();
