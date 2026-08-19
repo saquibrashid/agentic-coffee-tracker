@@ -22,6 +22,7 @@
  * the assurance of one resting on five (#200).
  */
 import { MAX_SCORE, NEUTRAL_SCORE, clampToScale } from '@/services/ratings/scale';
+import { flavourFamily, originFamily, PROCESS_NEIGHBOUR_DISCOUNT, PROCESS_ORDER } from './families';
 import type { CoffeeBean, Origin, Process, Rating, RoastLevel } from '@/types';
 
 /**
@@ -54,6 +55,9 @@ const ATTRIBUTE_KINDS = Object.keys(ATTRIBUTE_WEIGHTS).length;
  * is nearly "dark" and nothing like "light". Matching it as a bare string threw
  * that away, so a candidate whose exact level the user had never rated counted
  * as no evidence at all even when the neighbouring level had plenty (#200).
+ *
+ * Processing method turned out to be the same shape — see `families.ts` — so
+ * both now run through one ordinal matcher.
  */
 const ROAST_ORDER = ['light', 'medium-light', 'medium', 'medium-dark', 'dark'] as const;
 
@@ -63,6 +67,17 @@ const ROAST_ORDER = ['light', 'medium-light', 'medium', 'medium-dark', 'dark'] a
  * nothing, which is the point — they genuinely say little about each other.
  */
 const ROAST_NEIGHBOUR_DISCOUNT = [1, 0.6, 0.3, 0.12, 0.04];
+
+/**
+ * How much a family match counts against an exact one.
+ *
+ * Related is not the same as identical, and the discount says so. Origins are
+ * discounted harder than notes because a producing region is a coarser thing to
+ * belong to than a flavour family: two East African coffees can taste
+ * thoroughly unalike, whereas two coffees both described in terms of apple
+ * mostly do not.
+ */
+const FAMILY_DISCOUNT = { origin: 0.45, flavour: 0.55 } as const;
 
 /** Flavour notes are many and repetitive; only the best-evidenced few count. */
 const MAX_FLAVOUR_MATCHES = 4;
@@ -95,9 +110,10 @@ export interface Evidence {
   /** How far above or below the user's own baseline this attribute runs. */
   delta: number;
   /**
-   * True when the history has nothing about this exact value and a neighbour
-   * stood in for it — currently only roast level, which is ordinal. Callers must
-   * say so rather than implying the user has rated this value.
+   * True when the history has nothing about this exact value and something
+   * related stood in for it: a neighbouring roast level or process, or a whole
+   * origin region or flavour family. Callers must say so rather than implying
+   * the user has rated this value.
    */
   approximate?: boolean;
 }
@@ -269,27 +285,34 @@ function match(
 }
 
 /**
- * Roast level, matched along the ordinal scale rather than by exact string. An
- * exact hit wins outright; otherwise the nearest level the user has actually
+ * An attribute matched along an ordinal scale rather than by exact string. An
+ * exact hit wins outright; otherwise the nearest value the user has actually
  * rated stands in, discounted by how far away it is.
+ *
+ * Values that are not on the scale at all — `wet-hulled` among processes — fall
+ * through to null and are reported as unrated, which is the honest answer.
  */
-function matchRoastLevel(
-  index: PredictionIndex,
+function matchOrdinal(
+  map: Map<string, AttributeStats>,
+  order: readonly string[],
+  discounts: readonly number[],
   value: string,
+  kind: AttributeKind,
   baseline: number,
+  totalRatings: number,
 ): WeightedMatch | null {
-  const exact = match(index.roastLevels, value, 'roastLevel', baseline, index.totalRatings);
+  const exact = match(map, value, kind, baseline, totalRatings);
   if (exact) return exact;
 
-  const position = (ROAST_ORDER as readonly string[]).indexOf(key(value));
+  const position = order.indexOf(key(value));
   if (position < 0) return null;
 
   let best: { stats: AttributeStats; distance: number } | null = null;
-  for (const [i, level] of ROAST_ORDER.entries()) {
-    const stats = index.roastLevels.get(level);
+  for (const [i, level] of order.entries()) {
+    const stats = map.get(level);
     if (!stats) continue;
     const distance = Math.abs(i - position);
-    if ((ROAST_NEIGHBOUR_DISCOUNT[distance] ?? 0) <= 0) continue;
+    if ((discounts[distance] ?? 0) <= 0) continue;
     // Closest wins; between equally close levels, the better-evidenced one.
     if (
       !best ||
@@ -301,14 +324,65 @@ function matchRoastLevel(
   }
   if (!best) return null;
 
-  return weigh(
-    best.stats,
-    'roastLevel',
-    baseline,
-    index.totalRatings,
-    ROAST_NEIGHBOUR_DISCOUNT[best.distance] ?? 0,
-    true,
-  );
+  return weigh(best.stats, kind, baseline, totalRatings, discounts[best.distance] ?? 0, true);
+}
+
+interface FamilyBuckets {
+  origins: Map<string, AttributeStats>;
+  flavours: Map<string, AttributeStats>;
+}
+
+/**
+ * Family totals are derived from the index and never change while it exists, so
+ * they are computed once per index rather than once per candidate — the Predict
+ * screen re-checks against the same index every time the form is edited.
+ */
+const familyCache = new WeakMap<PredictionIndex, FamilyBuckets>();
+
+function bucketBy(
+  map: Map<string, AttributeStats>,
+  familyOf: (value: string) => string | null,
+): Map<string, AttributeStats> {
+  const buckets = new Map<string, AttributeStats>();
+  for (const stats of map.values()) {
+    const family = familyOf(stats.label);
+    if (!family) continue;
+    const current = buckets.get(family);
+    if (!current) {
+      buckets.set(family, { label: family, count: stats.count, averageScore: stats.averageScore });
+      continue;
+    }
+    // Pooled mean, weighted by how many ratings each value actually carries —
+    // otherwise a note rated once would count as much as one rated twenty times.
+    const total = current.count + stats.count;
+    current.averageScore =
+      (current.averageScore * current.count + stats.averageScore * stats.count) / total;
+    current.count = total;
+  }
+  return buckets;
+}
+
+function familyBuckets(index: PredictionIndex): FamilyBuckets {
+  const cached = familyCache.get(index);
+  if (cached) return cached;
+  const built: FamilyBuckets = {
+    origins: bucketBy(index.origins, originFamily),
+    flavours: bucketBy(index.flavours, flavourFamily),
+  };
+  familyCache.set(index, built);
+  return built;
+}
+
+function matchFamily(
+  buckets: Map<string, AttributeStats>,
+  family: string,
+  kind: 'origin' | 'flavour',
+  baseline: number,
+  totalRatings: number,
+): WeightedMatch | null {
+  const stats = buckets.get(family);
+  if (!stats) return null;
+  return weigh(stats, kind, baseline, totalRatings, FAMILY_DISCOUNT[kind], true);
 }
 
 function verdictFor(score: number, delta: number, confidence: number): Verdict {
@@ -339,6 +413,7 @@ export function predict(candidate: Candidate, index: PredictionIndex): Predictio
   const matches: WeightedMatch[] = [];
   const unknowns: string[] = [];
   const missing: string[] = [];
+  const buckets = familyBuckets(index);
 
   const consider = (
     value: string | undefined,
@@ -354,29 +429,91 @@ export function predict(candidate: Candidate, index: PredictionIndex): Predictio
     else unknowns.push(value);
   };
 
-  consider(candidate.roaster, index.roasters, 'roaster');
-  consider(candidate.process, index.processes, 'process');
+  const considerOrdinal = (
+    value: string | undefined,
+    map: Map<string, AttributeStats>,
+    order: readonly string[],
+    discounts: readonly number[],
+    kind: AttributeKind,
+  ): void => {
+    if (!value || value === 'unknown') {
+      missing.push(describe(kind));
+      return;
+    }
+    const found = matchOrdinal(
+      map,
+      order,
+      discounts,
+      value,
+      kind,
+      index.baseline,
+      index.totalRatings,
+    );
+    if (found) matches.push(found);
+    else unknowns.push(value);
+  };
 
-  if (!candidate.roastLevel || candidate.roastLevel === 'unknown') {
-    missing.push(describe('roastLevel'));
-  } else {
-    const roast = matchRoastLevel(index, candidate.roastLevel, index.baseline);
-    if (roast) matches.push(roast);
-    else unknowns.push(candidate.roastLevel);
-  }
+  consider(candidate.roaster, index.roasters, 'roaster');
+  considerOrdinal(
+    candidate.process,
+    index.processes,
+    PROCESS_ORDER,
+    PROCESS_NEIGHBOUR_DISCOUNT,
+    'process',
+  );
+  considerOrdinal(
+    candidate.roastLevel,
+    index.roastLevels,
+    ROAST_ORDER,
+    ROAST_NEIGHBOUR_DISCOUNT,
+    'roastLevel',
+  );
+
+  /**
+   * Exact first, then the family. A family that has already contributed is
+   * skipped entirely rather than counted twice or reported as unrated: two
+   * notes reading "green apple" and "orchard fruit" are one piece of evidence,
+   * not two, and neither of them is unknown once the family has answered.
+   */
+  const collect = (
+    values: string[],
+    exactMap: Map<string, AttributeStats>,
+    bucketMap: Map<string, AttributeStats>,
+    familyOf: (value: string) => string | null,
+    kind: 'origin' | 'flavour',
+    into: WeightedMatch[],
+  ): void => {
+    const usedFamilies = new Set<string>();
+    for (const value of values) {
+      const exact = match(exactMap, value, kind, index.baseline, index.totalRatings);
+      if (exact) {
+        into.push(exact);
+        continue;
+      }
+      const family = familyOf(value);
+      if (!family) {
+        unknowns.push(value);
+        continue;
+      }
+      if (usedFamilies.has(family)) continue;
+      const found = matchFamily(bucketMap, family, kind, index.baseline, index.totalRatings);
+      if (found) {
+        usedFamilies.add(family);
+        into.push(found);
+      } else {
+        unknowns.push(value);
+      }
+    }
+  };
 
   const countries = (candidate.origins ?? []).map((o) => o.country).filter(Boolean);
   if (countries.length === 0) missing.push('origin');
-  for (const country of countries) consider(country, index.origins, 'origin');
+  collect(countries, index.origins, buckets.origins, originFamily, 'origin', matches);
 
   const notes = candidate.tastingNotes ?? [];
   if (notes.length === 0) missing.push('tasting notes');
   const flavourMatches: WeightedMatch[] = [];
-  for (const note of notes) {
-    const found = match(index.flavours, note, 'flavour', index.baseline, index.totalRatings);
-    if (found) flavourMatches.push(found);
-    else unknowns.push(note);
-  }
+  collect(notes, index.flavours, buckets.flavours, flavourFamily, 'flavour', flavourMatches);
   // Only the best-evidenced notes count, so a bag listing twelve of them cannot
   // out-vote the origin and the process put together. Ordered by informativeness
   // rather than raw volume, so a note on almost every bag does not crowd out the
@@ -451,14 +588,22 @@ export function explain(evidence: Evidence): string {
     case 'roaster':
       return `You have ${ratings} from ${evidence.label} averaging ${average}/${MAX_SCORE}.`;
     case 'origin':
-      return `Coffees from ${evidence.label} average ${average}/${MAX_SCORE} across ${ratings}.`;
+      // An approximate origin match is a whole region standing in for a country
+      // the user has never had, so it must not read as if they had.
+      return evidence.approximate
+        ? `You have not rated this origin, but ${evidence.label} coffees average ${average}/${MAX_SCORE} across ${ratings}.`
+        : `Coffees from ${evidence.label} average ${average}/${MAX_SCORE} across ${ratings}.`;
     case 'process':
-      return `${evidence.label} process averages ${average}/${MAX_SCORE} across ${ratings}.`;
+      return evidence.approximate
+        ? `You have not rated this process, but the nearest you have — ${evidence.label} — averages ${average}/${MAX_SCORE} across ${ratings}.`
+        : `${evidence.label} process averages ${average}/${MAX_SCORE} across ${ratings}.`;
     case 'roastLevel':
       return evidence.approximate
         ? `You have not rated this roast level, but the nearest you have — ${evidence.label} — averages ${average}/${MAX_SCORE} across ${ratings}.`
         : `${evidence.label} roasts average ${average}/${MAX_SCORE} across ${ratings}.`;
     case 'flavour':
-      return `Coffees noting "${evidence.label}" average ${average}/${MAX_SCORE} across ${ratings}.`;
+      return evidence.approximate
+        ? `You have not rated this note, but related ones — ${evidence.label} — average ${average}/${MAX_SCORE} across ${ratings}.`
+        : `Coffees noting "${evidence.label}" average ${average}/${MAX_SCORE} across ${ratings}.`;
   }
 }

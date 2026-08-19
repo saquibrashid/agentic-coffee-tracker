@@ -229,6 +229,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Predictions now recognise related coffees instead of demanding the exact
+  same words.** Every attribute was matched by exact string, so a bag offering
+  "green apple" from Kenya learned nothing from a shelf of coffees rated as
+  "apple", "orchard fruit" and Ethiopian — and it was expensive twice over,
+  because confidence multiplies by how many attribute kinds were recognised, so
+  each unmatched word also cost a fifth of the confidence. That is why a real
+  bag came back as 7.6/10 at 9% confidence next to a history that had plenty to
+  say about it. Origins and tasting notes are open vocabulary, so they now fall
+  back to curated families — East Africa, Apple & pear — pooled by how many
+  ratings each value actually carries. Processing method needed no vocabulary
+  at all, being a closed set the app defines, but it turned out to have the same
+  shape as roast level before this: `washed → honey → natural → anaerobic` is a
+  scale, not a set of unrelated labels, so a neighbour now stands in, discounted
+  by distance. Family and neighbour matches are always discounted against exact
+  ones and always say so in their wording — "you have not rated this origin,
+  but East Africa coffees average…" — because related is not the same as
+  identical. Values that genuinely sit off the scale, such as wet-hulled
+  processing or a note nothing recognises, are still reported as unrated rather
+  than filed under whatever happened to be nearest. Brazil is deliberately a
+  family of one: a heavy nutty natural says little about a bright washed
+  Colombian, and grouping them would manufacture evidence rather than find it.
+
 - **"Will I like it?" is now a three-step wizard: Coffee, Details, Verdict.** It
   was always those three steps — bring in a coffee, confirm what it is, get an
   answer — but they were stacked on one page, which had two costs. The verdict
