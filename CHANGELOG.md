@@ -229,6 +229,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **"Will I like it?" is now a three-step wizard: Coffee, Details, Verdict.** It
+  was always those three steps — bring in a coffee, confirm what it is, get an
+  answer — but they were stacked on one page, which had two costs. The verdict
+  rendered _below_ the details form, so on a phone the thing you came for
+  arrived off-screen at the moment it appeared; and nothing said that filling in
+  the form led anywhere, so it read as a chore rather than progress. The verdict
+  now takes the screen to itself, with the score set large, the coffee named
+  above it and the confidence drawn as a labelled gauge instead of a percentage
+  buried in a caption. The gauge is coloured by confidence and never by the
+  verdict, so a high score the predictor is barely sure of still looks like the
+  shrug it is. Stepping back to adjust something keeps both what you typed and
+  the answer already given, until an edit actually invalidates it.
+
 - **Coffee scans now run on `gpt-5.4-mini`, at roughly a third of the cost.**
   The model behind parsing, recommendations and search had been `gpt-4o` since
   the app was built, chosen when every cheaper option failed for a concrete

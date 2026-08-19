@@ -44,10 +44,21 @@ async function seedHistory(page: Page) {
   await expect(page.getByRole('status')).toContainText('Imported 10 ratings');
 }
 
+/**
+ * The form lives on step 2 of the wizard, so every test that types into it has
+ * to get there first. Typing the coffee out is a first-class route in, which is
+ * lucky: it keeps these tests off the network.
+ */
+async function openDetails(page: Page) {
+  await page.getByRole('button', { name: 'Skip and type the details' }).click();
+  await expect(page.locator('#predict-origin')).toBeVisible();
+}
+
 async function fillCoffee(
   page: Page,
   values: { origin: string; process: string; roast: string; roaster?: string; name?: string },
 ) {
+  await openDetails(page);
   await page.fill('#predict-origin', values.origin);
   await page.selectOption('#predict-process', values.process);
   await page.selectOption('#predict-roast', values.roast);
@@ -121,6 +132,7 @@ test.describe('will I like it?', () => {
     await seedHistory(page);
 
     await page.goto('/predict');
+    await openDetails(page);
     await page.fill('#predict-name', 'Konga');
 
     await expect(page.getByRole('button', { name: 'Will I like it?' })).toBeDisabled();
@@ -178,9 +190,31 @@ test.describe('will I like it?', () => {
     await page.getByRole('button', { name: 'Will I like it?' }).click();
     await expect(page.getByTestId('prediction')).toBeVisible();
 
-    // A verdict left on screen after the details change would describe a
-    // different coffee than the one in the form.
+    // Going back to adjust something keeps the answer — the way back to it is
+    // what says so — but an actual edit must throw it away, or it would be
+    // describing a different coffee than the one in the form.
+    await page.getByRole('button', { name: 'Adjust the details' }).click();
+    await expect(page.getByRole('button', { name: 'Back to the verdict' })).toBeVisible();
+
     await page.fill('#predict-origin', 'Brazil');
+    await expect(page.getByRole('button', { name: 'Back to the verdict' })).toHaveCount(0);
+  });
+
+  test('gives the verdict the screen to itself', async ({ page }) => {
+    // #236: the answer used to render below the form, so on a phone it arrived
+    // off-screen at the moment it appeared.
+    await seedHistory(page);
+
+    await page.goto('/predict');
+    await fillCoffee(page, { origin: 'Ethiopia', process: 'natural', roast: 'light' });
+    await page.getByRole('button', { name: 'Will I like it?' }).click();
+
+    await expect(page.getByTestId('prediction')).toBeVisible();
+    await expect(page.locator('#predict-origin')).toHaveCount(0);
+    await expect(page.getByRole('meter', { name: 'Prediction confidence' })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Check another coffee' }).click();
     await expect(page.getByTestId('prediction')).toHaveCount(0);
+    await expect(page.getByLabel(/photo of the bag/i)).toBeVisible();
   });
 });
