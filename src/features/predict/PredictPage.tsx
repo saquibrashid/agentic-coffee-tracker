@@ -10,20 +10,26 @@
  * read with OCR and is often imperfect, so the user gets to correct it before
  * the prediction is drawn — and the correction costs nothing, because the
  * estimate is local.
+ *
+ * That convergence is now explicit: the screen is a three-step wizard, Coffee →
+ * Details → Verdict. It was always those three steps, but stacking them on one
+ * page meant the answer rendered *below* the form and so arrived off-screen on
+ * a phone at the moment it appeared (#236). Giving the verdict the screen to
+ * itself is the fix; the stepper is what makes the form feel like progress
+ * towards it rather than an unexplained chore.
  */
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
+  ArrowLeft,
   Camera,
   CheckCircle2,
-  HelpCircle,
   Image,
   Link2,
   LoaderCircle,
+  PencilLine,
   RotateCcw,
   Sparkles,
-  ThumbsDown,
-  ThumbsUp,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -41,14 +47,9 @@ import { EmptyPageError, enrichFromUrl } from '@/services/enrich';
 import { previewImageFromUrl } from '@/services/enrich/photo';
 import { dataUrlToBlob, resizeDataUrl } from '@/services/image/imagePipeline';
 import { canPredict, loadPredictionIndex, MIN_RATINGS_FOR_PREDICTION } from '@/services/predict';
-import {
-  explain,
-  predict,
-  type Evidence,
-  type Prediction,
-  type Verdict,
-} from '@/services/predict/predict';
-import { MAX_SCORE } from '@/services/ratings/scale';
+import { predict, type Prediction } from '@/services/predict/predict';
+import { VerdictHero } from './VerdictHero';
+import { WizardSteps, type PredictStep } from './WizardSteps';
 import type { ParsedBean } from '@/services/ai';
 import type { Process, RoastLevel } from '@/types';
 
@@ -70,13 +71,6 @@ const ROAST_OPTIONS: { value: RoastLevel | ''; label: string }[] = [
   { value: 'medium-dark', label: 'Medium-dark' },
   { value: 'dark', label: 'Dark' },
 ];
-
-const VERDICT_STYLES: Record<Verdict, { className: string; Icon: typeof ThumbsUp }> = {
-  love: { className: 'border-emerald-500/40 bg-emerald-500/10', Icon: ThumbsUp },
-  like: { className: 'border-emerald-500/30 bg-emerald-500/5', Icon: ThumbsUp },
-  unsure: { className: 'border-amber-500/40 bg-amber-500/10', Icon: HelpCircle },
-  avoid: { className: 'border-destructive/40 bg-destructive/10', Icon: ThumbsDown },
-};
 
 interface FormState {
   /**
@@ -294,73 +288,12 @@ function readFileAsDataUrl(file: File): Promise<string> {
   });
 }
 
-function EvidenceList({ title, items }: { title: string; items: Evidence[] }) {
-  if (items.length === 0) return null;
-  return (
-    <div>
-      <h4 className="text-sm font-medium">{title}</h4>
-      <ul className="text-muted-foreground mt-1 space-y-1 text-sm">
-        {items.map((item) => (
-          <li key={`${item.kind}-${item.label}`}>{explain(item)}</li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function VerdictCard({ prediction, title }: { prediction: Prediction; title?: string | null }) {
-  const { className, Icon } = VERDICT_STYLES[prediction.verdict];
-  const confidence = Math.round(prediction.confidence * 100);
-
-  return (
-    <div className={`space-y-4 rounded-md border p-4 ${className}`} data-testid="prediction">
-      <div className="flex items-start gap-3">
-        <Icon className="mt-0.5 shrink-0" aria-hidden="true" />
-        <div>
-          {/* Naming the coffee matters when several are checked from the same
-              roaster in a row: without it every verdict card looks alike and
-              there is nothing to say which one is being answered (#197). */}
-          {title ? <p className="font-medium">{title}</p> : null}
-          <p className={title ? 'text-muted-foreground text-sm' : 'font-medium'}>
-            {prediction.headline}
-          </p>
-          <p className="text-muted-foreground text-sm">
-            Predicted <strong data-testid="prediction-score">{prediction.score.toFixed(1)}</strong>/
-            {MAX_SCORE} · {confidence}% confidence
-          </p>
-        </div>
-      </div>
-
-      <EvidenceList title="What points that way" items={prediction.supporting} />
-      <EvidenceList title="What gives us pause" items={prediction.detracting} />
-
-      {prediction.confidence < 0.25 && (
-        <p className="text-muted-foreground text-sm">
-          There is little in your history to go on here, so treat this as a shrug rather than an
-          answer.
-        </p>
-      )}
-
-      {prediction.unknowns.length > 0 && (
-        <p className="text-muted-foreground text-sm">
-          Nothing rated yet for: {prediction.unknowns.join(', ')}.
-        </p>
-      )}
-
-      {prediction.missing.length > 0 && (
-        <p className="text-muted-foreground text-sm">
-          Add the {prediction.missing.join(', ')} for a sharper answer.
-        </p>
-      )}
-    </div>
-  );
-}
-
 export function PredictPage() {
   const index = useLiveQuery(() => loadPredictionIndex(), []);
   const photoInputRef = useRef<HTMLInputElement>(null);
   const requestRef = useRef(0);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [step, setStep] = useState<PredictStep>('source');
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState<BusyKind | null>(null);
@@ -384,6 +317,11 @@ export function PredictPage() {
     if (kind === 'photo') setUrl('');
     setBusy(kind);
     setStage('preparing');
+    // A read always runs on the first step, even when it was started from a
+    // later one — pasting an image is a global shortcut, so it can arrive while
+    // the details form is on screen, and its progress and its failure both
+    // belong where the other source controls are.
+    setStep('source');
     return requestId;
   }
 
@@ -426,6 +364,7 @@ export function PredictPage() {
       }
       setForm(formFromParsed(result.parsed));
       setPrediction(null);
+      setStep('details');
       setNotice(
         result.usedMock
           ? 'That was read with sample data, not your photo — check the details before trusting the answer.'
@@ -491,6 +430,7 @@ export function PredictPage() {
       setStage('interpreting');
       setForm(formFromParsed(enriched.parsed));
       setPrediction(null);
+      setStep('details');
       setNotice('Read from that page. Correct anything below, then check the verdict.');
 
       // The picture is cosmetic, so it is fetched after the fields are already
@@ -526,11 +466,13 @@ export function PredictPage() {
         index,
       ),
     );
+    setStep('verdict');
   }
 
   function reset({ focus = false }: { focus?: boolean } = {}) {
     requestRef.current += 1;
     setForm(EMPTY_FORM);
+    setStep('source');
     setPrediction(null);
     setUrl('');
     setBusy(null);
@@ -581,213 +523,270 @@ export function PredictPage() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>Will I like it?</CardTitle>
-          <CardDescription>
-            Check a coffee against your taste before you drink it. Nothing here is saved to your
-            library.
-          </CardDescription>
-        </CardHeader>
+      {/* The title sits outside the steps so it survives all three of them —
+          otherwise the page loses its name the moment the first card unmounts. */}
+      <div>
+        <h1 className="font-display text-2xl font-semibold">Will I like it?</h1>
+        <p className="text-muted-foreground mt-1 text-sm">
+          Check a coffee against your taste before you drink it. Nothing here is saved to your
+          library.
+        </p>
+      </div>
 
-        <CardContent className="space-y-5">
-          <div>
-            {cameraOpen ? (
-              <CameraCapture
-                onCapture={(dataUrl) => void handleCameraCapture(dataUrl)}
-                onCancel={() => setCameraOpen(false)}
-              />
-            ) : (
-              <>
-                {cameraAvailable && (
-                  <div className="mb-4">
-                    <Button
-                      type="button"
-                      disabled={busy !== null}
-                      onClick={() => setCameraOpen(true)}
-                    >
-                      <Camera aria-hidden="true" className="mr-2 h-4 w-4" />
-                      Take a photo
-                    </Button>
-                  </div>
-                )}
+      <WizardSteps current={step} />
 
-                <label htmlFor="predict-photo" className="mb-2 block text-sm font-medium">
-                  {cameraAvailable ? 'Or choose a photo of the bag' : 'Photo of the bag'}
-                </label>
-                <input
-                  ref={photoInputRef}
-                  id="predict-photo"
-                  type="file"
-                  accept="image/*"
-                  disabled={busy !== null}
-                  onChange={(e) => void handlePhoto(e)}
-                  className="file:bg-primary file:text-primary-foreground block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2 file:text-sm file:font-medium"
+      {step === 'source' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Which coffee?</CardTitle>
+            <CardDescription>
+              Photograph the bag, paste a screenshot, or point us at the roaster&rsquo;s page.
+            </CardDescription>
+          </CardHeader>
+
+          <CardContent className="space-y-5">
+            {/* The chosen bag stays visible while it is being read and, more
+                importantly, if the read fails: an error with no picture beside
+                it leaves the user unsure which attempt it is even about. */}
+            {source && !cameraOpen && <SourcePreview source={source} title={coffeeTitle(form)} />}
+
+            <div>
+              {cameraOpen ? (
+                <CameraCapture
+                  onCapture={(dataUrl) => void handleCameraCapture(dataUrl)}
+                  onCancel={() => setCameraOpen(false)}
                 />
-                <p className="text-muted-foreground mt-2 text-sm">
-                  You can also paste an image straight from your clipboard.
-                </p>
-              </>
-            )}
-          </div>
+              ) : (
+                <>
+                  {cameraAvailable && (
+                    <div className="mb-4">
+                      <Button
+                        type="button"
+                        disabled={busy !== null}
+                        onClick={() => setCameraOpen(true)}
+                      >
+                        <Camera aria-hidden="true" className="mr-2 h-4 w-4" />
+                        Take a photo
+                      </Button>
+                    </div>
+                  )}
 
-          <form onSubmit={(e) => void handleLink(e)} className="border-t pt-4">
-            <Label htmlFor="predict-url" className="mb-2 block">
-              Or a link to the coffee
-            </Label>
-            <div className="flex gap-2">
-              <Input
-                id="predict-url"
-                type="url"
-                inputMode="url"
-                placeholder="https://roaster.example/coffee"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
+                  <label htmlFor="predict-photo" className="mb-2 block text-sm font-medium">
+                    {cameraAvailable ? 'Or choose a photo of the bag' : 'Photo of the bag'}
+                  </label>
+                  <input
+                    ref={photoInputRef}
+                    id="predict-photo"
+                    type="file"
+                    accept="image/*"
+                    disabled={busy !== null}
+                    onChange={(e) => void handlePhoto(e)}
+                    className="file:bg-primary file:text-primary-foreground block w-full text-sm file:mr-4 file:rounded-md file:border-0 file:px-4 file:py-2 file:text-sm file:font-medium"
+                  />
+                  <p className="text-muted-foreground mt-2 text-sm">
+                    You can also paste an image straight from your clipboard.
+                  </p>
+                </>
+              )}
+            </div>
+
+            <form onSubmit={(e) => void handleLink(e)} className="border-t pt-4">
+              <Label htmlFor="predict-url" className="mb-2 block">
+                Or a link to the coffee
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="predict-url"
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://roaster.example/coffee"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  disabled={busy !== null}
+                  className="flex-1"
+                />
+                <Button type="submit" variant="outline" disabled={busy !== null || !url.trim()}>
+                  {busy === 'link' ? 'Reading…' : 'Read'}
+                </Button>
+              </div>
+            </form>
+
+            {/* Typing it out is a first-class route, not a fallback: standing in
+                a shop with a bag in hand, reading four fields off the label is
+                often quicker than getting a photo of it in focus. */}
+            <div className="border-t pt-4">
+              <Button
+                type="button"
+                variant="ghost"
                 disabled={busy !== null}
-                className="flex-1"
-              />
-              <Button type="submit" variant="outline" disabled={busy !== null || !url.trim()}>
-                {busy === 'link' ? 'Reading…' : 'Read'}
+                onClick={() => setStep('details')}
+              >
+                <PencilLine aria-hidden="true" className="mr-2 h-4 w-4" />
+                Skip and type the details
               </Button>
             </div>
-          </form>
 
-          {error && (
-            <p role="alert" className="text-destructive text-sm">
-              {error}
-            </p>
-          )}
-          {notice && (
-            <p role="status" className="text-muted-foreground text-sm">
-              {notice}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+            {error && (
+              <p role="alert" className="text-destructive text-sm">
+                {error}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-      {busy && (
+      {step === 'source' && busy && (
         <ProcessingPanel kind={busy} stage={stage} onCancel={() => reset({ focus: true })} />
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">The coffee</CardTitle>
-          <CardDescription>
-            Fill in whatever you know. Every field is optional, but the more you give the sharper
-            the answer.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {source && <SourcePreview source={source} title={coffeeTitle(form)} />}
-          <form onSubmit={handlePredict} className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <Label htmlFor="predict-name" className="mb-1 block">
-                  Coffee name
-                </Label>
-                <Input
-                  id="predict-name"
-                  placeholder="Konga"
-                  value={form.name}
-                  onChange={(e) => update({ name: e.target.value })}
-                  disabled={busy !== null}
-                />
+      {step === 'details' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">The coffee</CardTitle>
+            <CardDescription>
+              Fill in whatever you know. Every field is optional, but the more you give the sharper
+              the answer.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {source && <SourcePreview source={source} title={coffeeTitle(form)} />}
+            {notice && (
+              <p role="status" className="text-muted-foreground text-sm">
+                {notice}
+              </p>
+            )}
+            <form onSubmit={handlePredict} className="space-y-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                  <Label htmlFor="predict-name" className="mb-1 block">
+                    Coffee name
+                  </Label>
+                  <Input
+                    id="predict-name"
+                    placeholder="Konga"
+                    value={form.name}
+                    onChange={(e) => update({ name: e.target.value })}
+                    disabled={busy !== null}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="predict-roaster" className="mb-1 block">
+                    Roaster
+                  </Label>
+                  <Input
+                    id="predict-roaster"
+                    value={form.roaster}
+                    onChange={(e) => update({ roaster: e.target.value })}
+                    disabled={busy !== null}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="predict-origin" className="mb-1 block">
+                    Origin country
+                  </Label>
+                  <Input
+                    id="predict-origin"
+                    placeholder="Ethiopia, Colombia"
+                    value={form.origin}
+                    onChange={(e) => update({ origin: e.target.value })}
+                    disabled={busy !== null}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="predict-process" className="mb-1 block">
+                    Process
+                  </Label>
+                  <Select
+                    id="predict-process"
+                    value={form.process}
+                    onChange={(e) => update({ process: e.target.value as Process | '' })}
+                    disabled={busy !== null}
+                  >
+                    {PROCESS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="predict-roast" className="mb-1 block">
+                    Roast level
+                  </Label>
+                  <Select
+                    id="predict-roast"
+                    value={form.roastLevel}
+                    onChange={(e) => update({ roastLevel: e.target.value as RoastLevel | '' })}
+                    disabled={busy !== null}
+                  >
+                    {ROAST_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label htmlFor="predict-roaster" className="mb-1 block">
-                  Roaster
-                </Label>
-                <Input
-                  id="predict-roaster"
-                  value={form.roaster}
-                  onChange={(e) => update({ roaster: e.target.value })}
-                  disabled={busy !== null}
-                />
-              </div>
-              <div>
-                <Label htmlFor="predict-origin" className="mb-1 block">
-                  Origin country
-                </Label>
-                <Input
-                  id="predict-origin"
-                  placeholder="Ethiopia, Colombia"
-                  value={form.origin}
-                  onChange={(e) => update({ origin: e.target.value })}
-                  disabled={busy !== null}
-                />
-              </div>
-              <div>
-                <Label htmlFor="predict-process" className="mb-1 block">
-                  Process
-                </Label>
-                <Select
-                  id="predict-process"
-                  value={form.process}
-                  onChange={(e) => update({ process: e.target.value as Process | '' })}
-                  disabled={busy !== null}
-                >
-                  {PROCESS_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="predict-roast" className="mb-1 block">
-                  Roast level
-                </Label>
-                <Select
-                  id="predict-roast"
-                  value={form.roastLevel}
-                  onChange={(e) => update({ roastLevel: e.target.value as RoastLevel | '' })}
-                  disabled={busy !== null}
-                >
-                  {ROAST_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-            </div>
 
-            <div>
-              <Label htmlFor="predict-notes" className="mb-1 block">
-                Tasting notes
-              </Label>
-              <Input
-                id="predict-notes"
-                placeholder="blueberry, cocoa, jasmine"
-                value={form.tastingNotes}
-                onChange={(e) => update({ tastingNotes: e.target.value })}
-                disabled={busy !== null}
-              />
-            </div>
+              <div>
+                <Label htmlFor="predict-notes" className="mb-1 block">
+                  Tasting notes
+                </Label>
+                <Input
+                  id="predict-notes"
+                  placeholder="blueberry, cocoa, jasmine"
+                  value={form.tastingNotes}
+                  onChange={(e) => update({ tastingNotes: e.target.value })}
+                  disabled={busy !== null}
+                />
+              </div>
 
-            <div className="flex gap-2">
-              <Button type="submit" disabled={busy !== null || !hasAnyDetail}>
-                <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
-                Will I like it?
-              </Button>
-              {hasAnyDetail && (
-                <Button type="button" variant="ghost" onClick={() => reset()}>
-                  Start over
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" disabled={busy !== null || !hasAnyDetail}>
+                  <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Will I like it?
                 </Button>
-              )}
-            </div>
-          </form>
+                {/* Coming back to adjust something should not cost the answer
+                    already on screen — until an edit actually invalidates it,
+                    at which point `update` drops it and this button with it. */}
+                {prediction && (
+                  <Button type="button" variant="outline" onClick={() => setStep('verdict')}>
+                    Back to the verdict
+                  </Button>
+                )}
+                <Button type="button" variant="ghost" onClick={() => setStep('source')}>
+                  <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
+                  Back
+                </Button>
+                {hasAnyDetail && (
+                  <Button type="button" variant="ghost" onClick={() => reset()}>
+                    Start over
+                  </Button>
+                )}
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
-          {prediction && (
-            <div className="space-y-3">
-              <VerdictCard prediction={prediction} title={coffeeTitle(form)} />
-              <Button type="button" variant="outline" onClick={() => reset({ focus: true })}>
-                <RotateCcw aria-hidden="true" /> Check another coffee
+      {step === 'verdict' && prediction && (
+        <VerdictHero
+          prediction={prediction}
+          title={coffeeTitle(form)}
+          actions={
+            <>
+              <Button type="button" onClick={() => reset({ focus: true })}>
+                <RotateCcw className="mr-2 h-4 w-4" aria-hidden="true" />
+                Check another coffee
               </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              <Button type="button" variant="outline" onClick={() => setStep('details')}>
+                <PencilLine className="mr-2 h-4 w-4" aria-hidden="true" />
+                Adjust the details
+              </Button>
+            </>
+          }
+        />
+      )}
     </div>
   );
 }

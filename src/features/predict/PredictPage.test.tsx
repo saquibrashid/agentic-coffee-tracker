@@ -127,17 +127,31 @@ describe('PredictPage check sessions', () => {
     const user = userEvent.setup();
     render(<PredictPage />);
 
-    const input = await screen.findByLabelText(/photo of the bag/i);
-    await user.upload(input, new File(['first'], 'first.jpg', { type: 'image/jpeg' }));
+    await user.upload(
+      await screen.findByLabelText(/photo of the bag/i),
+      new File(['first'], 'first.jpg', { type: 'image/jpeg' }),
+    );
     await user.click(await screen.findByRole('button', { name: /will i like it/i }));
     expect(screen.getByTestId('prediction')).toBeInTheDocument();
 
-    await user.upload(input, new File(['second'], 'second.jpg', { type: 'image/jpeg' }));
+    // Back to the start for another coffee. The photo input is a fresh element
+    // each time the source step mounts, so it has to be looked up again.
+    await user.click(screen.getByRole('button', { name: /adjust the details/i }));
+    await user.click(screen.getByRole('button', { name: /^back$/i }));
+    await user.upload(
+      await screen.findByLabelText(/photo of the bag/i),
+      new File(['second'], 'second.jpg', { type: 'image/jpeg' }),
+    );
 
     expect(screen.queryByTestId('prediction')).not.toBeInTheDocument();
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not read second photo.');
     expect(screen.getByRole('img', { name: /selected coffee bag: second.jpg/i })).toBeVisible();
     expect(screen.queryByDisplayValue('Storyville')).not.toBeInTheDocument();
+
+    // The failed read must have taken the earlier verdict with it: the way back
+    // to it is the only thing on screen that says one still exists.
+    await user.click(screen.getByRole('button', { name: /skip and type the details/i }));
+    expect(screen.queryByRole('button', { name: /back to the verdict/i })).not.toBeInTheDocument();
   });
 
   it('identifies a URL source and offers an explicit next-check action', async () => {
@@ -150,8 +164,11 @@ describe('PredictPage check sessions', () => {
     const user = userEvent.setup();
     render(<PredictPage />);
 
-    const url = await screen.findByLabelText(/link to the coffee/i);
-    await pasteInto(user, url, 'https://storyville.com/products/epilogue');
+    await pasteInto(
+      user,
+      await screen.findByLabelText(/link to the coffee/i),
+      'https://storyville.com/products/epilogue',
+    );
     await user.click(screen.getByRole('button', { name: 'Read' }));
 
     expect(await screen.findByText('storyville.com')).toBeInTheDocument();
@@ -162,7 +179,7 @@ describe('PredictPage check sessions', () => {
       expect(screen.queryByTestId('prediction')).not.toBeInTheDocument();
       expect(screen.queryByText('storyville.com')).not.toBeInTheDocument();
     });
-    expect(url).toHaveValue('');
+    expect(await screen.findByLabelText(/link to the coffee/i)).toHaveValue('');
   });
 
   it('ignores a late response after the user starts a newer check', async () => {
@@ -182,12 +199,19 @@ describe('PredictPage check sessions', () => {
     const user = userEvent.setup();
     render(<PredictPage />);
 
-    const url = await screen.findByLabelText(/link to the coffee/i);
-    await pasteInto(user, url, 'https://storyville.com/products/epilogue');
+    await pasteInto(
+      user,
+      await screen.findByLabelText(/link to the coffee/i),
+      'https://storyville.com/products/epilogue',
+    );
     await user.click(screen.getByRole('button', { name: 'Read' }));
     await user.click(await screen.findByRole('button', { name: /cancel and start over/i }));
 
-    await pasteInto(user, url, 'https://onyxcoffeelab.com/products/geometry');
+    await pasteInto(
+      user,
+      await screen.findByLabelText(/link to the coffee/i),
+      'https://onyxcoffeelab.com/products/geometry',
+    );
     await user.click(screen.getByRole('button', { name: 'Read' }));
     expect(await screen.findByDisplayValue('Onyx')).toBeInTheDocument();
 
@@ -202,6 +226,79 @@ describe('PredictPage check sessions', () => {
       expect(screen.getByDisplayValue('Onyx')).toBeInTheDocument();
       expect(screen.queryByDisplayValue('Storyville')).not.toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * The wizard itself (#236): three steps, and the verdict gets the screen.
+ *
+ * These pin the transitions rather than the styling — that a step only shows
+ * its own controls, that going back does not cost the user what they typed,
+ * and that an edit still invalidates an answer drawn before it.
+ */
+describe('PredictPage wizard', () => {
+  async function typeDetails(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(await screen.findByRole('button', { name: /skip and type the details/i }));
+    await user.type(await screen.findByLabelText(/origin country/i), 'Colombia');
+  }
+
+  it('starts on the source step with the details form out of the way', async () => {
+    render(<PredictPage />);
+
+    expect(await screen.findByLabelText(/photo of the bag/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/origin country/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /will i like it/i })).not.toBeInTheDocument();
+  });
+
+  it('lets someone skip every reader and type the coffee out', async () => {
+    const user = userEvent.setup();
+    render(<PredictPage />);
+
+    await typeDetails(user);
+    await user.click(screen.getByRole('button', { name: /will i like it/i }));
+
+    expect(screen.getByTestId('prediction')).toBeInTheDocument();
+    // The verdict has the screen to itself: that is the whole point of the step.
+    expect(screen.queryByLabelText(/origin country/i)).not.toBeInTheDocument();
+  });
+
+  it('keeps what was typed when stepping back and forth', async () => {
+    const user = userEvent.setup();
+    render(<PredictPage />);
+
+    await typeDetails(user);
+    await user.click(screen.getByRole('button', { name: /^back$/i }));
+    expect(await screen.findByLabelText(/photo of the bag/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /skip and type the details/i }));
+    expect(await screen.findByLabelText(/origin country/i)).toHaveValue('Colombia');
+  });
+
+  it('drops a verdict that no longer describes the coffee on screen', async () => {
+    const user = userEvent.setup();
+    render(<PredictPage />);
+
+    await typeDetails(user);
+    await user.click(screen.getByRole('button', { name: /will i like it/i }));
+    await user.click(screen.getByRole('button', { name: /adjust the details/i }));
+
+    // Untouched, the answer is still good, so there is a way back to it.
+    expect(screen.getByRole('button', { name: /back to the verdict/i })).toBeInTheDocument();
+
+    await user.type(await screen.findByLabelText(/origin country/i), ' , Brazil');
+    expect(screen.queryByRole('button', { name: /back to the verdict/i })).not.toBeInTheDocument();
+  });
+
+  it('shows how much to trust the answer as a word, not just a percentage', async () => {
+    const user = userEvent.setup();
+    render(<PredictPage />);
+
+    await typeDetails(user);
+    await user.click(screen.getByRole('button', { name: /will i like it/i }));
+
+    const meter = screen.getByRole('meter', { name: /prediction confidence/i });
+    expect(meter).toBeInTheDocument();
+    expect(screen.getByTestId('prediction-confidence')).toHaveTextContent(/%/);
   });
 });
 
