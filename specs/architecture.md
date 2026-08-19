@@ -340,7 +340,11 @@ name in the compact form (WCAG 1.4.1).
   native controls) matches. Without it a dark page keeps white scrollbars.
 - `<meta name="theme-color">` is rewritten to the active background so browser
   chrome matches. The PWA manifest colours cannot follow the theme — they are
-  read once at install time — so they track the light palette.
+  read once at install time — so they track the light palette. On iOS the
+  home-screen app's status bar is filled with `theme-color`, so
+  `apple-mobile-web-app-status-bar-style` is `default` rather than
+  `black-translucent`: the translucent style forces light status-bar text, which
+  disappears against the cream header in light mode.
 - The dark background is a **deep roasted brown**, not near-black: below roughly
   12% lightness the hue stops being perceptible and a warm palette reads as
   grey. Contrast for every pairing in both palettes is asserted in
@@ -437,6 +441,25 @@ Hard limits: max 5 photos per bean (1 bag + up to 4 cup photos); reject > 8 MB a
 ---
 
 ## Offline-First Strategy
+
+### Installing to a home screen
+
+- The manifest's icons are listed once in `build-config/pwaIcons.ts` and shared
+  by `vite.config.ts` and `build-config/pwaIcons.test.ts`, which asserts every
+  referenced PNG exists at the size it claims. The manifest previously named
+  three icons that had never been generated: it stayed valid JSON, so nothing
+  failed, but Chromium would not offer to install the app and iOS used a
+  screenshot of the page as the home-screen icon.
+- The PNGs are rendered from `build-config/icons/*.svg` by
+  `scripts/generate-icons.mjs` and **committed**. `sharp` is not a project
+  dependency — it is a large platform-specific binary, and these files change
+  only when the logo does.
+- The maskable icon is a separate drawing, not the standard one re-tagged: a
+  maskable icon is cropped to the platform's own shape and only its middle 80%
+  survives.
+- iOS ignores the manifest for both the icon and `display: standalone`. It needs
+  `<link rel="apple-touch-icon">` and `apple-mobile-web-app-capable` in
+  `index.html`, so those are asserted by the same test.
 
 ### Service Worker (Workbox)
 

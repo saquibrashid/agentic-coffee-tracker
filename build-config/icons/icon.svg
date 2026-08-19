@@ -1,0 +1,27 @@
+<!--
+  Source for the app icons. See scripts/generate-icons.mjs.
+
+  The glyph is the same lucide "coffee" mark as favicon.svg, on an opaque
+  background: iOS composites a transparent home-screen icon onto black, which
+  would turn a brown-on-nothing cup into a brown-on-black smudge.
+
+  The glyph fills about two thirds of the canvas. One that touches the edges
+  looks cramped once iOS applies its rounded-rectangle mask.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#faf7f2" />
+  <g
+    transform="translate(87 87) scale(14.083)"
+    fill="none"
+    stroke="#6b3f1d"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+    <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+    <path d="M6 2v3" />
+    <path d="M10 2v3" />
+    <path d="M14 2v3" />
+  </g>
+</svg>

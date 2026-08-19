@@ -7,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { buildCsp } from './build-config/csp';
 import { cspPlugin } from './build-config/cspPlugin';
 import { NAVIGATION_FALLBACK_DENYLIST } from './build-config/serviceWorker';
+import { APPLE_TOUCH_ICON, PWA_ICONS } from './build-config/pwaIcons';
 
 // Supplied by `azd` from the infrastructure outputs of the same names. Absent
 // on a local build, which is correct: without a linked backend the browser
@@ -130,7 +131,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'robots.txt', 'apple-touch-icon.png'],
+      includeAssets: ['favicon.svg', 'robots.txt', APPLE_TOUCH_ICON.replace(/^\//, '')],
       manifest: {
         name: 'Coffee Bean Tracker',
         short_name: 'Bean Tracker',
@@ -145,11 +146,7 @@ export default defineConfig({
         orientation: 'any',
         start_url: '/',
         scope: '/',
-        icons: [
-          { src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-        ],
+        icons: PWA_ICONS,
       },
       workbox: {
         navigateFallbackDenylist: NAVIGATION_FALLBACK_DENYLIST,

@@ -83,4 +83,33 @@ test.describe('primary navigation', () => {
       await expect(nav.getByRole('link', { name, exact: true })).toBeVisible();
     }
   });
+
+  /**
+   * The nav has to sit at the bottom of the screen whether the page under it is
+   * long or short, or it jumps around as you move between screens.
+   *
+   * `position: sticky` alone does not do this. It pins an element only while its
+   * container is taller than the viewport; on a short page the container ends
+   * early and the nav simply sits wherever the content stopped — halfway up the
+   * screen on Summary, at the bottom on Home. So the interesting case is a
+   * *short* page, and asserting on Home would pass without the layout being
+   * right at all.
+   */
+  for (const [name, path] of [
+    ['a short page', '/summary'],
+    ['a long page', '/'],
+  ] as const) {
+    test(`stays at the bottom of the screen on ${name}`, async ({ page }) => {
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.goto(path);
+
+      const nav = page.locator('nav[aria-label="Primary"]');
+      await expect(nav).toBeVisible();
+
+      const gap = await nav.evaluate(
+        (el) => window.innerHeight - el.getBoundingClientRect().bottom,
+      );
+      expect(gap, `nav bottom is ${gap}px above the bottom of the viewport`).toBeLessThanOrEqual(1);
+    });
+  }
 });

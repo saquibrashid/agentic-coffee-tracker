@@ -3,6 +3,30 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <!--
+      iOS ignores the manifest's icons when you add the app to the home screen
+      and looks for this link instead; without it you get a screenshot of the
+      page as the icon. It also ignores the manifest's `display: standalone`
+      unless apple-mobile-web-app-capable says so, and would open the app in a
+      browser tab with the address bar still there.
+
+      apple-mobile-web-app-title is what appears under the icon: the manifest's
+      short_name is not consulted on iOS.
+    -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Bean Tracker" />
+    <!--
+      Deliberately not "black-translucent". That style puts the page behind the
+      status bar and forces light status-bar text, which is invisible against
+      this app's cream header for anyone in light mode, and it makes the layout
+      responsible for the notch. "default" has iOS lay the app out below the
+      status bar and fill that strip with the page's theme-color, which the
+      script below already keeps in step with the light/dark palette -- so the
+      status bar matches the header in both themes for free.
+    -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#faf7f2" />
     <meta name="description" content="Offline-first, AI-powered coffee tracking." />

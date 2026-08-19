@@ -59,7 +59,17 @@ function Shell() {
   }, []);
 
   return (
-    <div className="flex min-h-full flex-col">
+    // min-h-dvh, not min-h-full. `min-h-full` is `min-height: 100%`, which needs
+    // a parent with a definite height to resolve against -- html and body are
+    // `h-full`, but #root is not, so the percentage was silently ignored and the
+    // shell was only ever as tall as its content. That left `flex-1` on <main>
+    // with nothing to stretch into and the sticky nav sitting wherever the
+    // content happened to stop: at the bottom on a long page like Home, halfway
+    // up the screen on a short one like Summary. Sticky alone cannot fix that --
+    // it pins an element only while its container outruns the viewport.
+    // The dynamic viewport unit is what mobile browsers want here: it tracks the
+    // address bar collapsing, where `100vh` would sit permanently underneath it.
+    <div className="flex min-h-dvh flex-col">
       <header className="bg-background/95 sticky top-0 z-30 border-b backdrop-blur-sm">
         <div className="relative container flex h-16 items-center gap-2 overflow-visible sm:gap-3">
           <div className="bg-primary/10 text-primary relative flex size-10 shrink-0 items-center justify-center rounded-xl border">
@@ -117,7 +127,11 @@ function Shell() {
 
       <nav
         aria-label="Primary"
-        className="bg-background/95 sticky bottom-0 z-30 border-t backdrop-blur-sm"
+        // The safe-area padding is dead weight in a browser tab (the inset is
+        // 0) and load-bearing once the app is installed to the home screen:
+        // with `viewport-fit=cover` and no browser chrome, the bottom of the
+        // screen is the home indicator, and the nav labels would sit under it.
+        className="bg-background/95 sticky bottom-0 z-30 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur-sm"
       >
         <ul className="container grid grid-cols-7">
           <NavItem to="/" icon={<Home />} label="Home" />
