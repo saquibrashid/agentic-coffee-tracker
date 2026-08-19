@@ -62,7 +62,12 @@ public/workbox-*.js
 public/registerSW.js
 
 # --- PWA assets generated at build ---
-public/pwa-*.png
+# public/pwa-*.png is deliberately NOT ignored. It used to be, on the assumption
+# that something generated the icons during the build. Nothing did, so the
+# manifest shipped pointing at three files that had never existed and the app
+# was never installable. They are rendered from build-config/icons/*.svg by
+# scripts/generate-icons.mjs and committed; build-config/pwaIcons.test.ts fails
+# if one goes missing again.
 public/manifest.webmanifest
 
 # --- Misc ---

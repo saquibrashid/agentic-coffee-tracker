@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The bottom navigation now stays at the bottom of the screen.** On a short
+  page like Summary it sat directly under the content, halfway up the display,
+  and on a long page like Home it sat at the bottom — so it appeared to jump as
+  you moved between screens. The shell asked for `min-height: 100%`, which needs
+  a parent with a definite height to resolve against; `html` and `body` set one
+  but `#root` did not, so the rule was silently ignored and the shell was only
+  ever as tall as its content. `position: sticky` could not compensate, because
+  it pins an element only while its container outruns the viewport. The shell
+  now measures against the dynamic viewport instead, which also tracks the
+  mobile address bar collapsing, and the nav pads for the home-indicator safe
+  area so its labels are not underneath it once the app is installed.
+
+- **The app can be installed to an iPhone home screen.** It advertised itself as
+  installable and never was: the manifest listed three icons —
+  `pwa-192x192.png`, `pwa-512x512.png` and `apple-touch-icon.png` — that had
+  never been generated and returned 404 in production. Nothing complained,
+  because the manifest itself was valid and served, so the failure was entirely
+  silent: Chromium quietly declined to offer installation, and iOS fell back to
+  using a screenshot of the page as the icon. `.gitignore` was excluding
+  `public/pwa-*.png` as "generated at build" when no build step ever generated
+  them. The icons are now rendered from committed SVG sources by
+  `scripts/generate-icons.mjs`, and a test fails if the manifest ever again
+  names a file that is not there or claims a size the PNG does not have. iOS
+  needs more than the manifest, so `index.html` gained the `apple-touch-icon`
+  link and the `apple-mobile-web-app-capable` and title tags that make the
+  shortcut open without browser chrome and under its own name.
+
 - **A test failed at random because it typed a URL out one letter at a time.**
   `userEvent.type()` dispatches a separate keystroke per character, and each one
   costs a full React render plus a jsdom event — about 22ms here. The enrichment

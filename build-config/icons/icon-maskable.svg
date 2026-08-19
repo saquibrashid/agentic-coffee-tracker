@@ -1,0 +1,27 @@
+<!--
+  Maskable variant. See scripts/generate-icons.mjs.
+
+  A maskable icon is cropped by the platform to whatever shape it likes (a
+  circle, a squircle, a rounded square), and only the middle 80% (the "safe
+  zone") is guaranteed to survive. This is the same mark as icon.svg drawn
+  smaller so the cup stays inside that circle; reusing the standard icon as the
+  maskable one, which is what the manifest used to claim, gets the handle and
+  the steam sliced off on Android.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#faf7f2" />
+  <g
+    transform="translate(128 128) scale(10.667)"
+    fill="none"
+    stroke="#6b3f1d"
+    stroke-width="1.75"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+    <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+    <path d="M6 2v3" />
+    <path d="M10 2v3" />
+    <path d="M14 2v3" />
+  </g>
+</svg>
