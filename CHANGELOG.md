@@ -241,6 +241,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The coffee library has a place in the bottom navigation.** It is the app's
+  central noun — every other tab is a view over it, and rating a coffee starts
+  there — yet it was the one screen with no navigation entry, reachable only by
+  spotting a link on Home, Analytics or For you. It takes the slot Settings
+  held rather than becoming an eighth column, because seven labels already
+  crowd a 390px phone and Settings is by far the least frequent destination in
+  the set. Settings moves to the header beside the account control, where an
+  app-wide, rarely-used destination is conventionally looked for. The
+  navigation tests now assert that both the library and Settings are reachable
+  from a screen that does not link to them.
+
 - **The wizard's Back and Start over buttons no longer read as body text.** They
   sat flush against the last input with no divider and no border, so four
   controls in a row looked like more form, and Start over — the one that throws
