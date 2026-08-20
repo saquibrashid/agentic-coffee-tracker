@@ -1,4 +1,4 @@
-import { createBrowserRouter, RouterProvider, Outlet, NavLink } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Outlet, NavLink, Link } from 'react-router-dom';
 import {
   Bean,
   Coffee,
@@ -95,6 +95,17 @@ function Shell() {
             <Bean className="text-primary/15 absolute right-0 bottom-0 size-7 -rotate-12" />
             <div className="bg-primary/10 absolute top-3 right-3 size-16 rounded-full blur-xl" />
           </div>
+          {/* Settings left the bottom nav to make room for the library (#247).
+              It lands here because this is where a rarely-used, app-wide
+              destination is conventionally looked for, and it is already the
+              corner that holds the account control. */}
+          <Link
+            to="/settings"
+            aria-label="Settings"
+            className="hover:bg-accent hover:text-foreground focus-visible:ring-ring text-muted-foreground relative z-10 flex size-9 shrink-0 items-center justify-center rounded-full focus-visible:ring-2 focus-visible:outline-hidden"
+          >
+            <SettingsIcon className="size-5" aria-hidden="true" />
+          </Link>
           <HeaderAccountControl />
         </div>
         {!online && (
@@ -136,11 +147,18 @@ function Shell() {
         <ul className="container grid grid-cols-7">
           <NavItem to="/" icon={<Home />} label="Home" />
           <NavItem to="/add" icon={<Plus />} label="Add" />
+          {/* The library is the app's central noun -- every other tab is a view
+              over it, and rating a coffee starts here -- but it was the one
+              screen with no way to reach it except a link from Home (#247).
+              It takes the slot Settings held rather than becoming an eighth
+              column: seven labels already crowd a 390px phone, and Settings is
+              by far the least frequent destination in the set, so it moves to
+              the header where that kind of thing conventionally lives. */}
+          <NavItem to="/beans" icon={<Bean />} label="Coffees" />
           <NavItem to="/predict" icon={<ScanSearch />} label="Check" />
           <NavItem to="/for-you" icon={<Sparkles />} label="For you" />
           <NavItem to="/analytics" icon={<BarChart3 />} label="Analytics" />
           <NavItem to="/summary" icon={<Calendar />} label="Summary" />
-          <NavItem to="/settings" icon={<SettingsIcon />} label="Settings" />
         </ul>
       </nav>
     </div>

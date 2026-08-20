@@ -18,7 +18,7 @@ import { test, expect } from '@playwright/test';
 
 const PHONE_WIDTHS = [360, 390, 430];
 
-const NAV_LABELS = ['Home', 'Add', 'Check', 'For you', 'Analytics', 'Summary', 'Settings'];
+const NAV_LABELS = ['Home', 'Add', 'Coffees', 'Check', 'For you', 'Analytics', 'Summary'];
 
 test.describe('primary navigation', () => {
   for (const width of PHONE_WIDTHS) {
@@ -82,6 +82,31 @@ test.describe('primary navigation', () => {
     for (const name of NAV_LABELS) {
       await expect(nav.getByRole('link', { name, exact: true })).toBeVisible();
     }
+  });
+
+  /**
+   * Settings gave up its slot to the library (#247), so it has to be reachable
+   * from every screen some other way or the swap has simply lost a destination.
+   */
+  test('settings is still one tap away from anywhere', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/summary');
+
+    await page.getByRole('link', { name: 'Settings', exact: true }).click();
+
+    await expect(page).toHaveURL(/\/settings$/);
+  });
+
+  test('the library is reachable without going via Home', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/analytics');
+
+    await page
+      .locator('nav[aria-label="Primary"]')
+      .getByRole('link', { name: 'Coffees', exact: true })
+      .click();
+
+    await expect(page).toHaveURL(/\/beans$/);
   });
 
   /**
