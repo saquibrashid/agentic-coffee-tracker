@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A hung CI job can no longer burn hours of runner time.** A run of the build
+  and test job stalled for three and a half hours before GitHub's six-hour
+  default killed it; the culprit was the Playwright browser install, which
+  fetches browser binaries and apt packages and so blocks on the network rather
+  than failing. Every job now declares a `timeout-minutes` sized to roughly
+  three times its observed runtime, and the browser install carries its own
+  step-level timeout because it is the only step with that failure profile. The
+  deploy workflow matters most here: it uses `cancel-in-progress: false`, so one
+  hung deploy would have queued every later deploy behind it. A test parses the
+  workflow files and fails if any job is missing a timeout, and pins the list of
+  job names so it cannot pass by matching nothing.
+
 - **The bottom navigation now stays at the bottom of the screen.** On a short
   page like Summary it sat directly under the content, halfway up the display,
   and on a long page like Home it sat at the bottom — so it appeared to jump as

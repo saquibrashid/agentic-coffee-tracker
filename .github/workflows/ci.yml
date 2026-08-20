@@ -18,6 +18,12 @@ jobs:
   docs:
     name: Docs lint
     runs-on: ubuntu-latest
+    # Every job here carries a timeout because the default is six hours, and a
+    # step that hangs rather than fails will happily use all of it (#240). The
+    # numbers are roughly three times the observed run so a slow runner never
+    # trips them: docs and infra finish in seconds, build-and-test in 7-13
+    # minutes, lighthouse in about two.
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - name: Lint markdown
@@ -31,6 +37,7 @@ jobs:
   infra:
     name: Infra lint
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - name: Build Bicep templates
@@ -52,6 +59,7 @@ jobs:
     name: Build & test
     runs-on: ubuntu-latest
     needs: docs
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
 
@@ -102,6 +110,12 @@ jobs:
 
       - name: Install Playwright browsers
         if: steps.scaffold.outputs.ready == 'true'
+        # Tighter than the job as a whole because this is the step that has
+        # actually hung: it pulls browser binaries and apt packages, so a bad
+        # mirror leaves it waiting on the network rather than failing. Normally
+        # about a minute. Failing here fast, and naming the step, beats burning
+        # the job's whole budget on a download.
+        timeout-minutes: 10
         run: pnpm exec playwright install --with-deps
 
       - name: Playwright e2e (smoke + a11y)
@@ -139,6 +153,7 @@ jobs:
     name: Lighthouse budgets
     runs-on: ubuntu-latest
     needs: build-and-test
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
 
