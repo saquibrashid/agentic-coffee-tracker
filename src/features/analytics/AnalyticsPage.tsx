@@ -29,6 +29,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { EmptyState } from '@/components/ui/empty-state';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SampleDataNotice } from '@/features/sample/SampleDataNotice';
 import {
   computeAnalytics,
   type AnalyticsRange,
@@ -223,6 +224,8 @@ export function AnalyticsPage() {
           </Select>
         </label>
       </header>
+
+      <SampleDataNotice />
 
       {data.totalRatings === 0 ? (
         <Card>

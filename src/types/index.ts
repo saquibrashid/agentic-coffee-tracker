@@ -71,6 +71,17 @@ export interface CoffeeBean {
   isArchived: boolean;
   needsReview: boolean;
 
+  /**
+   * Marks a record loaded by the sample-data tutorial rather than one the user
+   * entered. Sample records live in the real tables on purpose — Analytics, For
+   * you and the predictor each read those tables directly, so anything else
+   * would demonstrate code paths the user will never actually use. The flag is
+   * what keeps them containable: it is the handle for removing them in one
+   * action and for excluding them from exports. They are kept out of sync by
+   * never being queued in the outbox, not by this flag.
+   */
+  isSample?: boolean;
+
   createdAt: string;
   updatedAt: string;
 }
@@ -102,6 +113,9 @@ export interface Rating {
 
   location?: 'home' | 'cafe' | 'work' | 'other';
   cafeName?: string;
+
+  /** See `CoffeeBean.isSample`. */
+  isSample?: boolean;
 
   createdAt: string;
   updatedAt: string;

@@ -349,6 +349,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A new user can now fill the app with a plausible library in one tap.** Every
+  screen worth showing — Analytics, "For you", the predictor — needs a history
+  before it says anything, so the first run of the app is a tour of empty
+  states, which is the worst possible moment to explain what it is for. Settings
+  now offers nine sample coffees and eighteen ratings that load into the real
+  tables, so the features run for real rather than being mocked for a demo. The
+  set is deliberately opinionated (bright washed and natural East Africans rated
+  8.5–9.5, dark and roasty ones 3–4.5) so the charts show a shape rather than
+  noise, and so the predictor has enough signal to reach a confident verdict.
+  The samples never leave the device: `loadSampleData` deliberately does not
+  enqueue to the outbox, which is the only thing sync reads from, so they are
+  unsyncable by construction rather than by filter, and export strips them at
+  the single point where all three exporters gather records. Home and Analytics
+  carry a standing notice while samples are loaded, because the real risk is not
+  loading them — it is forgetting you did and reading invented averages as your
+  own taste. Toward `#241`.
+
 - **The enrichment path now says what it is doing, in a vocabulary Foundry can
   read.** Every model call, tool call, and `/api/search` request emits an
   OpenTelemetry span in the GenAI semantic conventions, so questions we could
