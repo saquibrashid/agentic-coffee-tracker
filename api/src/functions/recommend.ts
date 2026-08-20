@@ -19,6 +19,7 @@ import {
   validateRecommendations,
   type PreferenceSummary,
 } from '../lib/recommendSchema.js';
+import { groundedRecommendations, isGroundedRecommendEnabled } from '../lib/groundedRecommend.js';
 
 interface RecommendRequest {
   preferences?: unknown;
@@ -84,11 +85,25 @@ app.http('recommend', {
 
       let candidate: unknown;
       let model: string;
+      let grounded = false;
 
       if (openAi) {
-        const result = await callAzureOpenAi(openAi, summary, max);
-        candidate = result.parsed;
-        model = result.model;
+        // Real, clickable coffees when the search can find them; the generic
+        // "kind of coffee to look for" answer when it cannot. The fallback is
+        // not a degraded mode — it is what this endpoint returned for its whole
+        // life before #179, and it is still a useful answer.
+        const real = isGroundedRecommendEnabled()
+          ? await groundedRecommendations(openAi, summary, max, ctx)
+          : null;
+        if (real) {
+          candidate = { recommendations: real.recommendations };
+          model = real.model;
+          grounded = true;
+        } else {
+          const result = await callAzureOpenAi(openAi, summary, max);
+          candidate = result.parsed;
+          model = result.model;
+        }
       } else {
         candidate = mockRecommendations(summary);
         model = 'mock-model';
@@ -107,6 +122,7 @@ app.http('recommend', {
       return json(200, {
         recommendations: validation.value.recommendations.slice(0, max),
         model,
+        grounded,
       });
     } catch (err) {
       return errorResponse(ctx, 500, 'Recommend failed', err);

@@ -35,6 +35,59 @@ describe('validateRecommendations', () => {
     expect(validateRecommendations(valid).valid).toBe(true);
   });
 
+  it('accepts a grounded suggestion carrying a real product page', () => {
+    const grounded = {
+      recommendations: [
+        {
+          ...valid.recommendations[0],
+          product: {
+            roaster: 'Stumptown Coffee Roasters',
+            name: 'Holler Mountain',
+            url: 'https://stumptowncoffee.com/products/holler-mountain',
+            verifiedAt: '2026-01-02T03:04:05.000Z',
+          },
+        },
+      ],
+    };
+    expect(validateRecommendations(grounded).valid).toBe(true);
+  });
+
+  it('rejects a product whose link is not a web address', () => {
+    const bad = {
+      recommendations: [
+        {
+          ...valid.recommendations[0],
+          product: {
+            roaster: 'Stumptown',
+            name: 'Holler Mountain',
+            url: 'javascript:alert(1)',
+            verifiedAt: '2026-01-02T03:04:05.000Z',
+          },
+        },
+      ],
+    };
+    const result = validateRecommendations(bad);
+    expect(result.valid).toBe(false);
+    if (!result.valid) expect(result.errors.join()).toContain('/product/url');
+  });
+
+  it('rejects a product with no roaster to attribute it to', () => {
+    const bad = {
+      recommendations: [
+        {
+          ...valid.recommendations[0],
+          product: {
+            roaster: '',
+            name: 'Holler Mountain',
+            url: 'https://stumptowncoffee.com/products/holler-mountain',
+            verifiedAt: '2026-01-02T03:04:05.000Z',
+          },
+        },
+      ],
+    };
+    expect(validateRecommendations(bad).valid).toBe(false);
+  });
+
   it('accepts an empty set, which means "not enough to say"', () => {
     expect(validateRecommendations({ recommendations: [] }).valid).toBe(true);
   });

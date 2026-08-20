@@ -18,6 +18,8 @@ export interface CachedRecommendations {
   generatedAt: string;
   /** Ratings count at generation time, used to tell the user when it is stale. */
   basedOnRatings: number;
+  /** Whether these came from real, cited product pages rather than coffee styles. */
+  grounded?: boolean;
 }
 
 function summarize<T extends string>(items: RankedItem<T>[]): PreferenceSummary['favoriteOrigins'] {
@@ -57,6 +59,7 @@ export async function generateRecommendations(max = 3): Promise<CachedRecommenda
     model: response.model,
     generatedAt: new Date().toISOString(),
     basedOnRatings: preferences.totalRatings,
+    grounded: response.grounded === true,
   };
   await db.meta.put({ key: CACHE_KEY, value: cached });
   return cached;

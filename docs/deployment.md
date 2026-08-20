@@ -45,6 +45,16 @@ manual setup. Two things to know:
   `WEB_SEARCH_ENABLED=false` on the Function App to switch it off without a redeploy. Coffees found
   by the free path never reach it.
 
+- **`GROUNDED_RECOMMEND_ENABLED` controls the more expensive search.** "For you → What to try next"
+  runs a `web_search` call to find real coffees for sale, then a second call to choose among them,
+  so one press of _Suggest coffees_ costs noticeably more than an enrichment lookup. It is on by
+  default and switches off with `GROUNDED_RECOMMEND_ENABLED=false`, which makes the endpoint return
+  the older generic "kind of coffee to look for" answer instead of failing.
+
+  It is deliberately a separate switch from `WEB_SEARCH_ENABLED`: enrichment searches for a coffee
+  the user already owns and is worth keeping on, while this one searches speculatively. Nothing
+  here runs automatically — the user has to ask.
+
 - **`AGENT_ENRICH_ENABLED` is off, and should stay off.** It exposes
   `POST /api/agent-enrich`, an experimental agentic enrichment loop kept as a measuring instrument
   rather than a feature. Unset, the route returns 404 and costs nothing. It was measured against the
