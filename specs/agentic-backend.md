@@ -110,12 +110,15 @@ construction.** Web search bills at $10 per 1,000 searches. Today's dominant
 path — Shopify store search — is free, with one ~$0.005 model call behind it.
 An agent permitted `max_uses: 5` can spend $0.05 on a single "Add a coffee".
 
-**And nothing currently stops it.** Only `/api/studio-photo` and the sync
-endpoints are rate-limited (`IMAGE_RATE_LIMIT`, `SYNC_RATE_LIMIT`).
-`/api/parse`, `/api/ocr`, `/api/search` and `/api/scrape` have **no per-caller
-limit at all**. This is the same gap flagged when adding the budget alerts in
+**And for a long time nothing stopped it.** Only `/api/studio-photo` and the
+sync endpoints were rate-limited (`IMAGE_RATE_LIMIT`, `SYNC_RATE_LIMIT`);
+`/api/parse`, `/api/ocr`, `/api/search` and `/api/scrape` had no per-caller
+limit at all. This was the same gap flagged when adding the budget alerts in
 [#206](https://github.com/saquibrashid/agentic-coffee-tracker/issues/206), and
-it is a prerequisite rather than a follow-up: budgets alert, they do not cap.
+it was a prerequisite rather than a follow-up, because budgets alert and do not
+cap. _(Closed in `357672b`: every AI endpoint now goes through
+`enforceRateLimit`. The cost ceiling below still applies — a limit caps the
+number of calls, not what an unbounded agent loop spends inside one.)_
 
 **The AI budget may not even see the spend.** Claude on Foundry bills as Claude
 Consumption Units through **Azure Marketplace**, metered hourly and invoiced in
