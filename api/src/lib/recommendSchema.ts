@@ -23,6 +23,26 @@ export interface PreferenceSummary {
   totalRatings: number;
 }
 
+/**
+ * A real coffee this suggestion points at.
+ *
+ * Only ever built by `groundedRecommend.ts` from a page a web search actually
+ * returned — the model is never given a field it could write a URL into. Absent
+ * means the suggestion is a *kind* of coffee to look for, which is the older and
+ * still-supported shape; see `groundedRecommend.ts` for why both exist.
+ */
+export interface GroundedProduct {
+  roaster: string;
+  name: string;
+  url: string;
+  /**
+   * When the listing was last seen. Not a stock check — nothing here knows
+   * whether it is in stock, which is why the UI dates the claim instead of
+   * making one.
+   */
+  verifiedAt: string;
+}
+
 export interface Recommendation {
   title: string;
   /** Why this fits, phrased in terms of the user's own history. */
@@ -33,6 +53,8 @@ export interface Recommendation {
   roastLevel: string | null;
   process: string | null;
   flavorNotes: string[];
+  /** Present only when the suggestion is a specific, cited product page. */
+  product?: GroundedProduct;
 }
 
 export interface RecommendationSet {
@@ -84,6 +106,16 @@ function isNullableString(value: unknown): value is string | null {
   return value === null || typeof value === 'string';
 }
 
+function isWebUrl(value: unknown): boolean {
+  if (typeof value !== 'string') return false;
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+  } catch {
+    return false;
+  }
+}
+
 export type RecommendationValidation =
   { valid: true; value: RecommendationSet } | { valid: false; errors: string[] };
 
@@ -119,6 +151,26 @@ export function validateRecommendations(input: unknown): RecommendationValidatio
     if (!isNullableString(item['process'])) errors.push(`${path}/process must be a string or null`);
     if (!isStringArray(item['flavorNotes'])) {
       errors.push(`${path}/flavorNotes must be an array of strings`);
+    }
+    // Belt and braces. The grounded path builds this itself from a cited page
+    // rather than from model output, so a malformed product here means a bug on
+    // our side — but it would render as a clickable link either way, and a link
+    // is the one thing in a suggestion a user will trust without checking.
+    const product = item['product'];
+    if (product !== undefined) {
+      if (!isPlainObject(product)) {
+        errors.push(`${path}/product must be an object`);
+      } else {
+        for (const field of ['roaster', 'name', 'verifiedAt'] as const) {
+          const value = product[field];
+          if (typeof value !== 'string' || value.trim() === '') {
+            errors.push(`${path}/product/${field} must be a non-empty string`);
+          }
+        }
+        if (!isWebUrl(product['url'])) {
+          errors.push(`${path}/product/url must be an http(s) URL`);
+        }
+      }
     }
   });
 

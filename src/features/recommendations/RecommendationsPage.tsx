@@ -11,6 +11,7 @@ import {
   BarChart3,
   Coffee,
   Compass,
+  ExternalLink,
   Flame,
   Globe2,
   Lightbulb,
@@ -24,7 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { db } from '@/services/db';
-import { ApiError, type Recommendation } from '@/services/ai';
+import { ApiError, type GroundedProduct, type Recommendation } from '@/services/ai';
 import {
   MIN_RATINGS_FOR_RECOMMENDATIONS,
   hasEnoughHistory,
@@ -130,6 +131,40 @@ function RecommendationArtwork({
 
 const RECOMMENDATION_KIND = ['Closest match', 'Fresh direction', 'Wildcard'];
 
+function storeName(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return 'the roaster';
+  }
+}
+
+/**
+ * The evidence behind a real coffee.
+ *
+ * Deliberately says "listed when we checked" rather than "in stock". The search
+ * proves a product page existed at that moment and nothing more, so the card
+ * dates its claim and sends the user to the roaster to find out the rest.
+ */
+function ProductProvenance({ product }: { product: GroundedProduct }) {
+  return (
+    <div className="bg-muted/45 space-y-2 rounded-md border p-3">
+      <p className="text-meta text-muted-foreground">From a real roaster</p>
+      <p className="text-sm font-medium">{product.roaster}</p>
+      <Button asChild variant="outline" size="sm" className="w-full">
+        <a href={product.url} target="_blank" rel="noopener noreferrer">
+          <ExternalLink aria-hidden="true" />
+          View on {storeName(product.url)}
+        </a>
+      </Button>
+      <p className="text-muted-foreground text-xs">
+        Listed when we checked on {new Date(product.verifiedAt).toLocaleDateString()}. Stock and
+        price are the roaster&apos;s to confirm.
+      </p>
+    </div>
+  );
+}
+
 function RecommendationCard({
   recommendation,
   index,
@@ -158,6 +193,7 @@ function RecommendationCard({
           <CardDescription>{recommendation.rationale}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
+          {recommendation.product && <ProductProvenance product={recommendation.product} />}
           {attributes.length > 0 && (
             <div>
               <p className="text-meta text-muted-foreground mb-1.5">What to look for</p>
@@ -408,8 +444,9 @@ export function RecommendationsPage() {
               <div>
                 <CardTitle id="next-coffees">What to try next</CardTitle>
                 <CardDescription className="mt-1 max-w-2xl">
-                  Ask for a balanced set: one close match, one fresh direction, and one wildcard
-                  grounded in your profile.
+                  Real coffees, searched for on roasters&apos; own stores and chosen to match your
+                  profile — with a fallback to styles worth looking for when nothing verifiable
+                  turns up.
                 </CardDescription>
               </div>
               <Button onClick={() => void onGenerate()} disabled={!ready || loading}>
@@ -469,9 +506,18 @@ export function RecommendationsPage() {
             )}
 
             {cached && (
-              <p className="text-muted-foreground text-xs">
-                Generated {new Date(cached.generatedAt).toLocaleString()} · {cached.model}
-              </p>
+              <>
+                {cached.recommendations.length > 0 && (
+                  <p className="text-muted-foreground text-xs">
+                    {cached.grounded
+                      ? 'Each pick is a coffee found on a roaster\u2019s own store, chosen only from pages a web search returned.'
+                      : 'No real listings could be verified this time, so these describe the kind of coffee to look for rather than a product to buy.'}
+                  </p>
+                )}
+                <p className="text-muted-foreground text-xs">
+                  Generated {new Date(cached.generatedAt).toLocaleString()} · {cached.model}
+                </p>
+              </>
             )}
           </CardContent>
         </Card>

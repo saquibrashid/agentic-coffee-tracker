@@ -405,6 +405,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **“What to try next” now recommends coffees you can actually buy.** It used
+  to suggest a _kind_ of coffee — “another Ethiopia natural” — because the model
+  was explicitly told it had no catalog and forbidden from naming a roaster.
+  Safe, and not much use: you could not click it, buy it, or check that it
+  existed. Suggestions now come from a web search for real product pages, and
+  the model that ranks them answers with a **candidate number, not a URL**, so
+  it has nowhere to write an address it invented. It writes the roaster and
+  coffee name for display, and those are checked back against the cited page's
+  own title and domain before the pick is shown — the index proves the link is
+  real, that check proves the label on it is. One roaster can fill at most two
+  slots, so a single store's catalog cannot become the whole answer. Cards say
+  “listed when we checked”, dated, rather than claiming stock the search never
+  established, and when nothing verifiable turns up the page says so and falls
+  back to the old style-level guidance instead of quietly looking the same.
+  Set `GROUNDED_RECOMMEND_ENABLED=false` to switch the search off; the fallback
+  is what you get.
+
 - **You can send feedback from inside the app.** Every issue in this backlog
   existed because the author hit something himself and went to a terminal;
   anyone else had no route at all, and the reports most worth having — “the

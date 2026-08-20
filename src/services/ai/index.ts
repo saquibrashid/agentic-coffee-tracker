@@ -248,6 +248,13 @@ export interface PreferenceSummary {
   averageScore: number;
   totalRatings: number;
 }
+export interface GroundedProduct {
+  roaster: string;
+  name: string;
+  url: string;
+  /** When the listing was last seen. Not a stock check. */
+  verifiedAt: string;
+}
 export interface Recommendation {
   title: string;
   rationale: string;
@@ -256,6 +263,8 @@ export interface Recommendation {
   roastLevel: string | null;
   process: string | null;
   flavorNotes: string[];
+  /** Present only when the suggestion is a specific coffee on a real store page. */
+  product?: GroundedProduct;
 }
 export interface RecommendRequest {
   preferences: PreferenceSummary;
@@ -264,6 +273,8 @@ export interface RecommendRequest {
 export interface RecommendResponse {
   recommendations: Recommendation[];
   model: string;
+  /** Whether the set came from real, cited product pages. */
+  grounded?: boolean;
   reason?: 'insufficient-history';
 }
 export const recommend = (req: RecommendRequest): Promise<RecommendResponse> =>
