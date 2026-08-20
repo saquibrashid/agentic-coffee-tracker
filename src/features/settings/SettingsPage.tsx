@@ -10,6 +10,7 @@ import { exportCsv, exportJson, exportJsonWithPhotos } from '@/services/export/e
 import { ImportPanel } from './ImportPanel';
 import { AccountPanel } from './AccountPanel';
 import { AppearancePanel } from './AppearancePanel';
+import { SampleDataPanel } from './SampleDataPanel';
 import { SyncPanel } from './SyncPanel';
 import {
   RESET_CONFIRMATION_PHRASE,
@@ -84,6 +85,8 @@ export function SettingsPage() {
       </Card>
 
       <ImportPanel />
+
+      <SampleDataPanel />
 
       <RelookupPanel />
 
