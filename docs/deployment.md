@@ -420,7 +420,9 @@ Pick the amount from evidence rather than instinct: run the deployment for a mon
 
 ## CI/CD
 
-`.github/workflows/deploy.yml` runs `azd provision` + `azd deploy` on every push to `main`, then smoke-tests `/api/health`. It authenticates with OIDC federated credentials — no long-lived secrets.
+`.github/workflows/deploy.yml` runs `azd provision` + `azd deploy api` on every push to `main`, publishes the SPA with `Azure/static-web-apps-deploy@v1`, then smoke-tests `/api/health`. It authenticates with OIDC federated credentials — no long-lived secrets.
+
+> **Why CI does not use `azd deploy web`.** azd publishes a `staticwebapp` service by shelling out to `npx @azure/static-web-apps-cli`, which resolves a fresh dependency tree from the npm registry on every run, with no lockfile to pin it. On 2026-08-19 a broken `@azure/identity` release — it declared a dependency on a package that was never published — made that install fail and blocked every deploy for hours, with nothing wrong in this repository ([#234](https://github.com/saquibrashid/agentic-coffee-tracker/issues/234)). The official action ships its tooling in a container, so a deploy no longer depends on the registry being healthy at that moment. Our own build was never affected, because it installs from the lockfile. `azd deploy web` remains the right thing to run by hand.
 
 The job needs these repository **variables**:
 
@@ -457,7 +459,7 @@ Answer **yes** when it offers to create `azure-dev.yml` — declining aborts the
 flow, so the identity and repository variables never get created. Then **delete**
 that generated file and decline the final "commit and push" prompt: `deploy.yml`
 already does everything it would, and two workflows triggering on `push: main`
-would race each other with concurrent `azd deploy` runs.
+would race each other with concurrent `azd provision` runs.
 
 > **`azd pipeline config` alone is not enough for this repo.** It registers federated
 > credentials for the `ref:refs/heads/main` and `pull_request` subjects only, but the
