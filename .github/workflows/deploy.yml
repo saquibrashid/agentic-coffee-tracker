@@ -54,6 +54,14 @@ jobs:
       AZURE_IMAGE_KEY: ${{ secrets.AZURE_IMAGE_KEY }}
       AZURE_VISION_KEY: ${{ secrets.AZURE_VISION_KEY }}
       AZURE_OPENAI_KEY: ${{ secrets.AZURE_OPENAI_KEY }}
+      # In-app feedback. Both halves or neither: without them /api/feedback
+      # reports itself disabled and the app points people at the issue tracker,
+      # which is honest. A repo without a token would accept somebody's words
+      # and then lose them. The token needs issue-creation on this repository
+      # and nothing else — it files publicly visible issues for anonymous
+      # callers. See docs/deployment.md.
+      GITHUB_FEEDBACK_REPO: ${{ vars.GITHUB_FEEDBACK_REPO }}
+      GITHUB_FEEDBACK_TOKEN: ${{ secrets.GITHUB_FEEDBACK_TOKEN }}
     steps:
       - uses: actions/checkout@v7
 

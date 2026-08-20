@@ -135,18 +135,22 @@ Recorded here so the gaps are not mistaken for guarantees:
 A plain-language summary of the same facts, for anyone deciding whether to sign
 in. The controls above are what enforce it.
 
-| Data                                    | Signed out         | Signed in                                            |
-| --------------------------------------- | ------------------ | ---------------------------------------------------- |
-| Beans, ratings, roasters, tasting notes | This device only   | This device **and** the operator's Cosmos DB         |
-| Bean photos                             | This device only   | This device **and** the operator's Blob Storage      |
-| Preferences, summaries, recommendations | This device only   | This device only — recomputed, never uploaded        |
-| Your name and email                     | Not collected      | Held by Microsoft Entra, not stored by this app      |
-| Images sent for AI extraction           | Sent, not retained | Sent, not retained — EXIF stripped before forwarding |
+| Data                                    | Signed out                     | Signed in                                                |
+| --------------------------------------- | ------------------------------ | -------------------------------------------------------- |
+| Beans, ratings, roasters, tasting notes | This device only               | This device **and** the operator's Cosmos DB             |
+| Bean photos                             | This device only               | This device **and** the operator's Blob Storage          |
+| Preferences, summaries, recommendations | This device only               | This device only — recomputed, never uploaded            |
+| Your name and email                     | Not collected                  | Held by Microsoft Entra, not stored by this app          |
+| Images sent for AI extraction           | Sent, not retained             | Sent, not retained — EXIF stripped before forwarding     |
+| Feedback you choose to send             | Filed as a public GitHub issue | Filed as a public GitHub issue — identity never attached |
 
 Three things follow from that table and are worth stating outright:
 
-- **Signing in is the only thing that puts your data on a server.** There is no
-  telemetry path, no analytics, and no background upload while signed out.
+- **Signing in and sending feedback are the only things that put your data on a
+  server.** There is no telemetry path, no analytics, no crash reporting, and
+  no background upload of any kind. Feedback is the one exception to "nothing
+  leaves the device while signed out", and it is an exception you make
+  deliberately, by typing a message and pressing a button.
 - **The operator can read what you sync.** Encryption is in transit and at rest,
   not end-to-end, for the reasons in `specs/sync.md` → Decisions § 1.
 - **Deleting cloud data does not delete local data, and signing out does not
@@ -154,3 +158,23 @@ Three things follow from that table and are worth stating outright:
   Settings → Delete all data removes the local one. They are separate on
   purpose, because "stop storing this in the cloud" and "lose my coffee
   library" are very different requests.
+
+### Feedback
+
+Settings → Send feedback files what you write as an issue on this project's
+**public** GitHub repository. The submit screen says so above the button, and
+lists every diagnostic before it is sent, because there is no un-publishing an
+issue.
+
+- It is **user-initiated every time**. No crash beacon, no background report,
+  no "help us improve" toggle that defaults on.
+- **Identity is never attached** — not your user id, which is the sync partition
+  key, and not your email. The report carries "signed in: yes or no", which is
+  the part that explains a sync bug; who, is not.
+- **No content is attached.** No coffee names, no ratings, no photos. If you
+  want to name a coffee you can type it; the app will not do it for you.
+- What _is_ attached is listed in the panel: app version, the screen you were
+  on, installed-vs-browser, a short browser description, signed-in state, and
+  sync state.
+- The endpoint is rate limited and length capped, and the token it uses is
+  scoped to creating issues on this one repository.

@@ -113,6 +113,24 @@ export const FETCH_RATE_LIMIT: RateLimitConfig = { capacity: 90, refillPerSecond
  */
 export const AGENT_RATE_LIMIT: RateLimitConfig = { capacity: 10, refillPerSecond: 0.05 };
 
+/**
+ * The budget for user-submitted feedback.
+ *
+ * The tightest limit here, because what an allowed request produces is not a
+ * cost but a *public issue on the repository*. The legitimate ceiling is
+ * genuinely small: someone who hits a bug might send two or three notes in a
+ * sitting, and nobody writes five considered paragraphs back to back. Anything
+ * beyond that is either a stuck client retrying or somebody using the backlog
+ * as a billboard.
+ *
+ * 5 back-to-back, refilling one every five minutes, leaves an honest reporter
+ * unaware the limit exists while making a spam run pointless. It is a blunt
+ * instrument and deliberately so — the alternative floated in #196 was
+ * requiring sign-in, which would have excluded exactly the signed-out users
+ * whose experience is most worth hearing about.
+ */
+export const FEEDBACK_RATE_LIMIT: RateLimitConfig = { capacity: 5, refillPerSecond: 0.0033 };
+
 interface Bucket {
   tokens: number;
   /** ms epoch of the last refill. */

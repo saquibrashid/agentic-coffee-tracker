@@ -405,6 +405,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **You can send feedback from inside the app.** Every issue in this backlog
+  existed because the author hit something himself and went to a terminal;
+  anyone else had no route at all, and the reports most worth having — “the
+  parse dropped my description”, “I got signed out again” — are exactly the
+  ones nobody files if filing means finding the repository. Settings → Send
+  feedback posts to a new `/api/feedback`, which files it as a GitHub issue
+  labelled `feedback` + `needs-triage`, so triage is reading a labelled issue
+  on the surface the backlog already lives on rather than a review queue that
+  has to be built and then remembered. The reply links the issue that was
+  created, because feedback sent into a void is assumed to have vanished.
+  Because this repository is **public**, the panel says so above the button in
+  ordinary type and lists every diagnostic before it is sent: app version,
+  screen, installed-vs-browser, a short browser description, signed-in state
+  and sync state. Identity is never attached — “signed in: yes” explains a sync
+  bug and who does not — and neither is any coffee, rating or photo. The
+  endpoint is rate limited and length capped, and an unconfigured deployment
+  answers 503 and points the user at the issue tracker rather than accepting
+  words it would then lose. `SECURITY.md` gains a row and the “no telemetry”
+  claim is now qualified honestly. Closes #196.
+
 - **Onboarding is now a set of hints that arrive when they are true, plus a
   walkthrough you can replay.** A first-launch tour was the obvious shape and
   the wrong one: it fires when the user has no data, so every feature has to be
