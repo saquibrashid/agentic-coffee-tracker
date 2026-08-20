@@ -10,20 +10,27 @@
  * failure mode of a redesign like this. So the confidence gauge is coloured by
  * confidence, never by the verdict: a 7.6 the predictor is barely sure of shows
  * a big number over a nearly empty, muted bar, and reads as the shrug it is.
+ *
+ * Two bars sit here and they measure different things, so they are deliberately
+ * not interchangeable: the upper one places the score on the 1-10 scale against
+ * the user's own average and takes the verdict's colour, the lower one reports
+ * how much history is behind it and takes confidence's colour. Only the second
+ * is allowed to say "trust this".
  */
 import { HelpCircle, ThumbsDown, ThumbsUp } from 'lucide-react';
 
 import { explain, type Evidence, type Prediction, type Verdict } from '@/services/predict/predict';
-import { MAX_SCORE } from '@/services/ratings/scale';
+import { formatScore, MAX_SCORE, MIN_SCORE } from '@/services/ratings/scale';
 
 const VERDICT_STYLES: Record<
   Verdict,
-  { shell: string; badge: string; score: string; Icon: typeof ThumbsUp; label: string }
+  { shell: string; badge: string; score: string; bar: string; Icon: typeof ThumbsUp; label: string }
 > = {
   love: {
     shell: 'border-emerald-500/40 bg-emerald-500/10',
     badge: 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-emerald-950',
     score: 'text-emerald-700 dark:text-emerald-300',
+    bar: 'bg-emerald-600 dark:bg-emerald-400',
     Icon: ThumbsUp,
     label: 'Worth buying',
   },
@@ -31,6 +38,7 @@ const VERDICT_STYLES: Record<
     shell: 'border-emerald-500/30 bg-emerald-500/5',
     badge: 'bg-emerald-600 text-white dark:bg-emerald-500 dark:text-emerald-950',
     score: 'text-emerald-700 dark:text-emerald-300',
+    bar: 'bg-emerald-600 dark:bg-emerald-400',
     Icon: ThumbsUp,
     label: 'Probably yes',
   },
@@ -38,6 +46,7 @@ const VERDICT_STYLES: Record<
     shell: 'border-amber-500/40 bg-amber-500/10',
     badge: 'bg-amber-600 text-white dark:bg-amber-500 dark:text-amber-950',
     score: 'text-amber-700 dark:text-amber-300',
+    bar: 'bg-amber-500',
     Icon: HelpCircle,
     label: 'Toss-up',
   },
@@ -45,6 +54,7 @@ const VERDICT_STYLES: Record<
     shell: 'border-destructive/40 bg-destructive/10',
     badge: 'bg-destructive text-white',
     score: 'text-destructive',
+    bar: 'bg-destructive',
     Icon: ThumbsDown,
     label: 'Probably not',
   },
@@ -110,6 +120,59 @@ function ConfidenceGauge({ confidence }: { confidence: number }) {
   );
 }
 
+/**
+ * The score, drawn on the scale it lives on — with the user's own average
+ * marked on it.
+ *
+ * A plain 0–10 bar would be decoration: "7.3" already tells you where 7.3 sits.
+ * What the digits cannot tell you is whether 7.3 is good *for this person*, and
+ * that is exactly what the verdict is computed from — `verdictFor` reads the gap
+ * to the baseline, not the raw number. Without the marker a 7.3 next to a green
+ * "Probably yes" looks like the app contradicting itself; with it, the reason is
+ * visible at a glance.
+ *
+ * Coloured by verdict rather than by height, so it stays consistent with the
+ * badge and the big number, and cannot be mistaken for the confidence gauge
+ * directly below it — which is coloured by confidence and means something else
+ * entirely.
+ */
+function ScoreScale({ score, baseline, tone }: { score: number; baseline: number; tone: string }) {
+  const place = (value: number) =>
+    ((Math.min(MAX_SCORE, Math.max(MIN_SCORE, value)) - MIN_SCORE) / (MAX_SCORE - MIN_SCORE)) * 100;
+  const percent = place(score);
+  const basePercent = place(baseline);
+  const above = score >= baseline;
+
+  return (
+    <div>
+      <div
+        role="meter"
+        aria-label="Predicted score"
+        aria-valuenow={score}
+        aria-valuemin={MIN_SCORE}
+        aria-valuemax={MAX_SCORE}
+        aria-valuetext={`${formatScore(score)} out of ${MAX_SCORE}, against your average of ${formatScore(baseline)}`}
+        className="bg-muted relative h-2.5 w-full overflow-hidden rounded-full"
+      >
+        <div
+          className={`h-full rounded-full ${tone}`}
+          style={{ width: `${Math.max(percent, 3)}%` }}
+        />
+        {/* Drawn over the fill so it stays visible when the score has passed it,
+            which is the case where the comparison matters most. */}
+        <div
+          aria-hidden="true"
+          className="bg-foreground/70 absolute inset-y-0 w-0.5 rounded-full"
+          style={{ left: `calc(${basePercent}% - 1px)` }}
+        />
+      </div>
+      <p className="text-muted-foreground mt-1.5 text-xs" data-testid="prediction-baseline">
+        Your average is {formatScore(baseline)} — this lands {above ? 'above' : 'below'} it.
+      </p>
+    </div>
+  );
+}
+
 function EvidenceList({ title, items }: { title: string; items: Evidence[] }) {
   if (items.length === 0) return null;
   return (
@@ -157,6 +220,8 @@ export function VerdictHero({
           <span className="text-muted-foreground ml-1 text-2xl font-normal">/{MAX_SCORE}</span>
         </p>
       </div>
+
+      <ScoreScale score={prediction.score} baseline={prediction.baseline} tone={style.bar} />
 
       <div>
         {/* Naming the coffee matters when several are checked from the same

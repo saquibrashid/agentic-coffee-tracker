@@ -125,6 +125,16 @@ export interface Prediction {
   score: number;
   /** 0–1. How much history stands behind the number. */
   confidence: number;
+  /**
+   * The user's own average, on the same scale as `score`.
+   *
+   * Exposed because the verdict is relative to it — `verdictFor` reads the gap,
+   * not the raw number — so a score shown without it can look like it disagrees
+   * with its own badge. For someone who averages 7.0, a 7.3 is a mild yes; for
+   * someone who averages 8.8 the identical 7.3 is a warning. Anything drawing
+   * the score on a scale needs this or it draws a misleading picture.
+   */
+  baseline: number;
   verdict: Verdict;
   headline: string;
   supporting: Evidence[];
@@ -567,6 +577,7 @@ export function predict(candidate: Candidate, index: PredictionIndex): Predictio
   return {
     score,
     confidence,
+    baseline: Math.round(clampToScale(index.baseline) * 10) / 10,
     verdict,
     headline: HEADLINES[verdict],
     supporting,
