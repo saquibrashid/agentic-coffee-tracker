@@ -741,7 +741,16 @@ export function PredictPage() {
                 />
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              {/* Actions belong with the form they act on, so these stay in the
+                  card — moving navigation outside it would split one decision
+                  across two containers. What made them hard to find was not the
+                  location but the lack of a boundary: four buttons abutting the
+                  last input read as more form. A divider makes this a footer,
+                  and matches the pattern the previous step already uses.
+
+                  "Start over" is pushed away from the rest because it is the
+                  one that throws work away, and it sat one mis-tap from "Back". */}
+              <div className="flex flex-wrap items-center gap-2 border-t pt-4">
                 <Button type="submit" disabled={busy !== null || !hasAnyDetail}>
                   <Sparkles className="mr-2 h-4 w-4" aria-hidden="true" />
                   Will I like it?
@@ -754,12 +763,17 @@ export function PredictPage() {
                     Back to the verdict
                   </Button>
                 )}
-                <Button type="button" variant="ghost" onClick={() => setStep('source')}>
+                <Button type="button" variant="outline" onClick={() => setStep('source')}>
                   <ArrowLeft className="mr-2 h-4 w-4" aria-hidden="true" />
                   Back
                 </Button>
                 {hasAnyDetail && (
-                  <Button type="button" variant="ghost" onClick={() => reset()}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-muted-foreground sm:ml-auto"
+                    onClick={() => reset()}
+                  >
                     Start over
                   </Button>
                 )}

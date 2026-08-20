@@ -448,6 +448,38 @@ describe('predict', () => {
     // of the coffee that was actually recognised differs.
     expect(barelyKnown.confidence).toBeLessThan(wellKnown.confidence / 2);
   });
+
+  /**
+   * The verdict is computed from the gap to the baseline rather than the raw
+   * score, so anything presenting the score needs the baseline to present it
+   * honestly. These pin the number down: the same predicted score is a yes for
+   * one palate and a warning for another, and the reported baseline has to be
+   * what actually separates them.
+   */
+  it('reports the baseline the verdict was judged against', () => {
+    const { beans, ratings } = history(10, 6, { origins: [{ country: 'Peru' }] });
+    const index = buildIndex(beans, ratings);
+
+    const prediction = predict({ origins: [{ country: 'Peru' }] }, index);
+
+    expect(prediction.baseline).toBe(6);
+    expect(prediction.baseline).toBe(index.baseline);
+  });
+
+  it('reports a baseline that explains why identical scores get opposite verdicts', () => {
+    const easy = history(12, 6, { origins: [{ country: 'Peru' }], roastLevel: 'medium' });
+    const harsh = history(12, 9, { origins: [{ country: 'Peru' }], roastLevel: 'medium' });
+    const candidate = { origins: [{ country: 'Peru' }], roastLevel: 'medium' as const };
+
+    const generous = predict(candidate, buildIndex(easy.beans, easy.ratings));
+    const demanding = predict(candidate, buildIndex(harsh.beans, harsh.ratings));
+
+    expect(generous.baseline).toBeLessThan(demanding.baseline);
+    // Each score sits at its own baseline, which is the only reason a bar drawn
+    // without the marker would look like it disagreed with the badge.
+    expect(generous.score).toBeCloseTo(generous.baseline, 1);
+    expect(demanding.score).toBeCloseTo(demanding.baseline, 1);
+  });
 });
 
 describe('explain', () => {

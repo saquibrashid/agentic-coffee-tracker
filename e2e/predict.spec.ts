@@ -90,6 +90,8 @@ test.describe('will I like it?', () => {
 
     const score = Number(await page.getByTestId('prediction-score').innerText());
     expect(score).toBeGreaterThan(8.4);
+
+    await expect(page.getByTestId('prediction-baseline')).toContainText('above it');
   });
 
   test('names the coffee it is answering about', async ({ page }) => {
@@ -151,6 +153,10 @@ test.describe('will I like it?', () => {
 
     const score = Number(await page.getByTestId('prediction-score').innerText());
     expect(score).toBeLessThan(6);
+
+    // The scale has to agree with the badge: a warning must not be drawn as a
+    // score sitting above the user's usual.
+    await expect(page.getByTestId('prediction-baseline')).toContainText('below it');
   });
 
   test('says so when it has nothing to go on, instead of guessing', async ({ page }) => {

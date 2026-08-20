@@ -229,6 +229,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The wizard's Back and Start over buttons no longer read as body text.** They
+  sat flush against the last input with no divider and no border, so four
+  controls in a row looked like more form, and Start over — the one that throws
+  the entered coffee away — sat one mis-tap from Back. They stay inside the card,
+  because actions belong with the form they act on and splitting navigation into
+  a separate container would spread one decision across two. What changed is the
+  hierarchy: a divider turns the row into a footer, matching the pattern the
+  previous step already used; Back becomes an outline button; and Start over is
+  pushed to the far end, quiet but no longer adjacent to the control people
+  reach for by accident.
+
 - **Predictions now recognise related coffees instead of demanding the exact
   same words.** Every attribute was matched by exact string, so a bag offering
   "green apple" from Kenya learned nothing from a shelf of coffees rated as
@@ -348,6 +359,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diff.
 
 ### Added
+
+- **The predicted score is now drawn on the scale it lives on, with your own
+  average marked on it.** A bare "7.3/10" reads as mediocre, which is why it
+  could sit under a green "Probably yes" and look like the app arguing with
+  itself. The verdict was never computed from the raw number — `verdictFor`
+  reads the gap to your baseline, so the same 7.3 is a mild yes for someone who
+  averages 7.0 and a warning for someone who averages 8.8. The bar makes that
+  gap visible, which is the only thing about it worth drawing: a plain 0–10 bar
+  would just restate the digits. It takes the verdict's colour and sits directly
+  under the number so it cannot be confused with the confidence gauge below,
+  which is coloured by confidence and means something else entirely. Toward
+  `#236`.
 
 - **A new user can now fill the app with a plausible library in one tap.** Every
   screen worth showing — Analytics, "For you", the predictor — needs a history
