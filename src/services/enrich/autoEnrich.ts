@@ -18,44 +18,28 @@ import { ApiError } from '@/services/ai';
 import type { CoffeeBean } from '@/types';
 import { EmptyPageError, enrichFromUrl, findCandidates } from './index';
 import { inferRoastLevel } from './inferRoast';
-import { attachPhotoFromUrl, beanNeedsPhoto } from './photo';
+import { attachPhotoFromUrl } from './photo';
+import {
+  CORE_FIELDS,
+  ENRICHABLE_FIELDS,
+  beanNeedsEnrichment,
+  beanNeedsPhoto,
+  isFieldMissing,
+  missingFields,
+  type EnrichableField,
+} from './completeness';
 
-/**
- * The fields auto-enrichment may fill.
- *
- * `roaster` and `name` are excluded because they are the search key — letting a
- * match rewrite them would let a bad hit rename the user's coffee. `roastDate`
- * is excluded because a product page advertises the roaster's *current* batch,
- * which has nothing to do with the bag drunk months ago. `confidence` is
- * excluded because it describes the parse, not the coffee.
- */
-export const ENRICHABLE_FIELDS = [
-  'origins',
-  'process',
-  'roastLevel',
-  'varietals',
-  'elevationMeters',
-  'tastingNotes',
-  'roasterDescription',
-] as const;
-
-export type EnrichableField = (typeof ENRICHABLE_FIELDS)[number];
-
-/**
- * The subset whose absence is worth a network round-trip.
- *
- * These are the fields the preference engine actually reasons over, and the ones
- * a spreadsheet plausibly carries. The wider `ENRICHABLE_FIELDS` set is filled
- * opportunistically once a lookup happens, but must not *trigger* one: no CSV
- * has a varietal or elevation column, so gating on those would queue a lookup
- * for every coffee forever, however complete it already is.
- */
-export const CORE_FIELDS: readonly EnrichableField[] = [
-  'origins',
-  'process',
-  'roastLevel',
-  'tastingNotes',
-];
+// Re-exported so the many call sites that reach for these through this module
+// keep working; the definitions moved to `completeness.ts` because the library
+// filters need them without the AI client this module pulls in (#246).
+export {
+  CORE_FIELDS,
+  ENRICHABLE_FIELDS,
+  beanNeedsEnrichment,
+  isFieldMissing,
+  missingFields,
+  type EnrichableField,
+};
 
 /** Raised when the search found nothing to scrape. Terminal — retrying will not help. */
 export class NoCandidatesError extends Error {
@@ -66,32 +50,6 @@ export class NoCandidatesError extends Error {
     super(`No product page found for ${roaster} — ${coffeeName}.`);
     this.name = 'NoCandidatesError';
   }
-}
-
-/**
- * `'unknown'` counts as missing: it is the schema's way of saying "not
- * established", so treating it as a real value would permanently block the one
- * lookup that could resolve it.
- */
-export function isFieldMissing(bean: CoffeeBean, field: EnrichableField): boolean {
-  const value: unknown = bean[field];
-  if (value === undefined || value === null) return true;
-  if (Array.isArray(value)) return value.length === 0;
-  if (typeof value === 'string') return value.trim().length === 0 || value === 'unknown';
-  if (typeof value === 'object') return Object.keys(value).length === 0;
-  return false;
-}
-
-export function missingFields(bean: CoffeeBean): EnrichableField[] {
-  return ENRICHABLE_FIELDS.filter((field) => isFieldMissing(bean, field));
-}
-
-/** True when a coffee is missing something worth looking up. */
-export function beanNeedsEnrichment(bean: CoffeeBean): boolean {
-  // A missing picture is reason enough on its own. An imported row has no
-  // photo by definition, and the library is a wall of cards — a coffee with
-  // no image is the most visible gap there is, even when its metadata is complete.
-  return CORE_FIELDS.some((field) => isFieldMissing(bean, field)) || beanNeedsPhoto(bean);
 }
 
 /** Narrows an update to the fields the bean is actually missing. */
@@ -118,6 +76,19 @@ export function isTerminalEnrichFailure(err: unknown): boolean {
   if (err instanceof NoCandidatesError || err instanceof EmptyPageError) return true;
   // 4xx other than 429 is our own bad request, not a passing outage.
   return err instanceof ApiError && err.status >= 400 && err.status < 500 && err.status !== 429;
+}
+
+/**
+ * The subset of terminal failures that mean "we could not find this coffee",
+ * as opposed to "the lookup broke".
+ *
+ * `EmptyPageError` counts: a page with no text is one the search matched
+ * wrongly, so the advice is the same as for no match at all — fix the name.
+ * Telling the user it "failed" would send them back to press the button, which
+ * the queue will never act on again.
+ */
+export function isNotFoundFailure(err: unknown): boolean {
+  return err instanceof NoCandidatesError || err instanceof EmptyPageError;
 }
 
 export interface AutoEnrichResult {

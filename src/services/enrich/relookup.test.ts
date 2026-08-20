@@ -5,6 +5,7 @@ import { db } from '@/services/db';
 import type { CoffeeBean } from '@/types';
 
 import { relookupIncompleteBeans } from './relookup';
+import { LAST_RELOOKUP_QUEUED_KEY, lastRelookupStartedAt } from './lookupOutcome';
 
 /**
  * A failed lookup is dropped rather than retried forever, which strands every
@@ -41,6 +42,7 @@ const complete = bean({
 beforeEach(async () => {
   await db.beans.clear();
   await db.pendingAiTasks.clear();
+  await db.meta.clear();
 });
 
 describe('relookupIncompleteBeans', () => {
@@ -49,16 +51,41 @@ describe('relookupIncompleteBeans', () => {
 
     const result = await relookupIncompleteBeans();
 
-    expect(result).toEqual({ incomplete: 2, queued: 2 });
+    expect(result).toMatchObject({ incomplete: 2, queued: 2 });
     const tasks = await db.pendingAiTasks.toArray();
     expect(tasks.map((t) => t.beanId).sort()).toEqual(['a', 'b']);
     expect(tasks.every((t) => t.type === 'web-enrich')).toBe(true);
   });
 
+  /**
+   * The run marker is what scopes the Settings summary to "what the button you
+   * just pressed did" (#246). Without it, outcomes recorded months ago would be
+   * reported as if they had just happened.
+   */
+  it('records a run marker covering every incomplete coffee', async () => {
+    await db.beans.bulkAdd([bean({ id: 'a' }), bean({ id: 'b' }), complete]);
+    await db.pendingAiTasks.add({
+      id: 'existing',
+      schemaVersion: 1,
+      type: 'web-enrich',
+      payload: {},
+      beanId: 'a',
+      attempts: 0,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const result = await relookupIncompleteBeans();
+
+    expect(await lastRelookupStartedAt()).toBe(result.startedAt);
+    // Two incomplete coffees, only one newly queued -- the one already waiting
+    // still reports, so the expected count must include it.
+    expect(result.queued).toBe(1);
+    expect((await db.meta.get(LAST_RELOOKUP_QUEUED_KEY))?.value).toBe(2);
+  });
+
   it('leaves complete coffees alone', async () => {
     await db.beans.add(complete);
-
-    expect(await relookupIncompleteBeans()).toEqual({ incomplete: 0, queued: 0 });
+    expect(await relookupIncompleteBeans()).toMatchObject({ incomplete: 0, queued: 0 });
     expect(await db.pendingAiTasks.count()).toBe(0);
   });
 
@@ -75,21 +102,21 @@ describe('relookupIncompleteBeans', () => {
     });
 
     // Still reported as incomplete, so the count the user sees stays honest.
-    expect(await relookupIncompleteBeans()).toEqual({ incomplete: 1, queued: 0 });
+    expect(await relookupIncompleteBeans()).toMatchObject({ incomplete: 1, queued: 0 });
     expect(await db.pendingAiTasks.count()).toBe(1);
   });
 
   it('skips archived coffees', async () => {
     await db.beans.add(bean({ id: 'a', isArchived: true }));
 
-    expect(await relookupIncompleteBeans()).toEqual({ incomplete: 0, queued: 0 });
+    expect(await relookupIncompleteBeans()).toMatchObject({ incomplete: 0, queued: 0 });
   });
 
   it('is safe to run twice in a row', async () => {
     await db.beans.add(bean({ id: 'a' }));
 
     await relookupIncompleteBeans();
-    expect(await relookupIncompleteBeans()).toEqual({ incomplete: 1, queued: 0 });
+    expect(await relookupIncompleteBeans()).toMatchObject({ incomplete: 1, queued: 0 });
     expect(await db.pendingAiTasks.count()).toBe(1);
   });
 });

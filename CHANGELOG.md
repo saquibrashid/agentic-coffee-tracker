@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Looking up missing details now tells you what it did.** Pressing “Look up
+  missing details” produced a queue that ran, deleted its own tasks and left no
+  trace, so the count above the button still said the same four coffees were
+  incomplete and nothing anywhere said why. Three separate paths in the queue
+  all ended in the same silent delete — filled, found nothing new, and gave up
+  permanently were indistinguishable — and the one status message lived in
+  component state, so navigating down to the queue and back destroyed even
+  that. Each lookup now records its outcome on the coffee itself, which
+  survives navigation and reload, and Settings reports the tally for the run
+  you started. A coffee whose product page could not be found is called out
+  separately from one whose lookup broke, because the queue will never retry
+  the former on its own and the fix is to edit the shortened name it was
+  imported with.
+
+- **The library shows which coffees are missing details.** Settings could say
+  four coffees were incomplete while the library gave no way to tell which
+  four: it badges coffees that need _review_, which is a different and only
+  partly overlapping set. Cards now carry a badge naming the gaps — “Missing
+  process and photo” — falling back to a count once the list would be wider
+  than the card, and there is a “Missing details only” filter. The Settings
+  count links straight to that filtered view.
+
 - **A hung CI job can no longer burn hours of runner time.** A run of the build
   and test job stalled for three and a half hours before GitHub's six-hour
   default killed it; the culprit was the Playwright browser install, which

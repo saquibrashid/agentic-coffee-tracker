@@ -7,6 +7,7 @@ import type { CoffeeBean, PendingAiTask } from '@/types';
 const mocks = vi.hoisted(() => ({
   autoEnrichBean: vi.fn(),
   isTerminalEnrichFailure: vi.fn(),
+  isNotFoundFailure: vi.fn(),
   extractBeanFromPhoto: vi.fn(),
   prepareStudioPhoto: vi.fn(),
   applyStudioPhoto: vi.fn(),
@@ -31,6 +32,7 @@ vi.mock('@/services/ai/pipeline', () => ({
 const {
   autoEnrichBean,
   isTerminalEnrichFailure,
+  isNotFoundFailure,
   extractBeanFromPhoto,
   prepareStudioPhoto,
   applyStudioPhoto,
@@ -209,6 +211,52 @@ describe('queue runner: web-enrich', () => {
     await runQueueNow();
 
     await expect(db.pendingAiTasks.count()).resolves.toBe(0);
+  });
+
+  /**
+   * #246: every one of these paths used to end in a silent delete, so a run
+   * that filled nothing was indistinguishable from a button that was never
+   * pressed. The outcome has to outlive the task.
+   */
+  it('records that a lookup filled the coffee in', async () => {
+    await db.beans.add(bean());
+    await db.pendingAiTasks.add(task());
+    autoEnrichBean.mockResolvedValue({ update: { process: 'washed' } });
+
+    await runQueueNow();
+
+    const stored = await db.beans.get('b1');
+    expect(stored?.lastLookupOutcome).toBe('filled');
+    expect(stored?.lastLookupAt).toBeDefined();
+  });
+
+  it('records that a lookup found nothing new', async () => {
+    await db.beans.add(bean());
+    await db.pendingAiTasks.add(task());
+    autoEnrichBean.mockResolvedValue(null);
+
+    await runQueueNow();
+
+    await expect(db.beans.get('b1')).resolves.toMatchObject({ lastLookupOutcome: 'nothing-new' });
+  });
+
+  it('separates "no product page" from a lookup that broke', async () => {
+    await db.beans.add(bean());
+    await db.pendingAiTasks.add(task());
+    autoEnrichBean.mockRejectedValue(new Error('no product page'));
+    isTerminalEnrichFailure.mockReturnValue(true);
+    isNotFoundFailure.mockReturnValue(true);
+
+    await runQueueNow();
+
+    await expect(db.beans.get('b1')).resolves.toMatchObject({ lastLookupOutcome: 'not-found' });
+
+    await db.pendingAiTasks.add(task());
+    isNotFoundFailure.mockReturnValue(false);
+
+    await runQueueNow();
+
+    await expect(db.beans.get('b1')).resolves.toMatchObject({ lastLookupOutcome: 'failed' });
   });
 
   it('caps how many lookups run in a single pass', async () => {

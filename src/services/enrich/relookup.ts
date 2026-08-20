@@ -2,6 +2,7 @@ import { ulid } from 'ulid';
 
 import { db } from '@/services/db';
 import { beanNeedsEnrichment } from './autoEnrich';
+import { LAST_RELOOKUP_QUEUED_KEY, markRelookupStarted } from './lookupOutcome';
 
 /**
  * Re-queues a web lookup for every coffee still missing details.
@@ -23,6 +24,8 @@ export interface RelookupResult {
   incomplete: number;
   /** Lookups actually queued — incomplete coffees minus those already queued. */
   queued: number;
+  /** When this run started. Scopes the outcome summary to what this press did. */
+  startedAt: string;
 }
 
 export async function relookupIncompleteBeans(): Promise<RelookupResult> {
@@ -47,5 +50,10 @@ export async function relookupIncompleteBeans(): Promise<RelookupResult> {
 
   if (tasks.length > 0) await db.pendingAiTasks.bulkAdd(tasks);
 
-  return { incomplete: incomplete.length, queued: tasks.length };
+  // Written before the queue drains so no outcome can land ahead of the marker
+  // and be excluded from the summary the user is about to read.
+  await markRelookupStarted(now);
+  await db.meta.put({ key: LAST_RELOOKUP_QUEUED_KEY, value: incomplete.length });
+
+  return { incomplete: incomplete.length, queued: tasks.length, startedAt: now };
 }
