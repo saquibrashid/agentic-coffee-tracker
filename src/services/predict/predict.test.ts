@@ -307,6 +307,121 @@ describe('predict', () => {
     expect(result.unknowns).not.toContain('dark');
   });
 
+  it('draws on related origins instead of throwing the history away', () => {
+    // #235: a candidate origin the user had never rated counted as no evidence
+    // at all, even with a shelf of coffees from next door.
+    const eastAfrica = history(10, 9, { origins: [{ country: 'Ethiopia' }] });
+    const index = buildIndex(eastAfrica.beans, eastAfrica.ratings);
+
+    const result = predict({ origins: [{ country: 'Kenya' }] }, index);
+    const origin = [...result.supporting, ...result.detracting].find((e) => e.kind === 'origin');
+
+    expect(origin?.label).toBe('East Africa');
+    expect(origin?.approximate).toBe(true);
+    expect(result.unknowns).not.toContain('Kenya');
+  });
+
+  it('draws on related tasting notes instead of demanding the same words', () => {
+    // The bag that prompted #235 said "green apple"; the history said "apple".
+    const apples = history(10, 9, { tastingNotes: ['apple', 'orchard fruit'] });
+    const index = buildIndex(apples.beans, apples.ratings);
+
+    const result = predict({ tastingNotes: ['green apple'] }, index);
+    const note = [...result.supporting, ...result.detracting].find((e) => e.kind === 'flavour');
+
+    expect(note?.label).toBe('Apple & pear');
+    expect(note?.approximate).toBe(true);
+  });
+
+  it('counts a family once however many notes land in it', () => {
+    // Three ways of saying "apple" is one piece of evidence, not three, and
+    // none of them is unrated once the family has answered.
+    const apples = history(10, 9, { tastingNotes: ['apple'] });
+    const index = buildIndex(apples.beans, apples.ratings);
+
+    const result = predict(
+      { tastingNotes: ['green apple', 'crisp apple', 'orchard fruit'] },
+      index,
+    );
+    const notes = [...result.supporting, ...result.detracting].filter((e) => e.kind === 'flavour');
+
+    expect(notes).toHaveLength(1);
+    expect(result.unknowns).toHaveLength(0);
+  });
+
+  it('prefers an exact note to its family', () => {
+    const exact = history(6, 2, { tastingNotes: ['blueberry'] });
+    const family = history(6, 10, { tastingNotes: ['raspberry'] });
+    const index = buildIndex(
+      [...exact.beans, ...family.beans],
+      [...exact.ratings, ...family.ratings],
+    );
+
+    const result = predict({ tastingNotes: ['blueberry'] }, index);
+    const note = [...result.supporting, ...result.detracting].find((e) => e.kind === 'flavour');
+
+    expect(note?.label).toBe('blueberry');
+    expect(note?.approximate).toBeUndefined();
+  });
+
+  it('treats processing method as a scale, like roast level', () => {
+    // #235: process is a closed set the app defines, so it needs no vocabulary
+    // table — but the values are ordinal, and matching them as bare strings
+    // threw that away. Someone who dislikes naturals tells you something about
+    // how they will feel about an anaerobic.
+    const naturals = history(8, 3, { process: 'natural' });
+    const washed = history(8, 9, { process: 'washed' });
+    const index = buildIndex(
+      [...naturals.beans, ...washed.beans],
+      [...naturals.ratings, ...washed.ratings],
+    );
+
+    const result = predict({ process: 'anaerobic' }, index);
+    const process = [...result.supporting, ...result.detracting].find((e) => e.kind === 'process');
+
+    expect(process?.label).toBe('natural');
+    expect(process?.approximate).toBe(true);
+    expect(result.score).toBeLessThan(index.baseline);
+  });
+
+  it('leaves wet-hulled off the process scale rather than guessing at it', () => {
+    // A heavy, earthy cup is not a point on a fruit-intensity axis. Reporting
+    // it as unrated is the honest answer.
+    const washed = history(8, 9, { process: 'washed' });
+    const index = buildIndex(washed.beans, washed.ratings);
+
+    const result = predict({ process: 'wet-hulled' }, index);
+
+    expect(result.unknowns).toContain('wet-hulled');
+    expect([...result.supporting, ...result.detracting].some((e) => e.kind === 'process')).toBe(
+      false,
+    );
+  });
+
+  it('recovers the confidence a vocabulary mismatch used to cost', () => {
+    // Confidence multiplies by how many attribute kinds were recognised, so
+    // every word the matcher failed on cost a fifth of it on top of the lost
+    // evidence. This is the 9%-confidence verdict from #235.
+    const { beans, ratings } = history(12, 8, {
+      origins: [{ country: 'Ethiopia' }],
+      process: 'natural',
+      tastingNotes: ['apple'],
+    });
+    const index = buildIndex(beans, ratings);
+
+    const result = predict(
+      {
+        origins: [{ country: 'Kenya' }],
+        process: 'anaerobic',
+        tastingNotes: ['green apple'],
+      },
+      index,
+    );
+
+    expect(result.unknowns).toHaveLength(0);
+    expect(result.confidence).toBeGreaterThan(0.25);
+  });
+
   it('is less confident about a coffee it barely recognises', () => {
     const { beans, ratings } = history(12, 8, {
       origins: [{ country: 'Ethiopia' }],
@@ -372,6 +487,48 @@ describe('explain', () => {
       }),
     ).toBe(
       'You have not rated this roast level, but the nearest you have — medium-dark — averages 6.0/10 across 4 ratings.',
+    );
+  });
+
+  it('does not claim the user has rated an origin, process or note they have not', () => {
+    // #235: family and neighbour matches are real evidence, but saying "coffees
+    // from East Africa average..." as if it were an exact hit would credit the
+    // user with a history they do not have.
+    expect(
+      explain({
+        kind: 'origin',
+        label: 'East Africa',
+        count: 9,
+        averageScore: 8.5,
+        delta: 1,
+        approximate: true,
+      }),
+    ).toBe(
+      'You have not rated this origin, but East Africa coffees average 8.5/10 across 9 ratings.',
+    );
+    expect(
+      explain({
+        kind: 'process',
+        label: 'natural',
+        count: 3,
+        averageScore: 7,
+        delta: 0.5,
+        approximate: true,
+      }),
+    ).toBe(
+      'You have not rated this process, but the nearest you have — natural — averages 7.0/10 across 3 ratings.',
+    );
+    expect(
+      explain({
+        kind: 'flavour',
+        label: 'Apple & pear',
+        count: 5,
+        averageScore: 9,
+        delta: 2,
+        approximate: true,
+      }),
+    ).toBe(
+      'You have not rated this note, but related ones — Apple & pear — average 9.0/10 across 5 ratings.',
     );
   });
 });
