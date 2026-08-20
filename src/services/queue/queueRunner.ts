@@ -9,7 +9,12 @@
 import { db } from '@/services/db';
 import { extractBeanFromPhoto, PipelineUnavailableError } from '@/services/ai/pipeline';
 import { parsedBeanToUpdate } from '@/services/ai/mapping';
-import { autoEnrichBean, isTerminalEnrichFailure } from '@/services/enrich/autoEnrich';
+import {
+  autoEnrichBean,
+  isNotFoundFailure,
+  isTerminalEnrichFailure,
+} from '@/services/enrich/autoEnrich';
+import { recordLookupOutcome } from '@/services/enrich/lookupOutcome';
 import {
   applyStudioPhoto,
   isTerminalStudioFailure,
@@ -139,6 +144,10 @@ async function processEnrichTask(task: PendingAiTask): Promise<void> {
     await db.beans.update(bean.id, result.update);
     await enqueueUpsert('bean', bean.id);
   }
+  // Recorded either way (#246). A lookup that found nothing used to be
+  // indistinguishable from one that never ran, which is why the Settings count
+  // appeared frozen after a run.
+  await recordLookupOutcome(bean.id, result ? 'filled' : 'nothing-new');
   await db.pendingAiTasks.delete(task.id);
 }
 
@@ -205,6 +214,12 @@ async function drain(): Promise<void> {
       // with, which is exactly the pre-enrichment state.
       if (task.type === 'web-enrich' && isTerminalEnrichFailure(err)) {
         console.warn('QueueRunner dropping unenrichable task', task.beanId, err);
+        // The user is owed the reason, since nothing will ever retry this on
+        // its own (#246). "No product page" is separated from a generic
+        // failure because only the former is worth editing the name over.
+        if (task.beanId) {
+          await recordLookupOutcome(task.beanId, isNotFoundFailure(err) ? 'not-found' : 'failed');
+        }
         await db.pendingAiTasks.delete(task.id);
         continue;
       }

@@ -5,7 +5,7 @@
  * unreachable. This route is the answer to "where did my coffee from March go?"
  */
 import { useCallback, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Coffee, Plus, SearchX, Trash2, X } from 'lucide-react';
 
@@ -17,6 +17,7 @@ import { EmptyState } from '@/components/ui/empty-state';
 import { RoastScale } from '@/components/ui/roast-scale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
+import { missingBadgeLabel } from '@/services/enrich/completeness';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
 import { BeanFilters } from './BeanFilters';
 import { BeanThumbnail } from './BeanThumbnail';
@@ -30,7 +31,16 @@ import {
 } from '@/services/beans/library';
 
 export function BeansLibraryPage() {
-  const [filters, setFilters] = useState<LibraryFilters>(DEFAULT_FILTERS);
+  // Settings links here as `/beans?incomplete=1`, so its "4 coffees are missing
+  // details" is a way to *see* those four rather than a number with nowhere to
+  // go (#246). Read once as the initial state rather than kept in sync with the
+  // URL: the user must be able to clear the filter without the link reapplying it.
+  const [searchParams] = useSearchParams();
+  const [filters, setFilters] = useState<LibraryFilters>(() =>
+    searchParams.get('incomplete') === '1'
+      ? { ...DEFAULT_FILTERS, incompleteOnly: true }
+      : DEFAULT_FILTERS,
+  );
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pendingSummary, setPendingSummary] = useState<DeletionSummary | null>(null);
@@ -254,6 +264,7 @@ function BeanRow({
   onToggle: (id: string) => void;
 }) {
   const { bean, ratingCount, averageScore } = summary;
+  const missingLabel = missingBadgeLabel(bean);
 
   const body = (
     <Card
@@ -287,9 +298,16 @@ function BeanRow({
             down a column of twenty cards, which is the only way they are ever
             actually read.
           */}
-          {(bean.needsReview || bean.isArchived) && (
+          {(bean.needsReview || bean.isArchived || missingLabel) && (
             <div className="mt-1.5 flex flex-wrap gap-1.5">
               {bean.needsReview && <Badge variant="secondary">Needs review</Badge>}
+              {/*
+                Settings could say "4 coffees are missing details" while the
+                library gave no way to tell which four (#246). The badge names
+                the gaps when there are one or two, because "missing photo" and
+                "missing origin" call for completely different actions.
+              */}
+              {missingLabel && <Badge variant="outline">{missingLabel}</Badge>}
               {bean.isArchived && <Badge variant="muted">Archived</Badge>}
             </div>
           )}

@@ -82,9 +82,38 @@ export interface CoffeeBean {
    */
   isSample?: boolean;
 
+  /**
+   * What the last web lookup for this coffee actually did.
+   *
+   * A lookup used to leave no trace: the queue deleted the task whether it
+   * filled fields, found nothing new, or gave up permanently, so "4 coffees are
+   * missing details" stayed at 4 after a run with nothing anywhere to say why
+   * (#246). Recording the outcome on the coffee is what makes the answer
+   * durable — it survives navigation, it survives a reload, and it is attached
+   * to the thing it is about rather than to a run the user has to remember.
+   */
+  lastLookupAt?: string;
+  lastLookupOutcome?: LookupOutcome;
+
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * `not-found` and `failed` are kept apart because they mean different things to
+ * the user: nothing on the roaster's store matched this coffee (usually an
+ * abbreviated imported name, which editing the name can fix), versus the lookup
+ * itself broke (which retrying can fix).
+ */
+export type LookupOutcome =
+  /** Filled at least one gap, or attached a photo. */
+  | 'filled'
+  /** Found the product page, but it carried nothing the coffee was missing. */
+  | 'nothing-new'
+  /** No product page matched. Retrying the same search will fail the same way. */
+  | 'not-found'
+  /** The lookup itself errored out. */
+  | 'failed';
 
 export interface BrewParams {
   doseGrams?: number;

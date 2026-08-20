@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +7,12 @@ import { Label } from '@/components/ui/label';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/services/db';
 import { beanNeedsEnrichment } from '@/services/enrich/autoEnrich';
+import {
+  LAST_RELOOKUP_KEY,
+  LAST_RELOOKUP_QUEUED_KEY,
+  describeTally,
+  tallyLookups,
+} from '@/services/enrich/lookupOutcome';
 import { exportCsv, exportJson, exportJsonWithPhotos } from '@/services/export/exporter';
 import { ImportPanel } from './ImportPanel';
 import { AccountPanel } from './AccountPanel';
@@ -138,30 +145,42 @@ export function SettingsPage() {
 }
 
 function RelookupPanel() {
-  const incomplete =
-    useLiveQuery(async () => {
-      const beans = await db.beans.toArray();
-      return beans.filter((bean) => !bean.isArchived && beanNeedsEnrichment(bean)).length;
-    }, []) ?? 0;
-  const [status, setStatus] = useState<string | null>(null);
+  const beans = useLiveQuery(async () => db.beans.toArray(), []);
+  const incomplete = (beans ?? []).filter(
+    (bean) => !bean.isArchived && beanNeedsEnrichment(bean),
+  ).length;
+
+  // Both halves of the report come from the database, not from component state,
+  // which is the whole point of #246: the old status line was `useState` and so
+  // was destroyed the moment the user navigated away to look at the queue.
+  const lastRun = useLiveQuery(async () => {
+    const [startedAt, queued] = await Promise.all([
+      db.meta.get(LAST_RELOOKUP_KEY),
+      db.meta.get(LAST_RELOOKUP_QUEUED_KEY),
+    ]);
+    return {
+      startedAt: typeof startedAt?.value === 'string' ? startedAt.value : null,
+      queued: typeof queued?.value === 'number' ? queued.value : 0,
+    };
+  }, []);
+
+  const report = describeTally(
+    tallyLookups(beans ?? [], lastRun?.startedAt ?? null, lastRun?.queued ?? 0),
+  );
+
+  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function handleRelookup() {
     setBusy(true);
-    setStatus(null);
+    setError(null);
     try {
       const { relookupIncompleteBeans } = await import('@/services/enrich/relookup');
-      const result = await relookupIncompleteBeans();
+      await relookupIncompleteBeans();
       const mod = await import('@/services/queue/queueRunner');
       await mod.runQueueNow();
-
-      setStatus(
-        result.queued === 0
-          ? 'Nothing new to look up — every incomplete coffee is already queued.'
-          : `Queued ${result.queued} ${result.queued === 1 ? 'lookup' : 'lookups'}. They run in the background, a few at a time.`,
-      );
     } catch (err) {
-      setStatus(err instanceof Error ? err.message : 'Could not queue the lookups.');
+      setError(err instanceof Error ? err.message : 'Could not queue the lookups.');
     } finally {
       setBusy(false);
     }
@@ -174,9 +193,17 @@ function RelookupPanel() {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-muted-foreground text-sm">
-          {incomplete === 0
-            ? 'Every coffee has its details filled in.'
-            : `${incomplete} ${incomplete === 1 ? 'coffee is' : 'coffees are'} missing a roast level, process, origin, tasting notes or photo. Searching the roaster's store again can fill them in.`}
+          {incomplete === 0 ? (
+            'Every coffee has its details filled in.'
+          ) : (
+            <>
+              <Link to="/beans?incomplete=1" className="underline underline-offset-2">
+                {incomplete} {incomplete === 1 ? 'coffee is' : 'coffees are'}
+              </Link>{' '}
+              missing a roast level, process, origin, tasting notes or photo. Searching the
+              roaster&rsquo;s store again can fill them in.
+            </>
+          )}
         </p>
         <p className="text-muted-foreground text-xs">
           Worth retrying if you imported coffees with shortened names — a lookup that found nothing
@@ -185,7 +212,12 @@ function RelookupPanel() {
         <Button disabled={busy || incomplete === 0} onClick={() => void handleRelookup()}>
           {busy ? 'Queueing…' : 'Look up missing details'}
         </Button>
-        {status && <p className="text-sm">{status}</p>}
+        {report && (
+          <p className="text-sm" role="status">
+            {report}
+          </p>
+        )}
+        {error && <p className="text-destructive text-sm">{error}</p>}
       </CardContent>
     </Card>
   );

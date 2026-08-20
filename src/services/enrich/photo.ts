@@ -55,9 +55,7 @@ export type PhotoDimensions = Pick<PhotoBlob, 'widthPx' | 'heightPx'>;
 export const UPGRADE_AREA_RATIO = 1.25;
 
 /** True when the coffee has no usable photo of its own yet. */
-export function beanNeedsPhoto(bean: Pick<CoffeeBean, 'photoId'>): boolean {
-  return !bean.photoId;
-}
+export { beanNeedsPhoto } from './completeness';
 
 function area(dim: PhotoDimensions): number {
   // Defensive: a record written by an older build, or a decode that reported

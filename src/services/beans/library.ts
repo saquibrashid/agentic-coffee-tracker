@@ -1,4 +1,5 @@
 import type { CoffeeBean, Process, RoastLevel } from '@/types';
+import { beanNeedsEnrichment } from '@/services/enrich/completeness';
 
 /**
  * Pure filter/sort/search logic for the bean library (specs/ui.md).
@@ -83,6 +84,17 @@ export interface LibraryFilters {
   /** Roasted within this many days, or null for no window. */
   roastedWithinDays: number | null;
   needsReviewOnly: boolean;
+  /**
+   * Coffees still missing a roast level, process, origin, tasting notes or
+   * photo — the same predicate Settings counts for "Fill in missing details".
+   *
+   * Distinct from `needsReviewOnly`, which is about a parse the user has not
+   * confirmed. A coffee can need review while being complete, and be incomplete
+   * while never having needed review, so one filter could not serve both. The
+   * Settings count linked nowhere before (#246): it said four coffees were
+   * incomplete and gave no way to find out which four.
+   */
+  incompleteOnly: boolean;
   includeArchived: boolean;
   sort: BeanSortKey;
 }
@@ -97,6 +109,7 @@ export const DEFAULT_FILTERS: LibraryFilters = {
   minRating: null,
   roastedWithinDays: null,
   needsReviewOnly: false,
+  incompleteOnly: false,
   includeArchived: false,
   sort: 'newest',
 };
@@ -125,6 +138,7 @@ export function countActiveFilters(filters: LibraryFilters): number {
   if (filters.minRating !== null) count += 1;
   if (filters.roastedWithinDays !== null) count += 1;
   if (filters.needsReviewOnly) count += 1;
+  if (filters.incompleteOnly) count += 1;
   if (filters.includeArchived !== DEFAULT_FILTERS.includeArchived) count += 1;
   return count;
 }
@@ -293,6 +307,7 @@ export function filterAndSortBeans(
   const filtered = summaries.filter(({ bean, averageScore }) => {
     if (!filters.includeArchived && bean.isArchived) return false;
     if (filters.needsReviewOnly && !bean.needsReview) return false;
+    if (filters.incompleteOnly && !beanNeedsEnrichment(bean)) return false;
     if (filters.roastLevel !== 'all' && (bean.roastLevel ?? 'unknown') !== filters.roastLevel) {
       return false;
     }

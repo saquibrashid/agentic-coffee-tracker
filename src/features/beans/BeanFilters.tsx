@@ -240,6 +240,11 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
               onChange={(e) => onChange('needsReviewOnly', e.target.checked)}
             />
             <CheckboxField
+              label="Missing details only"
+              checked={filters.incompleteOnly}
+              onChange={(e) => onChange('incompleteOnly', e.target.checked)}
+            />
+            <CheckboxField
               label="Include archived"
               checked={filters.includeArchived}
               onChange={(e) => onChange('includeArchived', e.target.checked)}
