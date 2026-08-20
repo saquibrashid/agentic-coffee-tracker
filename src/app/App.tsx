@@ -1,4 +1,11 @@
-import { createBrowserRouter, RouterProvider, Outlet, NavLink, Link } from 'react-router-dom';
+import {
+  createBrowserRouter,
+  RouterProvider,
+  Outlet,
+  NavLink,
+  Link,
+  useLocation,
+} from 'react-router-dom';
 import {
   Bean,
   Coffee,
@@ -37,6 +44,15 @@ function Shell() {
   const online = useOnlineStatus();
   const sync = useSyncStatus();
   const syncNotice = syncMessage(sync);
+  const { pathname } = useLocation();
+
+  // Which screens the user has actually opened. This is what lets an onboarding
+  // hint stop pointing at a feature the user already found on their own,
+  // instead of only when they take the hint's own button (#241). Recorded here
+  // rather than per page so no route can quietly opt out of it.
+  useEffect(() => {
+    void import('@/services/onboarding/store').then((m) => m.markVisited(pathname));
+  }, [pathname]);
 
   // Start the background queue runner for pending AI tasks
   useEffect(() => {
