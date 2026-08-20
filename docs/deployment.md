@@ -328,6 +328,31 @@ gh variable set SYNC_RECORD_QUOTA --body "50000"
 
 A value the API cannot parse as a positive integer falls back to 20,000 rather than failing the deploy, so a typo cannot lock you out of your own data. Raising the ceiling takes effect on the next deploy; it is read per request, not cached.
 
+## In-app feedback
+
+Settings → Send feedback posts to `/api/feedback`, which files what the user wrote as a GitHub issue labelled `feedback` + `needs-triage`. Triage is then "read a labelled issue", on the surface the backlog already lives on — there is no second queue to build, and none to forget.
+
+**It is off until you configure it,** and says so: an unconfigured deployment answers 503 and the app points the user at the issue tracker instead. Accepting a message and dropping it is the one behaviour a feedback channel must never have, so there is no mock mode here.
+
+Two settings, both required:
+
+| Setting                 | Kind                | Value                                              |
+| ----------------------- | ------------------- | -------------------------------------------------- |
+| `GITHUB_FEEDBACK_REPO`  | Repository variable | `owner/name` of the repository to file into        |
+| `GITHUB_FEEDBACK_TOKEN` | Repository secret   | A token that may create issues on that repo — only |
+
+```bash
+gh variable set GITHUB_FEEDBACK_REPO --body "saquibrashid/agentic-coffee-tracker"
+gh secret set GITHUB_FEEDBACK_TOKEN
+gh workflow run deploy.yml --ref main
+```
+
+Use a fine-grained personal access token scoped to the single repository, with **Issues: read and write** and nothing else. It is used on behalf of anonymous callers, so treat its blast radius as "whatever an anonymous caller could do with it": with that scope, the worst case is unwanted issues on one repository, which is recoverable. The token is written to Key Vault and referenced by URI, never stored on the Function App directly.
+
+`/api/health` reports `services.feedback` as `live` or `disabled`, so you can tell which state a deployment is in without submitting anything.
+
+The endpoint is rate limited to 5 submissions with one refilling every five minutes per caller, and messages are capped at 4,000 characters. Requiring sign-in was considered as anti-abuse and rejected: it would exclude exactly the signed-out users whose experience is most worth hearing about. See `SECURITY.md` → Feedback for what is and is not attached to a report.
+
 ## Monitoring
 
 Application Insights is wired to the Function App via `APPLICATIONINSIGHTS_CONNECTION_STRING`; the Functions host emits requests, dependencies, traces, and exceptions with no code changes.

@@ -32,6 +32,7 @@ export interface HealthResponse {
     recommend: 'live' | 'mock';
     studioPhoto: 'live' | 'mock';
     sync: 'live' | 'disabled';
+    feedback: 'live' | 'disabled';
   };
 }
 
@@ -63,6 +64,9 @@ app.http('health', {
           'PHOTO_STORAGE_ACCOUNT',
           'PHOTO_CONTAINER',
         ),
+        // 'disabled' rather than 'mock' for the same reason as sync: there is
+        // no honest mock for "your words reached somebody".
+        feedback: syncModeOf('GITHUB_FEEDBACK_TOKEN', 'GITHUB_FEEDBACK_REPO'),
       },
     };
     ctx.log('health probe', body.services);

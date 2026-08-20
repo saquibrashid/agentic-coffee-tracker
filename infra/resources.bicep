@@ -20,6 +20,13 @@ param imageKey string
 param imageDeployment string
 param scrapeAllowlist string
 
+@description('Repository that in-app feedback is filed into, as "owner/name". Empty leaves /api/feedback reporting itself as disabled rather than silently swallowing what people write.')
+param feedbackRepo string = ''
+
+@secure()
+@description('A GitHub token with issue-creation permission on feedbackRepo, and nothing else. Empty disables the feedback endpoint.')
+param feedbackToken string = ''
+
 @allowed(['owner', 'allowlist', 'open'])
 @description('Who may use sync. "owner"/"allowlist" admit only the accounts in syncAllowlist; "open" admits any signed-in account. Defaults to closed.')
 param syncAccessMode string = 'owner'
@@ -136,6 +143,12 @@ var effectiveImageKey = provisionImageAccount ? (imageAccount.?outputs.key ?? ''
 // Derived from parameters, not from `effectiveImageEndpoint`: this gates
 // resource creation, so it has to be computable before the deployment starts.
 var imageConfigured = (provisionImageAccount || !empty(imageEndpoint)) && !empty(effectiveImageDeployment)
+
+// Both halves or neither. A token without a repository has nowhere to file,
+// and a repository without a token cannot be written to, so treating either on
+// its own as "configured" would produce an endpoint that accepts a person's
+// words and then loses them.
+var feedbackConfigured = !empty(feedbackToken) && !empty(feedbackRepo)
 
 // The BFF still falls back to deterministic mocks when a key is absent, which is
 // what local development runs on. In Azure the credentials are always present,
@@ -326,6 +339,16 @@ resource openAiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   parent: keyVault
   name: 'azure-openai-key'
   properties: { value: effectiveOpenAiKey }
+}
+
+// Same conditional shape as the image key, and for the same reason: an empty
+// secret would leave the Function App holding a Key Vault reference that
+// resolves to nothing, which /api/feedback would read as "configured" and then
+// fail on every submission instead of reporting itself disabled.
+resource feedbackTokenSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (feedbackConfigured) {
+  parent: keyVault
+  name: 'github-feedback-token'
+  properties: { value: feedbackToken }
 }
 
 // Only when there is an image resource to hold a key for. Writing an empty
@@ -594,6 +617,19 @@ var imageSettings = imageConfigured
     ]
   : []
 
+var feedbackSettings = feedbackConfigured
+  ? [
+      {
+        name: 'GITHUB_FEEDBACK_REPO'
+        value: feedbackRepo
+      }
+      {
+        name: 'GITHUB_FEEDBACK_TOKEN'
+        value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/github-feedback-token/)'
+      }
+    ]
+  : []
+
 // Every value here is a deterministic string, never a property of the
 // conditional resources above. Referencing `cosmos.properties.documentEndpoint`
 // from a context that also evaluates when useLinkedBackend is false is
@@ -720,7 +756,8 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
         visionSettings,
         openAiSettings,
         imageSettings,
-        syncSettings
+        syncSettings,
+        feedbackSettings
       )
     }
   }
@@ -734,6 +771,9 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
     visionKeySecret
     openAiKeySecret
     openAiModelDeployment
+    // Conditional, so this is a no-op when feedback is unconfigured; when it is
+    // configured the setting is a Key Vault URI and hits the same lag as above.
+    feedbackTokenSecret
     // The sync settings above name these by string, so ARM infers no
     // dependency. Without these the app can boot pointing at a Cosmos account
     // or container that does not exist yet.

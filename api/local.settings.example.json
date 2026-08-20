@@ -13,6 +13,8 @@
     "AZURE_IMAGE_KEY": "",
     "AZURE_IMAGE_DEPLOYMENT": "",
     "SCRAPE_ALLOWLIST": "",
+    "GITHUB_FEEDBACK_REPO": "",
+    "GITHUB_FEEDBACK_TOKEN": "",
     "ALLOWED_ORIGINS": "http://localhost:5173"
   },
   "Host": {

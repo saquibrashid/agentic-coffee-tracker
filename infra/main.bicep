@@ -42,6 +42,13 @@ param imageModelName string = ''
 @description('Optional. Comma-separated hosts the /api/scrape endpoint may fetch. Empty (the default) allows any publicly routable host, which is what lets enrichment read arbitrary roaster storefronts; the endpoint still refuses private, loopback, and link-local addresses on every redirect hop. Set this to pin the deployment to a fixed set of stores.')
 param scrapeAllowlist string = ''
 
+@description('Optional. Repository that in-app feedback is filed into, as "owner/name". Empty (the default) leaves /api/feedback reporting itself disabled, and the app tells people to open an issue themselves rather than accepting words it would then lose.')
+param feedbackRepo string = ''
+
+@secure()
+@description('Optional. A GitHub token with permission to create issues on feedbackRepo and nothing else. Empty (the default) disables the feedback endpoint. Scope it to that one repository: it files publicly visible issues on behalf of anonymous callers.')
+param feedbackToken string = ''
+
 @allowed(['owner', 'allowlist', 'open'])
 @description('Who may use sync once signed in. "owner" and "allowlist" admit only the accounts named in syncAllowlist; "open" admits any signed-in Microsoft account. Defaults to closed, because authentication alone is not a restriction — Microsoft accounts are free and unlimited.')
 param syncAccessMode string = 'owner'
@@ -94,6 +101,8 @@ module resources 'resources.bicep' = {
     imageDeployment: imageDeployment
     imageModelName: imageModelName
     scrapeAllowlist: scrapeAllowlist
+    feedbackRepo: feedbackRepo
+    feedbackToken: feedbackToken
     syncAccessMode: syncAccessMode
     syncAllowlist: syncAllowlist
     syncRecordQuota: syncRecordQuota
