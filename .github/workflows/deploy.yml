@@ -19,6 +19,12 @@ jobs:
     name: azd up (dev)
     runs-on: ubuntu-latest
     environment: dev
+    # More urgent here than in CI: `cancel-in-progress: false` above means runs
+    # queue behind each other, so one hung deploy holds up every later one for
+    # as long as it lasts — six hours, by default (#240). Deploys take three to
+    # four minutes; 30 leaves room for a slow ARM rollout without letting a hang
+    # block the pipeline for an afternoon.
+    timeout-minutes: 30
     env:
       AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
       AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
