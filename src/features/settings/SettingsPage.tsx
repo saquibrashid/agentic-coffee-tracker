@@ -18,6 +18,7 @@ import { ImportPanel } from './ImportPanel';
 import { AccountPanel } from './AccountPanel';
 import { AppearancePanel } from './AppearancePanel';
 import { SampleDataPanel } from './SampleDataPanel';
+import { WalkthroughPanel } from '@/features/onboarding/WalkthroughPanel';
 import { SyncPanel } from './SyncPanel';
 import {
   RESET_CONFIRMATION_PHRASE,
@@ -94,6 +95,8 @@ export function SettingsPage() {
       <ImportPanel />
 
       <SampleDataPanel />
+
+      <WalkthroughPanel />
 
       <RelookupPanel />
 

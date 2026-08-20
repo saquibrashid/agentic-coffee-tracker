@@ -405,6 +405,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Onboarding is now a set of hints that arrive when they are true, plus a
+  walkthrough you can replay.** A first-launch tour was the obvious shape and
+  the wrong one: it fires when the user has no data, so every feature has to be
+  explained in the abstract against empty screens, it arrives before the user
+  has any question it could answer, and dismissing it is usually permanent.
+  Home instead shows at most one hint, gated on what the data says the user
+  needs next — a countdown to the three ratings that switch recommendations on,
+  then “For you” and “Check” once they will actually work, then assisted
+  capture for someone who has only ever typed. Each stops being true once the
+  user is past it, so a returning account with real history sees none of it
+  without ever having dismissed anything, which is also what keeps a second
+  device quiet: the conditions read synced data rather than a per-device “shown
+  already” flag. The countdown deliberately does not repeat the hero’s “add a
+  rating” — it adds the number the hero omits. Settings carries the same
+  explanation as a permanent walkthrough with a “Show hints again” button, so a
+  hurried dismissal is recoverable. Closes #241.
+
 - **The predicted score is now drawn on the scale it lives on, with your own
   average marked on it.** A bare "7.3/10" reads as mediocre, which is why it
   could sit under a green "Probably yes" and look like the app arguing with

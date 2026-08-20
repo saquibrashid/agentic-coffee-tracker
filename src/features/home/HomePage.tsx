@@ -21,6 +21,7 @@ import { RoastScale } from '@/components/ui/roast-scale';
 import { Skeleton } from '@/components/ui/skeleton';
 import { BeanThumbnail } from '@/features/beans/BeanThumbnail';
 import { usePhotoObjectUrl } from '@/features/beans/usePhotoObjectUrl';
+import { OnboardingHint } from '@/features/onboarding/OnboardingHint';
 import { SampleDataNotice } from '@/features/sample/SampleDataNotice';
 
 interface BeanHighlight {
@@ -195,6 +196,8 @@ export function HomePage() {
       </section>
 
       <SampleDataNotice />
+
+      <OnboardingHint />
 
       <section aria-labelledby="quick-actions">
         <div className="mb-3 flex items-end justify-between gap-3">
