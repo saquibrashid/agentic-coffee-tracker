@@ -67,6 +67,22 @@ Syncing derived data would create a second source of truth that can disagree wit
 - `userId` = `clientPrincipal.userId`, a stable per-provider subject identifier. It is the Cosmos partition key.
 - A successful sign-in records `auth.lastUserId` in Dexie. A later empty `/.auth/me` response means `session-expired` only while that marker exists. Deliberate sign-out clears it and sets `auth.signedOut` before redirecting, so a stale auth response from another tab cannot restore it; starting sign-in clears that intent flag.
 
+### Signing out does not end the Microsoft session
+
+`/.auth/logout` clears the Static Web Apps cookie and nothing else. The session at `login.microsoftonline.com` survives it, so the next sign-in completes silently against the same account and the user is never asked which one to use. Someone who signed in with the wrong account — a work account instead of a personal one, say — cannot get out of it from inside the app.
+
+This cannot be fixed at sign-in with the pre-configured provider. Measured against the live deployment:
+
+- `/.auth/login/aad?prompt=select_account` **drops the `prompt`**. The request is handed to a shared identity host (`identity.7.azurestaticapps.net`) and arrives at Entra's `authorize` endpoint with no `prompt` parameter, under Microsoft's own multi-tenant client id rather than one this deployment controls.
+- `post_logout_redirect_uri` pointing anywhere off-origin is dropped the same way, so the platform cannot hand sign-out over to Microsoft on our behalf.
+- SWA's own logout chain does not visit Entra's logout endpoint at all — it passes back through `authorize`.
+
+So the app sends the browser to Entra's logout endpoint itself, which takes two page loads: `/.auth/logout` must run on this origin to drop the app cookie, then `https://login.microsoftonline.com/common/oauth2/v2.0/logout` on Microsoft's. A marker in the return URL carries the intent between them (`services/auth/switchAccount.ts`), and the user confirms the second leg rather than being redirected off-origin automatically — Entra will not return them here afterwards, and saying so beforehand is the difference between a hand-off and a hijack.
+
+No `post_logout_redirect_uri` is sent to Entra: it only honours one registered on the app registration, and that registration belongs to Microsoft's shared Static Web Apps client, not to this deployment.
+
+**Why not a custom Entra app registration**, which would allow `prompt=select_account` on every sign-in: it requires a client secret, and Decisions § 2 already rejected a provider for exactly that reason — a secret expiring on a timer is a recurring manual rotation that fails closed silently, long after anyone remembers why. The same objection applies here, and the account-switching problem does not justify reintroducing it.
+
 ### Security constraint (blocking)
 
 `x-ms-client-principal` is trustworthy **only** when the Functions app is reachable exclusively through the SWA linked backend. This repo also supports a Free-tier topology where the client calls the Function App URL directly (`VITE_API_BASE_URL`, `architecture.md` → Secrets & Configuration). In that topology the header is attacker-controlled and would grant access to any user's data.
@@ -469,6 +485,7 @@ Signed out:
 Signed in:
 
 - Account identity and **Sign out** (local data is retained on sign-out; state returns to `disabled`)
+- **Sign out and switch account** — as above, then continues to Microsoft's sign-out so the next sign-in offers an account picker. See Identity → Signing out does not end the Microsoft session.
 - Status line: `Synced 2 minutes ago` / `3 changes pending` / `Offline — will sync when reconnected` / `Sign-in expired`
 - **Sync now**
 - Storage: records synced, photo bytes used against quota

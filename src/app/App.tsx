@@ -22,6 +22,7 @@ import { HomePage } from '@/features/home/HomePage';
 import { useSyncStatus } from '@/services/sync/useSyncStatus';
 import { cn } from '@/lib/utils';
 import { HeaderAccountControl, ReauthenticateButton } from './AccountControl';
+import { SwitchAccountPrompt } from './SwitchAccountPrompt';
 import { syncMessage } from './syncNotice';
 
 function useOnlineStatus(): boolean {
@@ -85,6 +86,7 @@ function Shell() {
     // The dynamic viewport unit is what mobile browsers want here: it tracks the
     // address bar collapsing, where `100vh` would sit permanently underneath it.
     <div className="flex min-h-dvh flex-col">
+      <SwitchAccountPrompt />
       <header className="bg-background/95 sticky top-0 z-30 border-b backdrop-blur-sm">
         <div className="relative container flex h-16 items-center gap-2 overflow-visible sm:gap-3">
           <div className="bg-primary/10 text-primary relative flex size-10 shrink-0 items-center justify-center rounded-xl border">

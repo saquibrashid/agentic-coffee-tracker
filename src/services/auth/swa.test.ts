@@ -141,6 +141,21 @@ describe('SwaAuthProvider.login', () => {
     );
   });
 
+  // The Microsoft half cannot happen in this navigation: the app cookie is
+  // dropped by an endpoint on this origin and the Entra session by one on
+  // Microsoft's. This leg only has to come back carrying the marker.
+  it('tags the return path when signing out everywhere, and still goes through SWA first', async () => {
+    await new SwaAuthProvider().logout('everywhere');
+    expect(assign).toHaveBeenCalledWith(
+      '/.auth/logout?post_logout_redirect_uri=%2Fsettings%3Ftab%3Daccount%26switchAccount%3D1',
+    );
+  });
+
+  it('does not send the browser straight to Microsoft, which would leave the app cookie behind', async () => {
+    await new SwaAuthProvider().logout('everywhere');
+    expect(assign.mock.calls[0]?.[0]).not.toContain('login.microsoftonline.com');
+  });
+
   it('configures Microsoft and nothing else', () => {
     // specs/sync.md → Decisions § 2: Apple was dropped rather than deferred.
     expect(CONFIGURED_PROVIDERS).toEqual(['aad']);

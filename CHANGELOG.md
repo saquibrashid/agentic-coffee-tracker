@@ -34,6 +34,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now recognises a photo that has not finished arriving, shows the preview
   until it does, and swaps in the full picture once the bytes land.
 
+- **You can change which Microsoft account the app uses.** Signing out and back
+  in always returned to the same account with no chance to pick another, which
+  left anyone who signed in with the wrong one — a work account instead of a
+  personal one — stuck with it. `/.auth/logout` only clears this app's cookie;
+  the Microsoft session outlives it and the next sign-in completes silently
+  against it. There is no fix available at sign-in: measured against the live
+  deployment, `/.auth/login/aad?prompt=select_account` has the `prompt` stripped
+  before the request reaches Entra, because the pre-configured provider runs
+  under Microsoft's own client id rather than one this deployment controls. The
+  account menu now offers **Sign out and switch account**, which continues to
+  Microsoft's sign-out endpoint so the next sign-in has no session to reuse.
+  Because Entra will not return you here afterwards — it only redirects to a URL
+  registered on its app registration, which is Microsoft's and not ours — the
+  app says so before handing over rather than dropping you on a Microsoft page
+  unannounced. Plain **Sign out** is unchanged for the ordinary case, and
+  neither one touches the coffees stored on the device.
+
 - **Looking up missing details now tells you what it did.** Pressing “Look up
   missing details” produced a queue that ran, deleted its own tasks and left no
   trace, so the count above the button still said the same four coffees were
