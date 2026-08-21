@@ -121,7 +121,11 @@ var effectiveVisionKey = empty(visionKey) ? vision.listKeys().key1 : visionKey
 // below to this same name.
 var provisionedOpenAiEndpoint = 'https://${abbrev.openAi}.openai.azure.com/'
 var effectiveOpenAiEndpoint = empty(openAiEndpoint) ? provisionedOpenAiEndpoint : openAiEndpoint
-var effectiveOpenAiKey = empty(openAiKey) ? openAi.listKeys().key1 : openAiKey
+// Only a bring-your-own account needs a key. The provisioned account is
+// reached with the Function App's managed identity (role assignment below), so
+// there is no key to store, reference, or rotate — `listKeys()` is not called
+// for it at all.
+var openAiUsesKey = !empty(openAiKey)
 var effectiveOpenAiDeployment = empty(openAiDeployment) ? openAiModelName : openAiDeployment
 
 // Three states, not two. An operator can point at an image resource they
@@ -335,10 +339,10 @@ resource visionKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
   properties: { value: effectiveVisionKey }
 }
 
-resource openAiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+resource openAiKeySecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = if (openAiUsesKey) {
   parent: keyVault
   name: 'azure-openai-key'
-  properties: { value: effectiveOpenAiKey }
+  properties: { value: openAiKey }
 }
 
 // Same conditional shape as the image key, and for the same reason: an empty
@@ -582,20 +586,29 @@ var visionSettings = [
   }
 ]
 
-var openAiSettings = [
-  {
-    name: 'AZURE_OPENAI_ENDPOINT'
-    value: effectiveOpenAiEndpoint
-  }
-  {
-    name: 'AZURE_OPENAI_KEY'
-    value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/azure-openai-key/)'
-  }
-  {
-    name: 'AZURE_OPENAI_DEPLOYMENT'
-    value: effectiveOpenAiDeployment
-  }
-]
+// The key setting is present only for a bring-your-own account. Its absence is
+// what selects managed identity in the BFF (see api/src/lib/openaiAuth.ts), so
+// this list is the whole switch — there is no second setting to disagree with.
+var openAiSettings = concat(
+  [
+    {
+      name: 'AZURE_OPENAI_ENDPOINT'
+      value: effectiveOpenAiEndpoint
+    }
+    {
+      name: 'AZURE_OPENAI_DEPLOYMENT'
+      value: effectiveOpenAiDeployment
+    }
+  ],
+  openAiUsesKey
+    ? [
+        {
+          name: 'AZURE_OPENAI_KEY'
+          value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/azure-openai-key/)'
+        }
+      ]
+    : []
+)
 
 // Omitted entirely rather than set empty when no image model is available.
 // `/api/studio-photo` decides between live and mock on whether these are
@@ -765,6 +778,11 @@ resource functionApp 'Microsoft.Web/sites@2023-12-01' = {
     deploymentContainer
     storageBlobDataOwner
     keyVaultSecretsUser
+    // Without this the app can start, call Azure OpenAI, get a 401, and report
+    // itself healthy-but-mock until something forces a restart. Unlike a missing
+    // secret this failure is invisible in configuration — the setting that would
+    // have been wrong no longer exists.
+    openAiUser
     // The app settings resolve these by Key Vault URI at startup. Without an
     // explicit dependency the secrets can lag the app, which resolves to an
     // empty value and silently drops the BFF into mock mode.
@@ -863,8 +881,27 @@ resource photoBlobDataContributor 'Microsoft.Authorization/roleAssignments@2022-
   }
 }
 
-// A user-assigned identity breaks the circular dependency between the site (which
-// needs its role assignments to exist first) and the role assignments (which need
+// Cognitive Services OpenAI User — data-plane access to the model deployments,
+// which is what replaces the account key. Read-only over the data plane: it can
+// call the deployments but cannot create, change, or delete them, and notably
+// cannot read the account keys either, so a compromise of the identity does not
+// hand over a credential that outlives it.
+//
+// Scoped to the account rather than the resource group, so it grants nothing
+// over the separate vision and image accounts.
+var openAiUserRoleId = '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd'
+
+resource openAiUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  scope: openAi
+  name: guid(openAi.id, abbrev.functionApp, openAiUserRoleId)
+  properties: {
+    principalId: functionAppIdentity.properties.principalId
+    principalType: 'ServicePrincipal'
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', openAiUserRoleId)
+  }
+}
+
+// A user-assigned identity breaks the circular dependency between the site (which// needs its role assignments to exist first) and the role assignments (which need
 // the site's principal id).
 resource functionAppIdentity 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: 'id-${resourceToken}'
