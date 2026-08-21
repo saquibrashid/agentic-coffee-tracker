@@ -55,7 +55,6 @@ Generate React components for:
 - Bean Detail
 - Ratings List
 - Analytics
-- Monthly Summary
 - Settings
 
 ### 5. Storage Layer

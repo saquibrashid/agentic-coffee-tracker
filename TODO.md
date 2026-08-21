@@ -11,7 +11,6 @@ High-level roadmap for Coffee Bean Tracker. Detailed work items live in [GitHub 
 - BFF endpoints with mock fallback and real Azure wiring (Vision / OpenAI / Bing)
 - Ratings CRUD on Bean Detail
 - Analytics (top roasters/flavors, score histogram) — Recharts
-- Monthly summary (narrative + highlights, persisted)
 - Export (CSV / JSON / JSON+photos)
 - Settings: pending operations UI (retry / cancel / run-now)
 - CI: lint, typecheck, build, Vitest, Playwright (chromium + webkit), axe a11y sweep, Bicep lint, Lighthouse budgets

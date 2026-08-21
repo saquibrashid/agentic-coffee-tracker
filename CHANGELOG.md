@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **The Monthly summary screen is gone.** It reported all-time figures under
+  the words “this month”: `generateMonthlySummary` called `computeAnalytics()`
+  with no argument, which defaults to the `all` range, so only the storage key
+  was ever monthly — regenerating in a new month produced identical numbers
+  filed under a new date. Everything it did show, Analytics and For you already
+  show correctly and in more detail, Analytics with a real 30-day range. The
+  three things `specs/ui.md` actually asked of it — top beans, flavour trends,
+  new insights — were never built. It was early scaffolding nothing came back
+  to, and it was spending one of only seven bottom-nav slots to be wrong. The
+  nav is now six items and correspondingly roomier.
+
 ### Fixed
 
 - **Looking up missing details now tells you what it did.** Pressing “Look up

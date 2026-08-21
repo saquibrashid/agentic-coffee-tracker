@@ -55,10 +55,10 @@ describe('collectDiagnostics', () => {
   });
 
   it('previews the same values it sends, so the disclosure cannot lie', () => {
-    const diagnostics = collectDiagnostics('/summary');
+    const diagnostics = collectDiagnostics('/analytics');
     const rows = diagnosticRows(diagnostics);
     expect(rows).toHaveLength(Object.keys(diagnostics).length);
-    expect(rows.map(([, value]) => value)).toContain('/summary');
+    expect(rows.map(([, value]) => value)).toContain('/analytics');
     expect(rows.find(([label]) => label === 'Signed in')?.[1]).toBe(
       diagnostics.signedIn ? 'yes' : 'no',
     );

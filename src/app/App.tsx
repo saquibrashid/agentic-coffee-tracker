@@ -12,7 +12,6 @@ import {
   Home,
   Plus,
   BarChart3,
-  Calendar,
   Sparkles,
   ScanSearch,
   Settings as SettingsIcon,
@@ -160,7 +159,7 @@ function Shell() {
         // screen is the home indicator, and the nav labels would sit under it.
         className="bg-background/95 sticky bottom-0 z-30 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur-sm"
       >
-        <ul className="container grid grid-cols-7">
+        <ul className="container grid grid-cols-6">
           <NavItem to="/" icon={<Home />} label="Home" />
           <NavItem to="/add" icon={<Plus />} label="Add" />
           {/* The library is the app's central noun -- every other tab is a view
@@ -174,7 +173,6 @@ function Shell() {
           <NavItem to="/predict" icon={<ScanSearch />} label="Check" />
           <NavItem to="/for-you" icon={<Sparkles />} label="For you" />
           <NavItem to="/analytics" icon={<BarChart3 />} label="Analytics" />
-          <NavItem to="/summary" icon={<Calendar />} label="Summary" />
         </ul>
       </nav>
     </div>
@@ -246,12 +244,6 @@ const router = createBrowserRouter([
         path: 'predict',
         lazy: async () => ({
           Component: (await import('@/features/predict/PredictPage')).PredictPage,
-        }),
-      },
-      {
-        path: 'summary',
-        lazy: async () => ({
-          Component: (await import('@/features/summary/SummaryPage')).SummaryPage,
         }),
       },
       {
