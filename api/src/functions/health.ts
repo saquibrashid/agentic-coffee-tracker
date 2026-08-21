@@ -21,6 +21,26 @@ function syncModeOf(...vars: string[]): 'live' | 'disabled' {
   return vars.every((name) => Boolean(process.env[name])) ? 'live' : 'disabled';
 }
 
+/**
+ * Azure OpenAI is live whether it authenticates with a key or with the Function
+ * App's managed identity, so the key cannot be part of the test.
+ *
+ * This is the trap the migration in `specs/agentic-backend.md` §9 sets: the more
+ * secure configuration has *fewer* settings, so a naive `modeOf(...)` over the
+ * key would read the improvement as an outage and report every model-backed
+ * endpoint as mock while they all worked perfectly.
+ */
+function openAiModeOf(): 'live' | 'mock' {
+  return modeOf('AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_DEPLOYMENT');
+}
+
+/** Which credential the model calls will present. Reported so a deploy that */
+/** silently fell back to a key is visible without reading app settings. */
+function openAiAuthOf(): 'identity' | 'key' | 'none' {
+  if (openAiModeOf() === 'mock') return 'none';
+  return process.env['AZURE_OPENAI_KEY'] ? 'key' : 'identity';
+}
+
 export interface HealthResponse {
   status: 'ok';
   version: string;
@@ -34,6 +54,9 @@ export interface HealthResponse {
     sync: 'live' | 'disabled';
     feedback: 'live' | 'disabled';
   };
+  auth: {
+    openAi: 'identity' | 'key' | 'none';
+  };
 }
 
 app.http('health', {
@@ -41,7 +64,7 @@ app.http('health', {
   authLevel: 'anonymous',
   route: 'health',
   handler: (_req, ctx: InvocationContext): HttpResponseInit => {
-    const openAi = modeOf('AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_KEY', 'AZURE_OPENAI_DEPLOYMENT');
+    const openAi = openAiModeOf();
     const body: HealthResponse = {
       status: 'ok',
       version: process.env['APP_VERSION'] ?? '0.1.0',
@@ -68,6 +91,7 @@ app.http('health', {
         // no honest mock for "your words reached somebody".
         feedback: syncModeOf('GITHUB_FEEDBACK_TOKEN', 'GITHUB_FEEDBACK_REPO'),
       },
+      auth: { openAi: openAiAuthOf() },
     };
     ctx.log('health probe', body.services);
     return json(200, body);

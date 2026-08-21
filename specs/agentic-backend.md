@@ -296,9 +296,34 @@ extra turns cheap. Neither is true today.
 - Should the agentic path be allowed to run offline-queued, or is it
   interactive-only? An unbounded loop behind the offline queue runner is a
   different risk profile.
-- Entra ID with RBAC is the recommended auth; the BFF uses Key Vault API keys
+- ~~Entra ID with RBAC is the recommended auth; the BFF uses Key Vault API keys
   today. The Function App already has a user-assigned managed identity, so the
-  plumbing exists — is this worth doing independently of any agent work?
+  plumbing exists — is this worth doing independently of any agent work?~~
+  **Answered: yes, and done.** It was worth doing on its own merits rather than
+  as agent groundwork. The provisioned Azure OpenAI account is now reached with
+  the Function App's user-assigned identity holding **Cognitive Services OpenAI
+  User** scoped to the account; no key is created, stored in Key Vault, or
+  injected as an app setting, and `listKeys()` is no longer called for it.
+
+  Three things worth recording for anyone doing the same to the vision or image
+  accounts:
+
+  - **Presence, not a flag, selects the credential.** `AZURE_OPENAI_KEY` unset
+    means identity; set means `api-key`. A separate toggle could disagree with
+    what is actually configured, and the failure would look like an outage.
+  - **The health endpoint had to change with it**, or the migration would have
+    reported itself as a regression: it tested for the key, so removing the key
+    would have made `parse`, `search` and `recommend` all read `mock` while they
+    worked. It now reports `auth.openAi` instead, which is also what makes the
+    change verifiable after a deploy.
+  - **Bring-your-own still needs keys.** This deployment cannot grant itself a
+    role on an account it does not own, so the key path stays supported rather
+    than being removed.
+
+  Follow-up not taken: `disableLocalAuth: true` on the account would make the
+  keys stop working entirely rather than merely stop being used. Deliberately
+  left for a separate change, because doing it in the same deploy removes the
+  rollback path — reverting the app to key auth would find the keys disabled.
 
 ---
 

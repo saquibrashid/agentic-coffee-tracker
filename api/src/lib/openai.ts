@@ -9,25 +9,41 @@
  * Image generation does *not* live here: it runs on a MAI model on a separate
  * resource with its own host and route — see `imageModel.ts`.
  *
- * Auth is the `api-key` header. The keys are injected as Key Vault references,
- * so they never sit in the deployed configuration in plaintext.
+ * Auth is either the Function App's managed identity or an `api-key` header,
+ * decided by whether a key was configured — see `openaiAuth.ts`. Keys, when
+ * used, are injected as Key Vault references, so they never sit in the deployed
+ * configuration in plaintext.
  */
 
 import { recordUsage, withModelSpan } from './telemetry.js';
+import { authHeaders } from './openaiAuth.js';
 
 export interface OpenAiConfig {
   endpoint: string;
-  key: string;
   deployment: string;
+  /**
+   * Absent on the provisioned path, where the managed identity is used instead.
+   * Present only for a bring-your-own account this deployment cannot grant
+   * itself a role on.
+   */
+  key?: string;
 }
 
-/** Returns null when the resource is not configured, which puts callers in mock mode. */
+/**
+ * Returns null when the resource is not configured, which puts callers in mock
+ * mode.
+ *
+ * Note the key is deliberately *not* required. Requiring it was correct while
+ * it was the only way to authenticate; now its absence selects the identity
+ * instead, and demanding it would make the more secure configuration look like
+ * an unconfigured one and silently drop every endpoint into mock mode.
+ */
 export function getOpenAiConfig(): OpenAiConfig | null {
   const endpoint = process.env['AZURE_OPENAI_ENDPOINT'];
   const key = process.env['AZURE_OPENAI_KEY'];
   const deployment = process.env['AZURE_OPENAI_DEPLOYMENT'];
-  if (!endpoint || !key || !deployment) return null;
-  return { endpoint: endpoint.replace(/\/$/, ''), key, deployment };
+  if (!endpoint || !deployment) return null;
+  return { endpoint: endpoint.replace(/\/$/, ''), deployment, ...(key ? { key } : {}) };
 }
 
 /** `text.format` values we use. `json_schema` is the strict, validated one. */
@@ -266,9 +282,10 @@ export async function callResponsesTurn(
   // agent loop's turns, so one span here covers all of them and none can be
   // added later that quietly escapes measurement.
   return withModelSpan(model, async (span) => {
+    const auth = await authHeaders(config.key);
     const res = await fetch(`${config.endpoint}/openai/v1/responses`, {
       method: 'POST',
-      headers: { 'api-key': config.key, 'Content-Type': 'application/json' },
+      headers: { ...auth, 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(request.timeoutMs ?? 30_000),
       body: JSON.stringify({
         model,

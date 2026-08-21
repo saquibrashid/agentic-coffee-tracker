@@ -276,6 +276,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The BFF no longer holds a key for Azure OpenAI.** It authenticates with the
+  Function App's user-assigned managed identity, which the template grants
+  **Cognitive Services OpenAI User** scoped to the account — enough to call the
+  deployments and nothing else, notably not enough to read the account keys. No
+  key is generated into Key Vault, referenced from app settings, or fetched with
+  `listKeys()`, so the secret that used to need rotating no longer exists.
+  Bring-your-own accounts are unaffected: this deployment cannot grant itself a
+  role on a resource it does not own, so supplying `openAiKey` keeps the previous
+  `api-key` path exactly as it was, and that is also how local development runs.
+  Which credential is in force is decided by whether the key is configured rather
+  than by a separate switch that could disagree with it, and `GET /api/health`
+  now reports the answer as `auth.openAi`. Closes the open question in
+  `specs/agentic-backend.md` §9.
+
 - **The coffee library has a place in the bottom navigation.** It is the app's
   central noun — every other tab is a view over it, and rating a coffee starts
   there — yet it was the one screen with no navigation entry, reachable only by

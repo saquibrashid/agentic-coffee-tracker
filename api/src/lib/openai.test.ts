@@ -26,11 +26,37 @@ afterEach(() => {
 });
 
 describe('getOpenAiConfig', () => {
-  it('returns null when any variable is missing', () => {
+  it('returns null when the endpoint is missing', () => {
+    vi.stubEnv('AZURE_OPENAI_ENDPOINT', '');
+    vi.stubEnv('AZURE_OPENAI_KEY', 'secret');
+    vi.stubEnv('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o');
+    expect(getOpenAiConfig()).toBeNull();
+  });
+
+  it('returns null when the deployment is missing', () => {
+    vi.stubEnv('AZURE_OPENAI_ENDPOINT', 'https://example.openai.azure.com');
+    vi.stubEnv('AZURE_OPENAI_KEY', 'secret');
+    vi.stubEnv('AZURE_OPENAI_DEPLOYMENT', '');
+    expect(getOpenAiConfig()).toBeNull();
+  });
+
+  // The provisioned deployment authenticates with the Function App's managed
+  // identity and has no key at all. Treating that as unconfigured would drop
+  // every AI endpoint into mock mode while the resource was working.
+  it('is configured without a key, leaving it unset so the identity is used', () => {
     vi.stubEnv('AZURE_OPENAI_ENDPOINT', 'https://example.openai.azure.com');
     vi.stubEnv('AZURE_OPENAI_KEY', '');
     vi.stubEnv('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o');
-    expect(getOpenAiConfig()).toBeNull();
+    const config = getOpenAiConfig();
+    expect(config).not.toBeNull();
+    expect(config?.key).toBeUndefined();
+  });
+
+  it('carries the key when a bring-your-own account supplies one', () => {
+    vi.stubEnv('AZURE_OPENAI_ENDPOINT', 'https://example.openai.azure.com');
+    vi.stubEnv('AZURE_OPENAI_KEY', 'secret');
+    vi.stubEnv('AZURE_OPENAI_DEPLOYMENT', 'gpt-4o');
+    expect(getOpenAiConfig()?.key).toBe('secret');
   });
 
   it('strips a trailing slash from the endpoint', () => {

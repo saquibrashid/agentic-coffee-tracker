@@ -68,6 +68,29 @@ favour of yours.
 If an endpoint ever _does_ fall back to its mock, the capture screen says so explicitly rather than
 presenting fixtures as a real read of your bag.
 
+### How the BFF authenticates to Azure OpenAI
+
+Two ways, and which one is used is decided by whether `AZURE_OPENAI_KEY` is set rather than by a
+switch, because a switch can disagree with reality.
+
+| `AZURE_OPENAI_KEY` | Credential                                        | When                                |
+| ------------------ | ------------------------------------------------- | ----------------------------------- |
+| unset              | The Function App's user-assigned managed identity | The provisioned account (default)   |
+| set                | `api-key` header                                  | A bring-your-own account, and local |
+
+The provisioned path has **no key anywhere** — none in Key Vault, none in app settings, and
+`listKeys()` is never called for that account. The template grants the Function App's identity
+**Cognitive Services OpenAI User** scoped to the account, which permits calling the deployments and
+nothing else: it cannot change deployments, and it cannot read the account keys, so compromising the
+identity does not yield a credential that outlives it.
+
+Bring-your-own is unchanged. This deployment cannot grant itself a role on an account it does not
+own, so supplying `openAiKey` restores the Key Vault secret and the `api-key` header exactly as
+before.
+
+`GET /api/health` reports which is in force as `auth.openAi` (`identity`, `key`, or `none`). Check it
+after a deploy — see [Verify the deployment](#verify-the-deployment).
+
 ### Which Azure OpenAI API the BFF calls
 
 The BFF calls the **v1 API** — `POST {endpoint}/openai/v1/responses` — not the older
@@ -229,6 +252,9 @@ curl "$(azd env get-value SERVICE_WEB_URI)/api/health"
     "search": "mock",
     "recommend": "live",
     "studioPhoto": "mock"
+  },
+  "auth": {
+    "openAi": "identity"
   }
 }
 ```
@@ -236,6 +262,22 @@ curl "$(azd env get-value SERVICE_WEB_URI)/api/health"
 `live` means the endpoint has real credentials; `mock` means it will return synthetic data. `search`
 is expected to be `mock` (see above), and so is `studioPhoto` unless you opted into an image
 deployment.
+
+`auth.openAi` should read `identity` on a default deployment. `key` means a bring-your-own account is
+in use — if you did not supply one, the old key setting is lingering and should be removed. `none`
+means Azure OpenAI is not configured at all, which is the same thing the `mock` values above are
+telling you.
+
+Health alone does not prove the role assignment took effect, because it reads configuration rather
+than calling the model. Confirm with a real call:
+
+```bash
+curl -sS -X POST "$(azd env get-value SERVICE_WEB_URI)/api/recommend" \
+  -H 'Content-Type: application/json' -d '{"beans":[]}' | head -c 400
+```
+
+A `401` from upstream here, with `auth.openAi` reading `identity`, means the role assignment has not
+propagated yet — give it a few minutes, then restart the Function App.
 
 > **Gotcha:** a Flex Consumption Function App does **not** pick up new app settings on its own. If
 > `/api/health` still says `mock` right after adding credentials, run
