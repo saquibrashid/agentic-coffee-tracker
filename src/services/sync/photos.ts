@@ -7,6 +7,7 @@
  * exists to uphold.
  */
 import { db } from '@/services/db';
+import { hasPhotoBytes } from '@/services/photos/bytes';
 import type { PhotoBlob } from '@/types';
 import { PhotoMissingError, type QuotaInfo, photoDownloadUrl, photoUploadUrl } from './api';
 
@@ -25,9 +26,12 @@ const BACKFILL_BATCH = 8;
  * metadata replicates through Cosmos and bytes do not. Size is therefore the
  * marker for "row present, bytes still to come" — no extra column needed, and
  * no way for the two to disagree.
+ *
+ * Shares its definition with the rendering path, which has to make the same
+ * judgement and once made it differently — see `services/photos/bytes.ts`.
  */
 export function needsBackfill(photo: PhotoBlob): boolean {
-  return photo.blob.size === 0;
+  return !hasPhotoBytes(photo.blob);
 }
 
 /**
