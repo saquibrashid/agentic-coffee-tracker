@@ -74,8 +74,8 @@ describe('validateFeedback', () => {
   });
 
   it('omits diagnostics the client did not send instead of writing “unknown”', () => {
-    expect(ok({ message: 'm', diagnostics: { route: '/summary' } }).diagnostics).toEqual([
-      ['Screen', '/summary'],
+    expect(ok({ message: 'm', diagnostics: { route: '/analytics' } }).diagnostics).toEqual([
+      ['Screen', '/analytics'],
     ]);
     expect(ok({ message: 'm' }).diagnostics).toEqual([]);
   });

@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * The primary nav packs seven items into a single row. At phone widths the
- * labels used to collide -- "Analytics" and "Summary" ran together at 390px.
+ * The primary nav packs six items into a single row. At phone widths the labels
+ * used to collide -- "Analytics" and "Summary" ran together at 390px, back when
+ * a seventh item was there to collide with.
  *
  * The meaningful assertion is that each label is *fully readable*, not merely
  * that the boxes do not overlap: `truncate` alone stops labels overlapping by
@@ -18,7 +19,7 @@ import { test, expect } from '@playwright/test';
 
 const PHONE_WIDTHS = [360, 390, 430];
 
-const NAV_LABELS = ['Home', 'Add', 'Coffees', 'Check', 'For you', 'Analytics', 'Summary'];
+const NAV_LABELS = ['Home', 'Add', 'Coffees', 'Check', 'For you', 'Analytics'];
 
 test.describe('primary navigation', () => {
   for (const width of PHONE_WIDTHS) {
@@ -90,7 +91,7 @@ test.describe('primary navigation', () => {
    */
   test('settings is still one tap away from anywhere', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto('/summary');
+    await page.goto('/analytics');
 
     await page.getByRole('link', { name: 'Settings', exact: true }).click();
 
@@ -116,12 +117,12 @@ test.describe('primary navigation', () => {
    * `position: sticky` alone does not do this. It pins an element only while its
    * container is taller than the viewport; on a short page the container ends
    * early and the nav simply sits wherever the content stopped — halfway up the
-   * screen on Summary, at the bottom on Home. So the interesting case is a
-   * *short* page, and asserting on Home would pass without the layout being
+   * screen on an empty Analytics, at the bottom on Home. So the interesting case
+   * is a *short* page, and asserting on Home would pass without the layout being
    * right at all.
    */
   for (const [name, path] of [
-    ['a short page', '/summary'],
+    ['a short page', '/analytics'],
     ['a long page', '/'],
   ] as const) {
     test(`stays at the bottom of the screen on ${name}`, async ({ page }) => {

@@ -209,24 +209,7 @@ Add rating form validation: score required (1–10 step 0.5), brew type required
 
 ---
 
-## 6. Monthly Summary
-
-| State   | UI                                                                                                                      |
-| ------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Loading | Skeleton text blocks + "Generating summary…" if regenerating.                                                           |
-| Empty   | No ratings in target month → "No coffees logged in {Month}." + button to pick another month.                            |
-| Error   | LLM summary failed → fallback to **deterministic** summary (top beans, avg score, counts) + retry button for narrative. |
-| Offline | Deterministic summary always renders; narrative shows "Available online".                                               |
-| Success | Narrative + stats grid + top beans.                                                                                     |
-
-Trigger rules:
-
-- Auto-generate on the 1st of each month for the previous month, in the background.
-- Cache result in `meta` store; user can regenerate manually (rate-limited to 1/hour).
-
----
-
-## 7. Settings
+## 6. Settings
 
 | State   | UI                                                                                      |
 | ------- | --------------------------------------------------------------------------------------- |

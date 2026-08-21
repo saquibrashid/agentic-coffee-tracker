@@ -81,14 +81,7 @@ Must include:
 - Roast level distribution
 - Brew type usage
 
-### 6. Monthly Summary
-
-- Top beans
-- Average rating
-- Flavor trends
-- New insights
-
-### 7. Settings
+### 6. Settings
 
 - Export (CSV + JSON)
 - Data management
