@@ -89,7 +89,7 @@ app.http('health', {
         ),
         // 'disabled' rather than 'mock' for the same reason as sync: there is
         // no honest mock for "your words reached somebody".
-        feedback: syncModeOf('GITHUB_FEEDBACK_TOKEN', 'GITHUB_FEEDBACK_REPO'),
+        feedback: syncModeOf('FEEDBACK_TOKEN', 'FEEDBACK_REPO'),
       },
       auth: { openAi: openAiAuthOf() },
     };

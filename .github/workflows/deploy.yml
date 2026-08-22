@@ -60,8 +60,8 @@ jobs:
       # and then lose them. The token needs issue-creation on this repository
       # and nothing else — it files publicly visible issues for anonymous
       # callers. See docs/deployment.md.
-      GITHUB_FEEDBACK_REPO: ${{ vars.GITHUB_FEEDBACK_REPO }}
-      GITHUB_FEEDBACK_TOKEN: ${{ secrets.GITHUB_FEEDBACK_TOKEN }}
+      FEEDBACK_REPO: ${{ vars.FEEDBACK_REPO }}
+      FEEDBACK_TOKEN: ${{ secrets.FEEDBACK_TOKEN }}
     steps:
       - uses: actions/checkout@v7
 

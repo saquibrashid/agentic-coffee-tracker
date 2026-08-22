@@ -48,10 +48,10 @@
       "value": "${SYNC_RECORD_QUOTA=20000}"
     },
     "feedbackRepo": {
-      "value": "${GITHUB_FEEDBACK_REPO=}"
+      "value": "${FEEDBACK_REPO=}"
     },
     "feedbackToken": {
-      "value": "${GITHUB_FEEDBACK_TOKEN=}"
+      "value": "${FEEDBACK_TOKEN=}"
     },
     "budgetContactEmails": {
       "value": "${BUDGET_CONTACT_EMAILS=}"

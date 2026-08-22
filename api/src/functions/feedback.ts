@@ -26,8 +26,8 @@ import { FEEDBACK_LABELS, issueBody, issueTitle, validateFeedback } from '../lib
  */
 
 export function githubConfig(): { token: string; repo: string } | null {
-  const token = process.env['GITHUB_FEEDBACK_TOKEN'];
-  const repo = process.env['GITHUB_FEEDBACK_REPO'];
+  const token = process.env['FEEDBACK_TOKEN'];
+  const repo = process.env['FEEDBACK_REPO'];
   if (!token || !repo) return null;
   return { token, repo };
 }

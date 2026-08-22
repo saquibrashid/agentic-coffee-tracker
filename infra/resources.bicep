@@ -633,11 +633,11 @@ var imageSettings = imageConfigured
 var feedbackSettings = feedbackConfigured
   ? [
       {
-        name: 'GITHUB_FEEDBACK_REPO'
+        name: 'FEEDBACK_REPO'
         value: feedbackRepo
       }
       {
-        name: 'GITHUB_FEEDBACK_TOKEN'
+        name: 'FEEDBACK_TOKEN'
         value: '@Microsoft.KeyVault(SecretUri=${keyVaultUri}secrets/github-feedback-token/)'
       }
     ]

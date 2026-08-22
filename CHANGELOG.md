@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **In-app feedback can now actually be switched on.** Sending feedback always
+  answered “this isn’t wired up on this deployment yet”, and the setup steps in
+  `docs/deployment.md` could not fix it, because the two settings they told you
+  to create were named `GITHUB_FEEDBACK_REPO` and `GITHUB_FEEDBACK_TOKEN` —
+  and GitHub reserves the `GITHUB_` prefix, rejecting any variable or secret
+  that uses it. Every other part of the feature was finished and working: the
+  endpoint, the issue formatting, the rate limit, and the fallback link the app
+  showed instead. The only broken thing was a name that could never be typed
+  in. They are now `FEEDBACK_REPO` and `FEEDBACK_TOKEN`.
+
 - **Photos no longer show as broken images while their bytes are still
   arriving.** A coffee synced from another device — or opened in the
   home-screen app on an iPhone, which iOS gives storage of its own separate
