@@ -86,3 +86,24 @@ Must include:
 - Export (CSV + JSON)
 - Data management
 - About
+
+## Waiting
+
+Anything that runs long enough to look stuck must say so, because a spinner
+after ninety seconds is the same picture as a spinner after one — and the
+reasonable response to a picture that has not changed is to press the button
+again, which turns one slow call into two.
+
+- Say the cost **before** the user commits, not only after. A wait someone was
+  warned about is a plan; the same wait unannounced is a fault they are
+  deciding whether to interrupt.
+- Use `LongWait` for anything model-backed. It carries a seconds counter, which
+  is the only part of the display that proves time is passing rather than
+  asserting it.
+- Never fabricate a percentage. These operations are model calls behind a
+  queue and have none to report; a bar that crawls to 90% and parks there
+  teaches the user to disbelieve every other progress bar in the app.
+- Work that is queued and durable should be **reported, not offered**. A button
+  to start what is already running produces duplicate work and a slower answer;
+  a notice that removes itself when the queue finishes cannot outlive the thing
+  it describes.

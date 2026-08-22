@@ -71,6 +71,7 @@ function renderPage(initialEntries: string[] = ['/beans/bean-1']) {
 beforeEach(async () => {
   await db.beans.clear();
   await db.ratings.clear();
+  await db.pendingAiTasks.clear();
   await db.beans.add(bean);
 });
 
@@ -356,5 +357,60 @@ describe('BeanDetailPage', () => {
 
     const list = await screen.findByRole('list');
     expect(within(list).getAllByRole('listitem')).toHaveLength(2);
+  });
+});
+
+/**
+ * Saving a coffee with gaps queues a web lookup, and until now nothing said so
+ * — which is how someone ends up filling in by hand what was about to be
+ * filled in for them, or leaving it blank without knowing the option existed.
+ */
+describe('BeanDetailPage pending lookup', () => {
+  function queueTask(type: 'web-enrich' | 'studio-photo') {
+    return db.pendingAiTasks.add({
+      id: `task-${type}`,
+      schemaVersion: 1,
+      type,
+      payload: { reason: 'single-add' },
+      beanId: bean.id,
+      attempts: 0,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    });
+  }
+
+  it('says a lookup is already running for this coffee', async () => {
+    await queueTask('web-enrich');
+    renderPage();
+
+    expect(await screen.findByText('Filling in what is missing')).toBeInTheDocument();
+  });
+
+  it('says nothing when no lookup is queued', async () => {
+    renderPage();
+
+    await screen.findByText('Holler Mtn.');
+    expect(screen.queryByText('Filling in what is missing')).not.toBeInTheDocument();
+  });
+
+  // A studio re-shoot is queued against the same bean and is not a lookup.
+  // Reporting it as one would describe work the user never asked about here.
+  it('ignores queued work that is not a lookup', async () => {
+    await queueTask('studio-photo');
+    renderPage();
+
+    await screen.findByText('Holler Mtn.');
+    expect(screen.queryByText('Filling in what is missing')).not.toBeInTheDocument();
+  });
+
+  it('takes the notice away once the queue has finished the task', async () => {
+    await queueTask('web-enrich');
+    renderPage();
+    await screen.findByText('Filling in what is missing');
+
+    await db.pendingAiTasks.delete('task-web-enrich');
+
+    await waitFor(() =>
+      expect(screen.queryByText('Filling in what is missing')).not.toBeInTheDocument(),
+    );
   });
 });

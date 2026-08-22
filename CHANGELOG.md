@@ -305,6 +305,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A studio re-shoot tells you it will take a minute, and then shows it
+  working.** The button gave no warning and the wait was a spinner with a line
+  of text, which looks exactly the same after one second as after ninety — so a
+  slow success and a hang were indistinguishable, and the reasonable response
+  was to press the button again and start a second one. It now says how long it
+  usually takes _before_ you commit, and while it runs it shows a moving bar
+  and a seconds counter. The bar deliberately does not claim a percentage:
+  there is nothing behind these calls that can report one, and a made-up one
+  that crawls to 90% and stops is how a progress bar stops being believed.
+
 - **The BFF no longer holds a key for Azure OpenAI.** It authenticates with the
   Function App's user-assigned managed identity, which the template grants
   **Cognitive Services OpenAI User** scoped to the account — enough to call the
@@ -460,6 +470,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   diff.
 
 ### Added
+
+- **A coffee saved with blanks now tells you they are being looked up.** Adding
+  a coffee has always queued a web lookup for whatever you left empty, but it
+  did so silently — so the coffee's page showed the same gaps you had just
+  failed to fill, with no way to tell "nothing is happening" apart from "this
+  is being looked up right now". People filled in by hand what was about to be
+  filled in for them, or left it blank not knowing the option existed. The add
+  form now says gaps get looked up after saving, and the coffee's own page
+  shows a notice while its lookup is queued, which disappears by itself when
+  the details arrive. It is a report rather than a button on purpose: offering
+  to start a lookup that is already running is how you get two of them.
 
 - **“What to try next” now recommends coffees you can actually buy.** It used
   to suggest a _kind_ of coffee — “another Ethiopia natural” — because the model

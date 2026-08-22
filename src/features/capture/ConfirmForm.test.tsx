@@ -157,3 +157,17 @@ describe('ConfirmForm enrichment queueing', () => {
     });
   });
 });
+
+/**
+ * The lookup above has run on save since single-add stopped being the worse
+ * path for metadata, but the form never mentioned it — so a user either filled
+ * in by hand what was about to be filled in for them, or left it blank without
+ * knowing the option existed. Reported as the latter.
+ */
+describe('ConfirmForm lookup notice', () => {
+  it('says on the form that gaps get looked up after saving', () => {
+    renderForm(makeBean());
+
+    expect(screen.getByText(/looked up on the roaster.s page automatically/i)).toBeInTheDocument();
+  });
+});
