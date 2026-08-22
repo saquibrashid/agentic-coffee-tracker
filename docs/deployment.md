@@ -388,16 +388,18 @@ Settings → Send feedback posts to `/api/feedback`, which files what the user w
 
 Two settings, both required:
 
-| Setting                 | Kind                | Value                                              |
-| ----------------------- | ------------------- | -------------------------------------------------- |
-| `GITHUB_FEEDBACK_REPO`  | Repository variable | `owner/name` of the repository to file into        |
-| `GITHUB_FEEDBACK_TOKEN` | Repository secret   | A token that may create issues on that repo — only |
+| Setting          | Kind                | Value                                              |
+| ---------------- | ------------------- | -------------------------------------------------- |
+| `FEEDBACK_REPO`  | Repository variable | `owner/name` of the repository to file into        |
+| `FEEDBACK_TOKEN` | Repository secret   | A token that may create issues on that repo — only |
 
 ```bash
-gh variable set GITHUB_FEEDBACK_REPO --body "saquibrashid/agentic-coffee-tracker"
-gh secret set GITHUB_FEEDBACK_TOKEN
+gh variable set FEEDBACK_REPO --body "saquibrashid/agentic-coffee-tracker"
+gh secret set FEEDBACK_TOKEN
 gh workflow run deploy.yml --ref main
 ```
+
+These were called `GITHUB_FEEDBACK_REPO` and `GITHUB_FEEDBACK_TOKEN` until it turned out that neither could ever be set: GitHub reserves the `GITHUB_` prefix and rejects any variable or secret using it with `HTTP 422`. The instructions above were therefore impossible to follow, which is why this feature sat unconfigured — the endpoint, the UI and the fallback all worked, and the only broken part was the name. Do not reintroduce the prefix.
 
 Use a fine-grained personal access token scoped to the single repository, with **Issues: read and write** and nothing else. It is used on behalf of anonymous callers, so treat its blast radius as "whatever an anonymous caller could do with it": with that scope, the worst case is unwanted issues on one repository, which is recoverable. The token is written to Key Vault and referenced by URI, never stored on the Function App directly.
 
