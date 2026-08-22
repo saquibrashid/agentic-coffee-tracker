@@ -17,6 +17,12 @@ import type { CoffeeBean } from '@/types';
 const preparePhotoFromFile = vi.hoisted(() => vi.fn());
 const preparePhotoFromDataUrl = vi.hoisted(() => vi.fn());
 const isCameraSupported = vi.hoisted(() => vi.fn());
+const prepareStudioPhoto = vi.hoisted(() => vi.fn());
+
+vi.mock('@/services/enrich/studioPhoto', async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  prepareStudioPhoto,
+}));
 
 vi.mock('@/services/enrich/photo', async (importOriginal) => ({
   ...(await importOriginal<object>()),
@@ -170,5 +176,43 @@ describe('PhotoPanel', () => {
     isCameraSupported.mockReturnValue(true);
     render(<PhotoPanel bean={makeBean()} />);
     expect(screen.getAllByRole('button', { name: /take a photo/i }).length).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * A studio re-shoot is a model call: long enough that a bare spinner reads as a
+ * hang, and long enough that being told beforehand turns the wait into a plan
+ * rather than a fault the user is deciding whether to interrupt.
+ */
+describe('PhotoPanel studio wait', () => {
+  it('warns how long a studio shot takes before it is asked for', () => {
+    render(<PhotoPanel bean={makeBean({ thumbnailDataUrl: 'data:image/webp;base64,cur' })} />);
+
+    expect(screen.getByText(/takes a minute or so/i)).toBeInTheDocument();
+  });
+
+  it('says nothing about it when there is no photo to re-shoot', () => {
+    render(<PhotoPanel bean={makeBean()} />);
+
+    expect(screen.queryByText(/takes a minute or so/i)).not.toBeInTheDocument();
+  });
+
+  /**
+   * The counter is the part that matters. A spinner looks identical after one
+   * second and after ninety, so without it a slow success and a hang are the
+   * same picture — and the rational response to that picture is to press the
+   * button again, which is how one long call becomes two.
+   */
+  it('shows a progressing wait, not a bare spinner, while it runs', async () => {
+    // Never settles: the point of the assertion is what is on screen *during*
+    // the call, which is the state a resolved promise would skip past.
+    prepareStudioPhoto.mockReturnValue(new Promise(() => {}));
+    render(<PhotoPanel bean={makeBean({ thumbnailDataUrl: 'data:image/webp;base64,cur' })} />);
+
+    await userEvent.click(screen.getByRole('button', { name: /studio shot/i }));
+
+    expect(await screen.findByRole('progressbar')).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/re-shooting the bag/i);
+    expect(screen.getByText('0s')).toBeInTheDocument();
   });
 });

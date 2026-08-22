@@ -260,6 +260,52 @@ function ReviewCard({ bean }: { bean: CoffeeBean }) {
   );
 }
 
+/**
+ * Says out loud that a web lookup is already running for this coffee.
+ *
+ * Saving a coffee with gaps in it queues a lookup — `ConfirmForm` has done this
+ * since single-add stopped being the worse path for metadata — but nothing ever
+ * said so. The user landed here, saw the same blanks they had just failed to
+ * fill, and had no way to tell the difference between "nothing is happening"
+ * and "it is being looked up right now". Reported as exactly that: not knowing
+ * the lookup could be done at all, when in fact it was already under way.
+ *
+ * So this is a report, not a button. Offering "look this up" here would be
+ * offering to do a second time what is already queued, and pressing it is how
+ * you end up with duplicate work and a slower answer.
+ *
+ * It disappears on its own, because the queue deletes the task when it
+ * finishes and this is a live query over that table — the same fact drives the
+ * card and the work, so the card cannot outlive what it describes.
+ */
+function LookupPendingCard({ beanId }: { beanId: string }) {
+  const queued = useLiveQuery(
+    () => db.pendingAiTasks.where('beanId').equals(beanId).toArray(),
+    [beanId],
+  );
+
+  if (!queued?.some((task) => task.type === 'web-enrich')) return null;
+
+  return (
+    <Card className="border-primary/40 bg-accent/40">
+      <CardHeader>
+        <div className="flex items-start gap-3">
+          <Globe className="text-primary mt-0.5 size-5 shrink-0" aria-hidden="true" />
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-base">Filling in what is missing</CardTitle>
+            <p className="text-muted-foreground mt-1 text-sm">
+              This coffee was saved with some details blank, so the roaster&rsquo;s page is being
+              looked up for them. It runs on its own — you can carry on, or leave the app entirely,
+              and the details will appear here when it finishes. If you are offline it waits until
+              you are back.
+            </p>
+          </div>
+        </div>
+      </CardHeader>
+    </Card>
+  );
+}
+
 export function BeanDetailPage() {
   const { beanId } = useParams<{ beanId: string }>();
   const navigate = useNavigate();
@@ -450,6 +496,8 @@ export function BeanDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      <LookupPendingCard beanId={bean.id} />
 
       <ReviewCard bean={bean} />
 

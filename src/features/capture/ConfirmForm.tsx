@@ -285,6 +285,14 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
         </p>
       )}
 
+      {/* The lookup below has run on save since single-add stopped being the
+          worse path for metadata, but nobody was told, so people filled gaps by
+          hand that were about to be filled for them — or left them, not knowing
+          it was an option. Saying it here costs a line and answers both. */}
+      <p className="text-muted-foreground text-sm">
+        Anything still blank is looked up on the roaster&rsquo;s page automatically once you save.
+      </p>
+
       <div className="flex gap-3">
         <Button type="submit" disabled={saving}>
           {saving ? 'Saving…' : 'Save coffee'}

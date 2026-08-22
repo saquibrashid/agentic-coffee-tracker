@@ -329,3 +329,24 @@
     }
   }
 }
+
+/*
+ * The indeterminate sweep used by LongWait.
+ *
+ * Indeterminate on purpose: the operations it covers are model calls behind a
+ * queue, so there is no percentage to report, and a fabricated one that crawls
+ * to 90% and parks there teaches the user to distrust every other progress bar
+ * in the app. This says "still working" and nothing it cannot back up.
+ *
+ * The reduced-motion rule above collapses the duration to nothing, which leaves
+ * the bar parked rather than flickering — the elapsed counter beside it carries
+ * the same information without moving.
+ */
+@keyframes long-wait {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(300%);
+  }
+}

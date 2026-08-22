@@ -21,6 +21,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Camera, ImagePlus, Loader2, Sparkles, Undo2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { LongWait } from '@/components/ui/long-wait';
 import { CameraCapture } from '@/features/capture/CameraCapture';
 import { isCameraSupported } from '@/services/camera';
 import {
@@ -195,14 +196,19 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
           </div>
 
           {busy && (
-            <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
-              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              {phase === 'reading'
-                ? 'Preparing your photo…'
-                : phase === 'reshooting'
-                  ? 'Re-shooting the bag — this takes a minute…'
-                  : 'Saving…'}
-            </p>
+            <>
+              {phase === 'reshooting' ? (
+                <LongWait
+                  label="Re-shooting the bag as a studio photo…"
+                  expectation="a minute or so"
+                />
+              ) : (
+                <p role="status" className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                  {phase === 'reading' ? 'Preparing your photo…' : 'Saving…'}
+                </p>
+              )}
+            </>
           )}
 
           {justSaved && !busy && (
@@ -310,6 +316,15 @@ export function PhotoPanel({ bean }: { bean: CoffeeBean }) {
               </Button>
             )}
           </div>
+
+          {/* Said before they commit, not only after. A minute of waiting the
+              user was warned about is a plan; the same minute unannounced is a
+              fault they are deciding whether to interrupt. */}
+          {hasPhoto && !busy && !candidate && (
+            <p className="text-muted-foreground text-xs">
+              A studio shot is redrawn from your photo by a model, so it takes a minute or so.
+            </p>
+          )}
 
           {/*
             Driven by the button above so the control reads as one of the pair
