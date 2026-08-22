@@ -65,6 +65,35 @@ describe('HeaderAccountControl', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(logout).toHaveBeenCalledOnce();
   });
+
+  // Plain sign-out leaves the Microsoft session alone, so signing back in
+  // reuses the same account with no chance to choose. These are two different
+  // actions and must stay two different calls.
+  it('offers a separate switch-account sign-out that reaches Microsoft too', async () => {
+    mockedUseAuthUser.mockReturnValue(
+      authState({
+        user: { userId: 'user-a', displayName: 'sam@example.com', provider: 'aad' },
+      }),
+    );
+    render(<HeaderAccountControl />);
+
+    await userEvent.click(screen.getByLabelText('Account for sam@example.com'));
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out and switch account' }));
+    expect(logout).toHaveBeenCalledWith('everywhere');
+  });
+
+  it('keeps plain sign-out scoped to this app', async () => {
+    mockedUseAuthUser.mockReturnValue(
+      authState({
+        user: { userId: 'user-a', displayName: 'sam@example.com', provider: 'aad' },
+      }),
+    );
+    render(<HeaderAccountControl />);
+
+    await userEvent.click(screen.getByLabelText('Account for sam@example.com'));
+    await userEvent.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(logout).toHaveBeenCalledWith();
+  });
 });
 
 it('offers reauthentication for an expired session notice', async () => {

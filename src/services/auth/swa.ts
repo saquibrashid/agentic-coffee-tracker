@@ -9,7 +9,8 @@
  *
  * See `specs/sync.md` → Identity.
  */
-import type { AuthProvider, AuthProviderId, AuthUser } from './types';
+import type { AuthProvider, AuthProviderId, AuthUser, SignOutScope } from './types';
+import { withSwitchAccountMarker } from './switchAccount';
 
 /**
  * The providers that are actually configured in `public/staticwebapp.config.json`.
@@ -111,10 +112,19 @@ export class SwaAuthProvider implements AuthProvider {
     return Promise.resolve();
   }
 
-  /** Ends the SWA session. Local IndexedDB data is deliberately left untouched. */
-  logout(): Promise<void> {
+  /**
+   * Ends the SWA session. Local IndexedDB data is deliberately left untouched.
+   *
+   * `everywhere` cannot be done in one navigation: the app cookie is dropped by
+   * an endpoint on this origin, and the Microsoft session by an endpoint on
+   * Microsoft's. So this leg only tags the return path; the second leg runs on
+   * the page load that comes back. See `switchAccount.ts`.
+   */
+  logout(scope: SignOutScope = 'app'): Promise<void> {
+    const returnPath =
+      scope === 'everywhere' ? withSwitchAccountMarker(currentPath()) : currentPath();
     window.location.assign(
-      `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(currentPath())}`,
+      `/.auth/logout?post_logout_redirect_uri=${encodeURIComponent(returnPath)}`,
     );
     return Promise.resolve();
   }

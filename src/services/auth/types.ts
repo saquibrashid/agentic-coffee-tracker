@@ -35,13 +35,27 @@ export interface AuthUser {
   provider: AuthProviderId;
 }
 
+/**
+ * How far a sign-out reaches.
+ *
+ * `app` ends this app's session only. `everywhere` also ends the session at the
+ * identity provider, which is the only way to be offered a different account on
+ * the next sign-in — see `switchAccount.ts` for why sign-in itself cannot ask.
+ */
+export type SignOutScope = 'app' | 'everywhere';
+
 export interface AuthProvider {
   /** The signed-in user, or `null` when signed out. Never throws. */
   getUser(): Promise<AuthUser | null>;
   /** Begins sign-in. May navigate away, so callers must not rely on it returning. */
   login(provider: AuthProviderId): Promise<void>;
-  /** Ends the session. Local data is always retained. */
-  logout(): Promise<void>;
+  /**
+   * Ends the session. Local data is always retained.
+   *
+   * `everywhere` navigates to the identity provider and does not come back, so
+   * nothing may be queued after it.
+   */
+  logout(scope?: SignOutScope): Promise<void>;
   /** False when this build cannot sign anyone in, so the UI can omit the option. */
   readonly isAvailable: boolean;
 }

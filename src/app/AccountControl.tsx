@@ -1,4 +1,4 @@
-import { LogIn, LogOut, UserRound } from 'lucide-react';
+import { LogIn, LogOut, UserRound, UserRoundCog } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { useAuthUser } from '@/services/auth';
@@ -47,6 +47,19 @@ export function HeaderAccountControl() {
         >
           <LogOut aria-hidden="true" />
           Sign out
+        </Button>
+        {/* Plain sign-out leaves the Microsoft session intact, so signing back
+            in silently reuses this same account and never offers a choice. This
+            is the only way to switch — see services/auth/switchAccount.ts. */}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="w-full justify-start"
+          onClick={() => void logout('everywhere')}
+        >
+          <UserRoundCog aria-hidden="true" />
+          Sign out and switch account
         </Button>
       </div>
     </details>

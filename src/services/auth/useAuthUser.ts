@@ -2,14 +2,14 @@ import { useCallback, useEffect, useSyncExternalStore } from 'react';
 
 import { getAuthProvider } from './index';
 import { allowAuthUser, forgetAuthUser, rememberAuthUser } from './session';
-import type { AuthProviderId, AuthUser } from './types';
+import type { AuthProviderId, AuthUser, SignOutScope } from './types';
 
 export interface AuthState {
   user: AuthUser | null;
   loading: boolean;
   available: boolean;
   login: (provider: AuthProviderId) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: (scope?: SignOutScope) => Promise<void>;
   error: string | null;
 }
 
@@ -98,13 +98,13 @@ export function useAuthUser(): AuthState {
     }
   }, []);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (scope: SignOutScope = 'app') => {
     publish({ ...getSnapshot(), error: null });
     try {
       authGeneration += 1;
       await forgetAuthUser();
       publish({ ...getSnapshot(), user: null, loading: false });
-      await getAuthProvider().logout();
+      await getAuthProvider().logout(scope);
     } catch (cause) {
       publish({
         ...getSnapshot(),
