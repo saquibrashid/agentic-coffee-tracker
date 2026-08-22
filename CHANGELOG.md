@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Photos no longer show as broken images while their bytes are still
+  arriving.** A coffee synced from another device — or opened in the
+  home-screen app on an iPhone, which iOS gives storage of its own separate
+  from Safari's — appeared with a broken-image icon instead of its picture.
+  Sync copies a photo's details and its actual bytes over two different
+  routes, so for a short while a photo exists as a record with nothing in it.
+  The app was building an image out of those empty bytes and showing it, and
+  because that counted as "a photo", it was preferred over the small preview
+  image that was sitting there working perfectly well the whole time. The app
+  now recognises a photo that has not finished arriving, shows the preview
+  until it does, and swaps in the full picture once the bytes land.
+
 - **Looking up missing details now tells you what it did.** Pressing “Look up
   missing details” produced a queue that ran, deleted its own tasks and left no
   trace, so the count above the button still said the same four coffees were
