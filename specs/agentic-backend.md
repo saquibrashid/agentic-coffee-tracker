@@ -1,11 +1,13 @@
 # Agentic backend — investigation
 
-**Status:** investigation, no decision taken. Tracks [#208](https://github.com/saquibrashid/agentic-coffee-tracker/issues/208).
+**Status:** complete. The experiment was built, run and measured; the
+recommendation is **keep the pipeline** (§8), and the Foundry shortcut is
+**revisit later, not now** (§10.6). Tracks [#208](https://github.com/saquibrashid/agentic-coffee-tracker/issues/208).
 
-This is the desk half of that issue: what the options actually are, what they
-would cost, and what they would break. It deliberately stops short of a
-recommendation to adopt, because the issue asks for a comparison on real
-inputs and that requires building the experiment in §7.
+Sections 1-7 are the desk half: what the options are, what they would cost, and
+what they would break, ending in the experiment to run. Section 8 is the result
+of running it. Sections 9-10 are what remained open afterwards and a spike into
+Foundry Agent Service.
 
 ---
 
@@ -424,8 +426,10 @@ its own terms**:
   the eval model runs once per task per candidate, on top of the agent model.
 - `gpt-5.4-mini` is not listed as a supported _optimization_ model, though it
   can be the agent's model.
-- Auth becomes Entra-only, which is the right direction but couples this to the
-  Key Vault API-key change still open in §9.
+- Auth becomes Entra-only. This was the one blocker that has since cleared: §9
+  records the Function App now reaching Azure OpenAI with its user-assigned
+  identity, so adopting the shortcut no longer means doing the auth migration
+  first — only granting that same identity the `Foundry Agent Consumer` role.
 
 And the prerequisite #228 named itself still stands: Optimizer improves a
 system against an eval set, which only pays if the system is failing.
