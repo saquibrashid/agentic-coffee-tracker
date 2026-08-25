@@ -68,7 +68,12 @@ function offlineLine(status: SyncStatus, now: number): string {
   const since = status.lastSyncedAt
     ? ` Last synced ${relativeTime(status.lastSyncedAt, now)}.`
     : '';
-  return `${changes} still waiting to sync.${since} If this device is online, press Sync now.`;
+  // Once the line has admitted something is wrong, what actually failed is the
+  // most useful thing left to say. On a device that has quietly stopped
+  // syncing it is also the only way for the person holding it to report
+  // anything more specific than "it does not work".
+  const why = status.lastError ? ` Last attempt: ${status.lastError}` : '';
+  return `${changes} still waiting to sync.${since} If this device is online, press Sync now.${why}`;
 }
 
 function relativeTime(iso: string, now: number): string {

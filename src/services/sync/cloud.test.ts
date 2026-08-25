@@ -479,6 +479,31 @@ describe('failure handling', () => {
     expect(engine.status().state).toBe('offline');
   });
 
+  it('keeps the failure message even when it calls the state offline', async () => {
+    // Nothing shows this while an outage looks ordinary. Once changes have been
+    // stranded long enough for the UI to admit something is wrong, what
+    // actually failed is the only useful thing left to say — and discarding it
+    // is what made a stuck device impossible to diagnose from the outside.
+    pull.mockRejectedValue(new SyncTimeoutError('/api/sync/pull'));
+
+    await engine.sync();
+
+    expect(engine.status().lastError).toContain('timed out');
+  });
+
+  it('does not disguise a server failure as offline when the browser flag is stuck', async () => {
+    // The classifier used to start with `!navigator.onLine`, so on a device
+    // whose flag was stuck at `false` every failure became "offline" and its
+    // message was thrown away. A real fault then looked exactly like a tunnel.
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+    pull.mockRejectedValue(new SyncApiError({ status: 503, message: 'unavailable' }));
+
+    await engine.sync({ force: true });
+
+    expect(engine.status().state).toBe('error');
+    expect(engine.status().lastError).toContain('unavailable');
+  });
+
   it('halts and asks for a refresh when the server sends a newer schema', async () => {
     pull.mockResolvedValue({
       records: [

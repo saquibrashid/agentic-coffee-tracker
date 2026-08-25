@@ -22,27 +22,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **A device could stop syncing and never say so.** `navigator.onLine` gated
-  every sync cycle, and iOS is known to leave that flag stuck at `false` after
-  a pinned app resumes from the background — with no `online` event to unstick
-  it, because from the browser's point of view nothing transitioned. The check
-  publishes `offline` without counting an attempt, so it never escalated to an
-  error, never halted, and never appeared outside Settings. The device sat
-  showing “Offline — will sync when reconnected” while connected, and
-  **Sync now** hit the very same check and returned without attempting a
-  request — the one control offered for the problem was inert against its most
-  likely cause. Discovering it required opening the app on another device and
-  noticing the data differed.
+- **Photos could never sync, and the app blamed your network for it.** The
+  deploy workflow passed the API base URL and the auth flag into the web build
+  but not the photo storage account name, which is what puts
+  `https://<account>.blob.core.windows.net` into the page's `connect-src`.
+  Production therefore shipped `connect-src 'self'`, and since photo bytes go
+  straight to Blob Storage over a SAS URL — a different origin — the browser
+  blocked every photo upload and download outright.
 
-  A sync the user asks for now ignores the flag and lets the request decide;
-  if the device really is offline the fetch fails in milliseconds through the
-  normal failure path. Automatic cycles still respect it, because polling a
-  dead radio every five minutes is the battery drain the check exists to
-  prevent. Separately, offline with changes stranded for over a day now says
-  what is waiting and how long it has been, and raises a page-level notice
-  instead of only a reassuring line in Settings. A short outage stays quiet: a
-  phone on a flight is working as designed, and a warning that fires then stops
-  meaning anything when it matters.
+  A fetch blocked by Content-Security-Policy rejects with a `TypeError`, which
+  is precisely what a device with no network produces, so sync classified a
+  permanent misconfiguration as a passing connection problem. And because a
+  failed photo upload aborts the whole cycle, every other change queued behind
+  it was stuck too. Phones took the worst of it, being where photos are taken:
+  one could sit for days reporting “Offline” on a flawless connection while
+  quietly falling further behind. The build now carries the account name, and a
+  test asserts it keeps doing so — every individual piece was already correct,
+  and only the line joining them was missing.
+
+- **A device could stop syncing and never say so.** Two things hid it.
+
+  `navigator.onLine` gated every sync cycle, and iOS is known to leave that
+  flag stuck at `false` after a pinned app resumes from the background — with
+  no `online` event to unstick it, because from the browser's point of view
+  nothing transitioned. The check publishes `offline` without counting an
+  attempt, so it never escalated to an error, never halted, and never appeared
+  outside Settings. **Sync now** hit the very same check and returned without
+  attempting a request, so the one control offered for the problem was inert
+  against its most likely cause.
+
+  The same flag then appeared again in the failure classifier, where it did
+  worse: it relabelled _every_ failure as “offline” and dropped the message, so
+  a genuine fault was indistinguishable from a tunnel. Failures are now
+  classified from the error itself — a fetch with no network throws a
+  `TypeError`, which is already detected — and the message is kept even when
+  the state is offline.
+
+  A sync you ask for now ignores the flag and lets the request decide.
+  Automatic cycles still respect it, because polling a dead radio every five
+  minutes is the battery drain the check exists to prevent. Separately, offline
+  with changes stranded for over a day now says what is waiting, how long it
+  has been, and what the last attempt actually failed with, and raises a
+  page-level notice instead of only a reassuring line in Settings. A short
+  outage stays quiet: a phone on a flight is working as designed, and a warning
+  that fires then stops meaning anything when it matters.
 
 - **In-app feedback can now actually be switched on.** Sending feedback always
   answered “this isn’t wired up on this deployment yet”, and the setup steps in

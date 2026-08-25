@@ -542,6 +542,8 @@ connect-src 'self' https://<storage-account>.blob.core.windows.net
 
 Shipped. The account name carries a per-environment token, so the policy is generated at build time from the `AZURE_PHOTO_STORAGE_ACCOUNT_NAME` infrastructure output rather than written out as a literal — see `build-config/csp.ts`. A deployment without a linked backend omits the entry entirely, because photos never leave the device there.
 
+**The value has to be carried into the build, and once was not.** `deploy.yml` exported `VITE_API_BASE_URL` and `VITE_AUTH_ENABLED` and omitted this one, so production shipped `connect-src 'self'` and the browser blocked every photo upload and download. The failure mode is unusually bad: a CSP-blocked `fetch` rejects with a `TypeError`, which is exactly what having no network produces, so the sync engine classified a permanent misconfiguration as a passing outage. A phone — where photos are taken, so where photo entries sit in the outbox — could report "Offline" for days on a perfect connection, with every other queued change stuck behind the photo it could never upload. `build-config/deployCsp.test.ts` now asserts the workflow carries it, because every individual piece was already correct and only the line joining them was missing.
+
 ### Estimated cost
 
 At single-user volumes — a few thousand records, a few hundred MB of photos — this is **a few cents a month**, verified against the East US 2 retail prices (Cosmos serverless $0.25/1M RUs and $0.25/GB-month; blob hot LRS $0.02/GB-month).

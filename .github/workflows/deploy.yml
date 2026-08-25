@@ -165,14 +165,24 @@ jobs:
       - name: Build the web bundle
         if: steps.config.outputs.ready == 'true'
         run: |
-          # Both are infrastructure outputs rather than hand-set values: the
-          # topology decides them, so reading them back from the environment
+          # All three are infrastructure outputs rather than hand-set values:
+          # the topology decides them, so reading them back from the environment
           # that was just provisioned is what keeps the bundle honest about
-          # which API it talks to and whether sign-in can be trusted.
+          # which API it talks to, whether sign-in can be trusted, and which
+          # storage account it is allowed to reach.
+          #
+          # The photo account is load-bearing and was missing here. It feeds the
+          # `connect-src` in `build-config/csp.ts`, and photo bytes travel
+          # directly to `https://<account>.blob.core.windows.net` over a SAS
+          # URL — a different origin. Without it the policy is `connect-src
+          # 'self'`, the browser blocks every photo upload and download, and the
+          # resulting TypeError is indistinguishable from having no network.
           VITE_API_BASE_URL=$(azd env get-value VITE_API_BASE_URL 2>/dev/null || echo '')
           VITE_AUTH_ENABLED=$(azd env get-value VITE_AUTH_ENABLED 2>/dev/null || echo 'false')
-          export VITE_API_BASE_URL VITE_AUTH_ENABLED
+          AZURE_PHOTO_STORAGE_ACCOUNT_NAME=$(azd env get-value AZURE_PHOTO_STORAGE_ACCOUNT_NAME 2>/dev/null || echo '')
+          export VITE_API_BASE_URL VITE_AUTH_ENABLED AZURE_PHOTO_STORAGE_ACCOUNT_NAME
           echo "Building with VITE_AUTH_ENABLED=$VITE_AUTH_ENABLED and API base '${VITE_API_BASE_URL:-<linked backend>}'"
+          echo "Photo storage account for CSP: '${AZURE_PHOTO_STORAGE_ACCOUNT_NAME:-<none — photos stay on device>}'"
           pnpm build
 
       - name: Log in to the Azure CLI
