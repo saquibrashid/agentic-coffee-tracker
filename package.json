@@ -45,7 +45,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.12.1",
-    "@axe-core/react": "^4.12.1",
+    "@axe-core/react": "^4.13.0",
     "@eslint/js": "^10",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.3",
