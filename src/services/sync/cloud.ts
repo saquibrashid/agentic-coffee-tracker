@@ -499,7 +499,15 @@ export class CloudSyncEngine implements SyncEngine {
 
     this.#attempts += 1;
 
-    const offline = !navigator.onLine || err instanceof SyncTimeoutError || isNetworkError(err);
+    // Classified from the error itself, never from `navigator.onLine`. A fetch
+    // that fails because there is no network throws a TypeError, which
+    // `isNetworkError` catches — so the flag adds no information here, and on a
+    // device where it is stuck at `false` it does active harm: it relabels
+    // *every* failure as "offline" and, because the offline branch below
+    // carries no message, throws the diagnosis away. A genuine server error on
+    // such a device is indistinguishable from a tunnel, which is precisely the
+    // situation this classifier exists to tell apart.
+    const offline = err instanceof SyncTimeoutError || isNetworkError(err);
     if (this.#attempts >= MAX_ATTEMPTS) {
       this.#halted = true;
       await this.#publish({
@@ -514,8 +522,16 @@ export class CloudSyncEngine implements SyncEngine {
 
     // Offline is a state, not an error: local data is untouched and the app is
     // fully usable, so it must not be presented as a failure.
+    //
+    // The message is kept even so. Nothing shows it while an outage looks
+    // ordinary, but once changes have been stranded long enough for the UI to
+    // admit something is wrong, "what actually failed" is the only useful thing
+    // left to say. A cycle clears it on every attempt, so it can never describe
+    // anything but the most recent one.
     await this.#publish(
-      offline ? { state: 'offline' } : { state: 'error', lastError: messageOf(err) },
+      offline
+        ? { state: 'offline', lastError: messageOf(err) }
+        : { state: 'error', lastError: messageOf(err) },
     );
   }
 

@@ -85,6 +85,36 @@ describe('describeSync', () => {
     );
   });
 
+  it('reports what actually failed once it admits something is wrong', () => {
+    // Without this the user can only report "it does not work", which is the
+    // position a stuck device left them in.
+    expect(
+      describeSync(
+        status({
+          state: 'offline',
+          pendingCount: 4,
+          lastSyncedAt: '2025-12-30T12:00:00.000Z',
+          lastError: 'POST /api/sync/pull timed out after 30000ms',
+        }),
+        NOW,
+      ),
+    ).toContain('Last attempt: POST /api/sync/pull timed out after 30000ms');
+  });
+
+  it('does not show a failure message while an outage still looks ordinary', () => {
+    expect(
+      describeSync(
+        status({
+          state: 'offline',
+          pendingCount: 4,
+          lastSyncedAt: '2026-01-02T02:00:00.000Z',
+          lastError: 'POST /api/sync/pull timed out after 30000ms',
+        }),
+        NOW,
+      ),
+    ).toBe('Offline — 4 changes will sync when reconnected.');
+  });
+
   it('keeps quiet about a short outage', () => {
     // A phone on a flight is working exactly as designed and must not be
     // nagged, or the warning stops meaning anything when it matters.
