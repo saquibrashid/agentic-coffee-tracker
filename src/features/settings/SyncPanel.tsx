@@ -44,7 +44,7 @@ export function SyncPanel() {
     if ('resume' in engine && typeof engine.resume === 'function') {
       (engine as { resume: () => void }).resume();
     }
-    await engine.sync();
+    await engine.sync({ force: true });
     setBusy(false);
   }, []);
 

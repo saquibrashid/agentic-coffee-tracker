@@ -3,6 +3,7 @@
  * reused without dragging React rendering into it.
  */
 import type { SyncStatus } from '@/services/sync/types';
+import { isSyncStale } from '@/services/sync/staleness';
 
 /**
  * Typing the word is the point: it is the difference between an action taken
@@ -25,7 +26,7 @@ export function describeSync(status: SyncStatus, relativeTo: number = Date.now()
     case 'syncing':
       return 'Syncing…';
     case 'offline':
-      return 'Offline — will sync when reconnected.';
+      return offlineLine(status, relativeTo);
     case 'session-expired':
       return status.pendingCount > 0
         ? `Sign in again to sync ${status.pendingCount} pending ${
@@ -44,6 +45,28 @@ export function describeSync(status: SyncStatus, relativeTo: number = Date.now()
         ? `Synced ${relativeTime(status.lastSyncedAt, relativeTo)}.`
         : 'Not synced yet.';
   }
+}
+
+/**
+ * The offline line, which has to serve two very different situations.
+ *
+ * With nothing outstanding, or with recent changes waiting, offline is simply
+ * true and reassurance is the honest answer. Once changes have been stranded
+ * for a day it stops being reassurance and becomes a lie of omission, so the
+ * line reports what is actually stuck and points at the button.
+ *
+ * The nudge toward Sync now is not filler. The most common way to reach this
+ * state on a device that is plainly connected is a browser whose offline flag
+ * has stuck, and pressing Sync now is what forces a real request past it.
+ */
+function offlineLine(status: SyncStatus, now: number): string {
+  if (status.pendingCount === 0) return 'Offline — will sync when reconnected.';
+
+  const changes = `${status.pendingCount} ${status.pendingCount === 1 ? 'change' : 'changes'}`;
+  if (!isSyncStale(status, now)) return `Offline — ${changes} will sync when reconnected.`;
+
+  const since = status.lastSyncedAt ? ` Last synced ${relativeTime(status.lastSyncedAt, now)}.` : '';
+  return `${changes} still waiting to sync.${since} If this device is online, press Sync now.`;
 }
 
 function relativeTime(iso: string, now: number): string {
