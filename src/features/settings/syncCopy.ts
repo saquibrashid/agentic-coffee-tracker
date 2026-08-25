@@ -65,7 +65,9 @@ function offlineLine(status: SyncStatus, now: number): string {
   const changes = `${status.pendingCount} ${status.pendingCount === 1 ? 'change' : 'changes'}`;
   if (!isSyncStale(status, now)) return `Offline — ${changes} will sync when reconnected.`;
 
-  const since = status.lastSyncedAt ? ` Last synced ${relativeTime(status.lastSyncedAt, now)}.` : '';
+  const since = status.lastSyncedAt
+    ? ` Last synced ${relativeTime(status.lastSyncedAt, now)}.`
+    : '';
   return `${changes} still waiting to sync.${since} If this device is online, press Sync now.`;
 }
 

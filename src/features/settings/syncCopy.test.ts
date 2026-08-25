@@ -80,7 +80,9 @@ describe('describeSync', () => {
         status({ state: 'offline', pendingCount: 4, lastSyncedAt: '2025-12-30T12:00:00.000Z' }),
         NOW,
       ),
-    ).toBe('4 changes still waiting to sync. Last synced 3 days ago. If this device is online, press Sync now.');
+    ).toBe(
+      '4 changes still waiting to sync. Last synced 3 days ago. If this device is online, press Sync now.',
+    );
   });
 
   it('keeps quiet about a short outage', () => {

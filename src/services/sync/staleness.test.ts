@@ -18,9 +18,9 @@ describe('isSyncStale', () => {
   });
 
   it('is false for an outage shorter than a day', () => {
-    expect(isSyncStale(status({ pendingCount: 3, lastSyncedAt: '2026-01-02T00:00:00.000Z' }), NOW)).toBe(
-      false,
-    );
+    expect(
+      isSyncStale(status({ pendingCount: 3, lastSyncedAt: '2026-01-02T00:00:00.000Z' }), NOW),
+    ).toBe(false);
   });
 
   it('is true once waiting changes pass the threshold', () => {
