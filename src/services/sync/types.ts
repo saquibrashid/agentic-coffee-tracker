@@ -55,8 +55,14 @@ export interface SyncEngine {
   status(): SyncStatus;
   /** Observes status changes. Returns an unsubscribe function. */
   subscribe(fn: (status: SyncStatus) => void): () => void;
-  /** Runs one full pull -> merge -> push cycle. Never rejects; failures land in status. */
-  sync(): Promise<void>;
+  /**
+   * Runs one full pull -> merge -> push cycle. Never rejects; failures land in status.
+   *
+   * `force` marks a cycle the user asked for directly. It bypasses both the
+   * backoff window and `navigator.onLine`, because that flag is advisory and
+   * is known to get stuck reporting offline on a device that plainly is not.
+   */
+  sync(options?: { force?: boolean }): Promise<void>;
   /** Clears the cursor and outbox, forcing a full re-pull on the next cycle. */
   reset(): Promise<void>;
   /**

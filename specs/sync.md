@@ -487,13 +487,27 @@ Signed in:
 - Account identity and **Sign out** (local data is retained on sign-out; state returns to `disabled`)
 - **Sign out and switch account** — as above, then continues to Microsoft's sign-out so the next sign-in offers an account picker. See Identity → Signing out does not end the Microsoft session.
 - Status line: `Synced 2 minutes ago` / `3 changes pending` / `Offline — will sync when reconnected` / `Sign-in expired`
-- **Sync now**
+- **Sync now** — a cycle the user asked for directly, which bypasses both the backoff window and `navigator.onLine` (see [Offline is advisory](#offline-is-advisory))
 - Storage: records synced, photo bytes used against quota
 - **Delete cloud data** — typed confirmation, matching the existing destructive-action pattern in `ux-states.md`
 
+### Offline is advisory
+
+`navigator.onLine` gates automatic cycles only. Polling a genuinely offline radio every five minutes is a real battery cost and the flag is usually right, so the timer keeps trusting it — but nothing else does.
+
+It cannot be trusted absolutely because the spec only promises that `true` means a network _might_ be reachable, and iOS is known to leave it stuck at `false` after a PWA resumes from the background. No `online` event follows, because from the browser's point of view nothing transitioned. The engine's offline check publishes `offline` **without** incrementing the attempt counter, so a stuck flag never escalates to `error`, never halts, and never surfaces anywhere: the device reports "will sync when reconnected" indefinitely while already reconnected, and **Sync now** returns at the same check without attempting a request. The one control offered for the problem was inert against its most likely cause.
+
+So a forced cycle ignores the flag and lets the request decide. A device that really is offline fails in milliseconds through the normal failure path, which costs nothing; a device whose flag was lying recovers.
+
+### Stale sync
+
+Offline needs no action and gets no page-level notice. Offline for over a day **with changes waiting** does: sync has stopped working, and Settings is the last place anyone thinks to look — the only other way to discover it is to compare the device against another one and notice the difference.
+
+`isSyncStale()` in `services/sync/staleness.ts` is the single definition, shared by the Settings status line and the page notice so the two cannot disagree. It requires a known `lastSyncedAt`: a device that has never synced has no duration to measure, and warning there would fire on a fresh install that simply happens to be offline.
+
 ### Global indicator
 
-Extend the existing offline indicator rather than adding a second status surface. Sync state is shown only when it is `syncing`, `error`, or `needs-upgrade` — an idle, working sync should be invisible.
+Extend the existing offline indicator rather than adding a second status surface. Sync state is shown only when it is `syncing`, `error`, `needs-upgrade`, or a stale `offline` — an idle, working sync should be invisible.
 
 ### `ux-states.md` additions
 

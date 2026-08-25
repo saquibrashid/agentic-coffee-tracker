@@ -557,6 +557,47 @@ describe('triggers and coalescing', () => {
     expect(engine.status().state).toBe('offline');
   });
 
+  it('syncs anyway when the user forces it, even though the browser says offline', async () => {
+    // `navigator.onLine` is advisory and gets stuck at `false` on iOS after a
+    // PWA resumes. That made Sync now a no-op on exactly the devices that
+    // needed it: the button cleared the halt, called sync, and the cycle
+    // returned at the offline check without attempting anything — leaving the
+    // user pressing a button that could not work, under a message promising it
+    // would sync later.
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+    await engine.sync({ force: true });
+
+    expect(pull).toHaveBeenCalledTimes(1);
+    expect(engine.status().state).toBe('idle');
+  });
+
+  it('lets a forced sync through the backoff window', async () => {
+    // Waiting out a backoff is right for an automatic retry and wrong for a
+    // person who just asked for one.
+    pull.mockRejectedValueOnce(new SyncTimeoutError('/api/sync/pull'));
+    await engine.sync();
+    expect(engine.status().state).toBe('offline');
+
+    await engine.sync();
+    expect(pull).toHaveBeenCalledTimes(1);
+
+    await engine.sync({ force: true });
+    expect(pull).toHaveBeenCalledTimes(2);
+    expect(engine.status().state).toBe('idle');
+  });
+
+  it('still skips automatic cycles while genuinely offline', async () => {
+    // The flag is kept for the timer, where polling a dead radio every five
+    // minutes is the battery drain the check exists to prevent.
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false);
+
+    await engine.sync();
+    await engine.sync();
+
+    expect(pull).not.toHaveBeenCalled();
+  });
+
   it('syncs as soon as the tab starts', async () => {
     engine.start();
     await vi.waitFor(() => expect(pull).toHaveBeenCalledTimes(1));

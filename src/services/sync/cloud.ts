@@ -113,11 +113,11 @@ export class CloudSyncEngine implements SyncEngine {
    * Runs one cycle. Never rejects — failures land in `status`, because every
    * caller is a UI trigger or a browser event with nowhere to put an error.
    */
-  async sync(): Promise<void> {
+  async sync(options: { force?: boolean } = {}): Promise<void> {
     // Coalesce concurrent callers within this tab. Two triggers firing at once
     // (a mutation debounce landing as the tab becomes visible) should be one
     // cycle, and the Web Lock below only arbitrates *between* tabs.
-    this.#running ??= this.#runGuarded().finally(() => {
+    this.#running ??= this.#runGuarded(options.force ?? false).finally(() => {
       this.#running = null;
     });
     return this.#running;
@@ -231,11 +231,28 @@ export class CloudSyncEngine implements SyncEngine {
     void this.sync();
   };
 
-  async #runGuarded(): Promise<void> {
+  async #runGuarded(force: boolean): Promise<void> {
     if (this.#halted) return;
-    if (Date.now() < this.#nextAttemptAt) return;
+    if (!force && Date.now() < this.#nextAttemptAt) return;
 
-    if (!navigator.onLine) {
+    // `navigator.onLine` is advisory, not authoritative. The spec only promises
+    // that `true` means a network *might* be reachable, and iOS in particular
+    // is known to leave it stuck at `false` after a PWA resumes from the
+    // background — with no matching `online` event to unstick it, because from
+    // the browser's point of view nothing transitioned.
+    //
+    // That made this early return permanent: it publishes `offline` without
+    // incrementing `#attempts`, so the engine never escalates to `error`, never
+    // stops, and never tells anyone. The device reports "will sync when
+    // reconnected" forever while already reconnected.
+    //
+    // So a cycle the user asked for ignores the flag entirely and lets the
+    // actual request decide. If the device really is offline the fetch fails in
+    // milliseconds and lands in the normal failure path, which costs nothing;
+    // if the flag was lying, sync recovers. Automatic cycles still respect it,
+    // because polling a genuinely offline radio every five minutes is exactly
+    // the battery drain the check exists to prevent.
+    if (!force && !navigator.onLine) {
       await this.#publish({ state: 'offline' });
       return;
     }

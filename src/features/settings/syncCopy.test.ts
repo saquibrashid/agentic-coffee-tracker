@@ -62,6 +62,40 @@ describe('describeSync', () => {
     );
   });
 
+  it('counts what is waiting while offline', () => {
+    expect(
+      describeSync(
+        status({ state: 'offline', pendingCount: 2, lastSyncedAt: '2026-01-02T09:00:00.000Z' }),
+        NOW,
+      ),
+    ).toBe('Offline — 2 changes will sync when reconnected.');
+  });
+
+  it('stops reassuring once changes have been stranded for a day', () => {
+    // The reassuring version is what let a device sit broken unnoticed: it
+    // promises a reconnection that, on a browser whose offline flag has stuck,
+    // is never coming.
+    expect(
+      describeSync(
+        status({ state: 'offline', pendingCount: 4, lastSyncedAt: '2025-12-30T12:00:00.000Z' }),
+        NOW,
+      ),
+    ).toBe(
+      '4 changes still waiting to sync. Last synced 3 days ago. If this device is online, press Sync now.',
+    );
+  });
+
+  it('keeps quiet about a short outage', () => {
+    // A phone on a flight is working exactly as designed and must not be
+    // nagged, or the warning stops meaning anything when it matters.
+    expect(
+      describeSync(
+        status({ state: 'offline', pendingCount: 4, lastSyncedAt: '2026-01-02T02:00:00.000Z' }),
+        NOW,
+      ),
+    ).toBe('Offline — 4 changes will sync when reconnected.');
+  });
+
   it('explains that an expired session leaves changes waiting', () => {
     expect(describeSync(status({ state: 'session-expired', pendingCount: 2 }), NOW)).toBe(
       'Sign in again to sync 2 pending changes.',

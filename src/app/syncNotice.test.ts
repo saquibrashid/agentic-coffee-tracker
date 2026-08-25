@@ -21,6 +21,28 @@ describe('app sync notices', () => {
     ).toBeNull();
   });
 
+  it('says nothing about being offline, which needs no action', () => {
+    expect(syncMessage(status({ state: 'offline' }))).toBeNull();
+    expect(
+      syncMessage(
+        status({ state: 'offline', pendingCount: 3, lastSyncedAt: new Date().toISOString() }),
+      ),
+    ).toBeNull();
+  });
+
+  it('speaks up when a device has quietly stopped syncing', () => {
+    // Settings is the last place anyone looks, so a device stuck offline for a
+    // day could only be discovered by comparing it against another device.
+    const old = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    expect(syncMessage(status({ state: 'offline', pendingCount: 4, lastSyncedAt: old }))).toBe(
+      'Not synced for a while. 4 local changes are waiting — open Settings to sync.',
+    );
+    expect(syncMessage(status({ state: 'offline', pendingCount: 1, lastSyncedAt: old }))).toBe(
+      'Not synced for a while. 1 local change is waiting — open Settings to sync.',
+    );
+  });
+
   it('keeps actionable failures visible', () => {
     expect(syncMessage(status({ state: 'error', lastError: 'Sign in again.' }))).toBe(
       'Sign in again.',

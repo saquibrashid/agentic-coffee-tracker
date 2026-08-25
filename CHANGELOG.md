@@ -22,6 +22,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A device could stop syncing and never say so.** `navigator.onLine` gated
+  every sync cycle, and iOS is known to leave that flag stuck at `false` after
+  a pinned app resumes from the background — with no `online` event to unstick
+  it, because from the browser's point of view nothing transitioned. The check
+  publishes `offline` without counting an attempt, so it never escalated to an
+  error, never halted, and never appeared outside Settings. The device sat
+  showing “Offline — will sync when reconnected” while connected, and
+  **Sync now** hit the very same check and returned without attempting a
+  request — the one control offered for the problem was inert against its most
+  likely cause. Discovering it required opening the app on another device and
+  noticing the data differed.
+
+  A sync the user asks for now ignores the flag and lets the request decide;
+  if the device really is offline the fetch fails in milliseconds through the
+  normal failure path. Automatic cycles still respect it, because polling a
+  dead radio every five minutes is the battery drain the check exists to
+  prevent. Separately, offline with changes stranded for over a day now says
+  what is waiting and how long it has been, and raises a page-level notice
+  instead of only a reassuring line in Settings. A short outage stays quiet: a
+  phone on a flight is working as designed, and a warning that fires then stops
+  meaning anything when it matters.
+
 - **In-app feedback can now actually be switched on.** Sending feedback always
   answered “this isn’t wired up on this deployment yet”, and the setup steps in
   `docs/deployment.md` could not fix it, because the two settings they told you
