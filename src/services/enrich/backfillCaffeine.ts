@@ -1,6 +1,5 @@
 import { DEFAULT_CAFFEINE } from '@/services/beans/caffeine';
 import { db } from '@/services/db';
-import { enqueueUpsert } from '@/services/sync/outbox';
 import { inferCaffeine } from './inferCaffeine';
 import type { CoffeeBean } from '@/types';
 
@@ -25,6 +24,25 @@ import type { CoffeeBean } from '@/types';
  * `backfillRoast.ts`: a migration cannot safely bump `updatedAt` or write
  * outbox rows from an upgrade transaction, and would never revisit a bean that
  * arrives later from another device still running an older build.
+ *
+ * ## Why this pass does not sync, and does not touch `updatedAt`
+ *
+ * Unlike the roast backfill it writes to *every* bean it considers rather than
+ * to the rare one an inference resolves, and that turns an ordinary race into a
+ * certainty. Syncing the result cost a deleted coffee its grave: the pass runs
+ * on app start alongside the sync engine, so a bean deleted on another device
+ * was re-uploaded here with a fresh `updatedAt`, and last-write-wins handed the
+ * resurrection back to every device. An e2e two-device test caught it.
+ *
+ * The redundancy is the fix. This value is a pure function of `name` and
+ * `roasterDescription`, both of which already sync, so every device computes
+ * the same answer for itself and there is nothing worth sending. A device on an
+ * older build simply reads `unknown`, which compares equal to everything.
+ *
+ * Corrections are the opposite case and do sync: a decaf the user set by hand
+ * is a fact no other device can derive, and the bean page writes it through the
+ * outbox in the normal way. This pass then leaves it alone forever, because it
+ * only ever writes into a gap.
  */
 
 /** A bean is a candidate while nothing has answered for it. */
@@ -65,11 +83,10 @@ export async function backfillCaffeine(): Promise<CaffeineBackfillResult> {
     if (inference) inferred += 1;
     else assumed += 1;
 
-    await db.beans.update(bean.id, {
-      caffeine: inference?.level ?? DEFAULT_CAFFEINE,
-      updatedAt: new Date().toISOString(),
-    });
-    await enqueueUpsert('bean', bean.id);
+    // No `updatedAt` bump and no outbox row: see the note above. Touching
+    // either would let a locally derived guess outrank a real change made
+    // somewhere else, up to and including a delete.
+    await db.beans.update(bean.id, { caffeine: inference?.level ?? DEFAULT_CAFFEINE });
   }
 
   return { considered: candidates.length, inferred, assumed };

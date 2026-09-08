@@ -77,24 +77,29 @@ describe('backfillCaffeine', () => {
     expect((await db.beans.get('a'))?.caffeine).toBe('decaf');
   });
 
-  it('queues every written bean for sync', async () => {
+  it('does not queue anything for sync', async () => {
+    // A synced backfill resurrected a deleted bean: this pass runs on app start
+    // beside the sync engine, so an upsert carrying a fresh updatedAt beat a
+    // delete made on another device and last-write-wins put the coffee back.
+    // The value is derived from fields that already sync, so every device
+    // reaches it alone and there is nothing to send.
     await db.beans.add(bean('a', { name: 'Hair Bender' }));
     await db.beans.add(bean('b', { name: 'Night Light Decaf' }));
 
     await backfillCaffeine();
 
-    const queued = await db.outbox.toArray();
-    expect(queued.map((row) => row.recordId).sort()).toEqual(['a', 'b']);
+    expect(await db.outbox.count()).toBe(0);
   });
 
-  it('bumps updatedAt so the write survives a sync merge', async () => {
-    // Last-write-wins: a write carrying its original timestamp would lose to
-    // the stale copy still sitting in the cloud.
+  it('leaves updatedAt alone', async () => {
+    // Same reason: a bumped timestamp would let a local guess outrank a real
+    // change made somewhere else, and would reorder the library by recency on
+    // the one run that touches every bean at once.
     await db.beans.add(bean('a', { name: 'Hair Bender' }));
 
     await backfillCaffeine();
 
-    expect((await db.beans.get('a'))?.updatedAt).not.toBe('2026-01-01T00:00:00.000Z');
+    expect((await db.beans.get('a'))?.updatedAt).toBe('2026-01-01T00:00:00.000Z');
   });
 
   it('is a no-op on a second pass', async () => {
