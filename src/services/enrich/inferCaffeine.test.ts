@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inferCaffeine } from './inferCaffeine';
+import { caffeineForNewBean, inferCaffeine } from './inferCaffeine';
 
 describe('inferCaffeine', () => {
   it('reads decaf out of the product name', () => {
@@ -62,5 +62,33 @@ describe('inferCaffeine', () => {
 
   it('is case-insensitive', () => {
     expect(inferCaffeine({ name: 'DECAF ESPRESSO' })?.level).toBe('decaf');
+  });
+});
+
+describe('caffeineForNewBean', () => {
+  it('assumes caffeinated when the text says nothing', () => {
+    // The distinction from `inferCaffeine`, which returns undefined here.
+    expect(caffeineForNewBean({ name: 'Hair Bender' })).toBe('caffeinated');
+  });
+
+  it('assumes caffeinated when there is no text at all', () => {
+    expect(caffeineForNewBean({})).toBe('caffeinated');
+  });
+
+  it('lets evidence beat the assumption', () => {
+    expect(caffeineForNewBean({ name: 'Night Light Decaf' })).toBe('decaf');
+  });
+
+  it('lets a half-caf name beat the assumption', () => {
+    expect(caffeineForNewBean({ name: 'Half-Caf House Blend' })).toBe('half-caf');
+  });
+
+  it('lets a decaffeination method in the description beat the assumption', () => {
+    expect(
+      caffeineForNewBean({
+        name: 'Storyville Reserve',
+        roasterDescription: 'Sugarcane EA, sweet and clean.',
+      }),
+    ).toBe('decaf');
   });
 });

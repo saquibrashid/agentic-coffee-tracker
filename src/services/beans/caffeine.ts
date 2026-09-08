@@ -48,6 +48,11 @@ export function isDecaf(bean: Pick<CoffeeBean, 'caffeine'>): boolean {
  * computed from nothing. An unlabelled coffee is overwhelmingly likely to be
  * caffeinated, and being wrong about a handful is a far smaller error than
  * discarding the entire history.
+ *
+ * `backfillCaffeine` has since made `unknown` rare rather than universal, but
+ * the rule stays: a coffee arriving from a device that has not run the backfill
+ * is still unknown, and it should behave as it always did rather than fall out
+ * of the user's history for as long as that other device stays behind.
  */
 export function comparableCaffeine(
   a: Pick<CoffeeBean, 'caffeine'>,
@@ -58,6 +63,24 @@ export function comparableCaffeine(
   if (left === 'unknown' || right === 'unknown') return true;
   return left === right;
 }
+
+/**
+ * What a coffee is taken to be when nothing anywhere says otherwise.
+ *
+ * This is a claim about the world, not about the data: essentially all coffee
+ * sold is caffeinated, and decaf is the case a roaster goes out of its way to
+ * mark. Recording a new bean as `unknown` is therefore technically honest and
+ * practically useless — it describes a coffee we are already confident about,
+ * and it excludes that coffee from every grouping that separates decaf from
+ * caffeinated, which is the reason the field exists.
+ *
+ * The assumption is only ever applied where a human is present to correct it:
+ * at capture, where it becomes the pre-filled value on a form the user is about
+ * to confirm, and in the backfill, which the user asked for. It is deliberately
+ * *not* applied by `inferCaffeine`, which reports evidence and nothing else, so
+ * that enrichment never proposes overwriting a decaf someone set by hand.
+ */
+export const DEFAULT_CAFFEINE: CaffeineLevel = 'caffeinated';
 
 /** How each value is written wherever the user sees it. */
 export const CAFFEINE_LABELS: Record<CaffeineLevel, string> = {

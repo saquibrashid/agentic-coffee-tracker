@@ -414,3 +414,67 @@ describe('BeanDetailPage pending lookup', () => {
     );
   });
 });
+
+/**
+ * The only bean attribute this page lets the user change by hand.
+ *
+ * It exists because caffeine is assumed rather than read: a bag that does not
+ * say "decaf" is recorded as caffeinated, so an unmarked decaf can only be
+ * corrected here. A web lookup cannot do it — there is no evidence on the
+ * product page for it to find.
+ */
+describe('BeanDetailPage caffeine control', () => {
+  beforeEach(async () => {
+    await db.outbox.clear();
+  });
+
+  it('shows the stored value', async () => {
+    await db.beans.update('bean-1', { caffeine: 'decaf' });
+    renderPage();
+
+    const select = await screen.findByLabelText('Caffeine');
+    expect(select).toHaveValue('decaf');
+  });
+
+  it('writes a correction the user makes', async () => {
+    await db.beans.update('bean-1', { caffeine: 'caffeinated' });
+    renderPage();
+
+    const select = await screen.findByLabelText('Caffeine');
+    await userEvent.selectOptions(select, 'decaf');
+
+    await waitFor(async () => expect((await db.beans.get('bean-1'))?.caffeine).toBe('decaf'));
+  });
+
+  it('queues the correction for sync', async () => {
+    renderPage();
+
+    await userEvent.selectOptions(await screen.findByLabelText('Caffeine'), 'decaf');
+
+    await waitFor(async () => {
+      const queued = await db.outbox.toArray();
+      expect(queued.some((row) => row.recordId === 'bean-1')).toBe(true);
+    });
+  });
+
+  it('stays reachable on a coffee nothing else is known about', async () => {
+    // The control used to sit inside the attribute grid, which was replaced
+    // wholesale by a "nothing known yet" message -- putting the one fix for a
+    // sparse decaf exactly out of reach.
+    await db.beans.clear();
+    await db.beans.add({
+      id: 'bean-1',
+      schemaVersion: 1,
+      roaster: 'Unknown',
+      name: 'Draft from photo',
+      isArchived: false,
+      needsReview: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    } as CoffeeBean);
+    renderPage();
+
+    expect(await screen.findByText(/Nothing else is known/)).toBeInTheDocument();
+    expect(await screen.findByLabelText('Caffeine')).toBeInTheDocument();
+  });
+});

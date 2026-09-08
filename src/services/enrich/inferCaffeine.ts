@@ -16,11 +16,17 @@
  * "decaf" is strong evidence, while finding no mention of caffeine is no
  * evidence at all — it describes almost every bag ever printed.
  *
- * Nothing here therefore ever returns `caffeinated`. Absence stays `unknown`,
- * and `unknown` is treated as comparable with everything by
- * `services/beans/caffeine.ts`, so an unmarked coffee behaves exactly as it did
- * before this field existed.
+ * Nothing here therefore ever returns `caffeinated`. This function reports
+ * evidence, and "no mention of caffeine" is not evidence. Keeping it that way
+ * is what lets enrichment use it safely: `caffeine` is an enrichable field, so
+ * an inference that guessed `caffeinated` from silence would have every web
+ * lookup propose overwriting a decaf the user set by hand.
+ *
+ * Assuming caffeinated is a separate decision, made once in
+ * `caffeineForNewBean` below and applied only where a person is present to
+ * correct it.
  */
+import { DEFAULT_CAFFEINE } from '@/services/beans/caffeine';
 import type { CaffeineLevel } from '@/types';
 
 export interface CaffeineInference {
@@ -121,4 +127,17 @@ export function inferCaffeine(input: CaffeineInferenceInput): CaffeineInference 
     if (containsPhrase(haystack, phrase)) return { level, evidence: phrase };
   }
   return undefined;
+}
+
+/**
+ * The value to record for a coffee being created now.
+ *
+ * Evidence wins: a bag whose name says "Decaf" is decaf regardless of the
+ * default. Only when the text says nothing does the assumption apply, and it
+ * applies here rather than inside `inferCaffeine` so that the assumption
+ * reaches new beans without also reaching the enrichment diff, which would turn
+ * every web lookup into a proposal to mark the coffee caffeinated.
+ */
+export function caffeineForNewBean(input: CaffeineInferenceInput): CaffeineLevel {
+  return inferCaffeine(input)?.level ?? DEFAULT_CAFFEINE;
 }

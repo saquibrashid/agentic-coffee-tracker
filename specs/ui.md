@@ -61,7 +61,10 @@ Must include:
 - Origins
 - Process
 - Roast level
-- Caffeine (decaf, half-caf, caffeinated — hidden when nobody has answered)
+- Caffeine — a dropdown, not a read-only value. The one bean attribute editable
+  by hand, because it is the only one the app assumes rather than reads, and a
+  web lookup cannot correct it. Always shown, including on a coffee nothing else
+  is known about.
 - Tasting notes
 - Roast date
 - Ratings timeline

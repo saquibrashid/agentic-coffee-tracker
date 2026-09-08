@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { db } from '@/services/db';
+import { DEFAULT_CAFFEINE } from '@/services/beans/caffeine';
 import { enqueueUpsert } from '@/services/sync/outbox';
 import { createThumbnail, dataUrlToBlob, resizeDataUrl } from '@/services/image/imagePipeline';
 import { extractBeanFromPhoto, PipelineUnavailableError } from '@/services/ai/pipeline';
@@ -84,6 +85,7 @@ export function AddCoffeePage() {
       name: 'Draft from link',
       source: 'url-scrape',
       sourceUrl: trimmed,
+      caffeine: DEFAULT_CAFFEINE,
       isArchived: false,
       needsReview: true,
       createdAt: now,
@@ -178,6 +180,7 @@ export function AddCoffeePage() {
       source: 'photo-ocr',
       thumbnailDataUrl: thumb.dataUrl,
       photoId,
+      caffeine: DEFAULT_CAFFEINE,
       isArchived: false,
       needsReview: true,
       createdAt: now,
