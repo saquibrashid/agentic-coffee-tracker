@@ -195,3 +195,39 @@ describe('applyProposals', () => {
     expect(update).toEqual({});
   });
 });
+
+/**
+ * New beans are assumed caffeinated, so the field is occupied by a guess rather
+ * than left empty. These pin that the assumption does not become a wall: a web
+ * lookup that finds real evidence of decaf must still be able to say so.
+ */
+describe('caffeine proposals against an assumed value', () => {
+  it('still proposes decaf over an assumed "caffeinated"', () => {
+    const proposals = buildProposals(
+      bean({ caffeine: 'caffeinated' }),
+      parsed({ caffeine: 'decaf' }),
+    );
+
+    const caffeine = proposals.find((p) => p.field === 'caffeine');
+    expect(caffeine?.current).toBe('Caffeinated');
+    expect(caffeine?.proposed).toBe('Decaf');
+  });
+
+  it('marks it a conflict, so accepting the defaults cannot silently overwrite', () => {
+    const proposals = buildProposals(
+      bean({ caffeine: 'caffeinated' }),
+      parsed({ caffeine: 'decaf' }),
+    );
+
+    expect(proposals.find((p) => p.field === 'caffeine')?.isConflict).toBe(true);
+    expect(defaultSelection(proposals).has('caffeine')).toBe(false);
+  });
+
+  it('proposes nothing when the lookup found no evidence either way', () => {
+    // The important half: silence must not become a proposal to re-assert the
+    // assumption on every single bean the user looks up.
+    const proposals = buildProposals(bean({ caffeine: 'caffeinated' }), parsed({ caffeine: null }));
+
+    expect(fields(proposals)).not.toContain('caffeine');
+  });
+});
