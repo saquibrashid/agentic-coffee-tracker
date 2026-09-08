@@ -478,3 +478,60 @@ describe('BeanDetailPage caffeine control', () => {
     expect(await screen.findByLabelText('Caffeine')).toBeInTheDocument();
   });
 });
+
+/**
+ * A coffee can have been bought in one place and documented in another.
+ * Cometeer sells other roasters' beans flash-frozen, so enrichment finds the
+ * roaster's page while the user bought the box -- and the page used to show
+ * whichever of the two was written last.
+ */
+describe('BeanDetailPage source links', () => {
+  it('shows both places when they differ', async () => {
+    await db.beans.update('bean-1', {
+      vendorUrl: 'https://cometeer.com/products/build-your-own-box',
+      sourceUrl: 'https://counterculturecoffee.com/products/fast-forward-12oz-bag',
+    });
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'cometeer.com' })).toHaveAttribute(
+      'href',
+      'https://cometeer.com/products/build-your-own-box',
+    );
+    expect(screen.getByRole('link', { name: 'counterculturecoffee.com' })).toBeInTheDocument();
+  });
+
+  it('shows one link when the coffee was added from the same page it was read from', async () => {
+    const url = 'https://counterculturecoffee.com/products/fast-forward-12oz-bag';
+    await db.beans.update('bean-1', { vendorUrl: url, sourceUrl: url });
+    renderPage();
+
+    await screen.findByText('Holler Mtn.');
+    expect(screen.getAllByRole('link', { name: 'counterculturecoffee.com' })).toHaveLength(1);
+  });
+
+  it('still shows the one link a coffee added before this field existed has', async () => {
+    await db.beans.update('bean-1', {
+      sourceUrl: 'https://counterculturecoffee.com/products/fast-forward-12oz-bag',
+    });
+    renderPage();
+
+    expect(
+      await screen.findByRole('link', { name: 'counterculturecoffee.com' }),
+    ).toBeInTheDocument();
+  });
+
+  it('strips www so the host reads as the name of a place', async () => {
+    await db.beans.update('bean-1', { sourceUrl: 'https://www.highwirecoffee.com/products/x' });
+    renderPage();
+
+    expect(await screen.findByRole('link', { name: 'highwirecoffee.com' })).toBeInTheDocument();
+  });
+
+  it('shows nothing when the coffee has no address at all', async () => {
+    renderPage();
+
+    await screen.findByText('Holler Mtn.');
+    expect(screen.queryByText(/Where you added it from/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Where the details came from/)).not.toBeInTheDocument();
+  });
+});

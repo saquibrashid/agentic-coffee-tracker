@@ -70,6 +70,9 @@ Must include:
 - Ratings timeline
 - Brew types used
 - “Fetch missing info” button
+- Source links, named by host. Two when the coffee was added from one place and
+  documented from another (a Cometeer box and the roaster's own page); one when
+  they are the same address.
 
 ### 4. Ratings List
 

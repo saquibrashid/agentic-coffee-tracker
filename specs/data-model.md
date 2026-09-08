@@ -79,7 +79,8 @@ export interface CoffeeBean {
 
   // Provenance of data
   source: EntrySource;
-  sourceUrl?: string; // if scraped
+  sourceUrl?: string; // where the details were last read from
+  vendorUrl?: string; // where the user added it from; never overwritten
   confidence?: number; // 0–1, from LLM
   rawOcrText?: string; // kept for debugging / re-parsing
   llmModel?: string; // e.g. "gpt-4o-2024-08-06"
@@ -103,6 +104,31 @@ export interface Origin {
 ```
 
 **Required after user confirmation**: `roaster`, `name`. All others optional.
+
+### Two addresses, because a coffee is sold in more than one place
+
+Cometeer flash-freezes other roasters' coffee, so a Cometeer product page and
+Counter Culture's own page describe the same beans in different packaging.
+Roasting attribution already handles this correctly — the roaster is Counter
+Culture, and Cometeer is not modelled as one — but the link back to the coffee
+did not.
+
+The two fields are split by who owns them:
+
+- **`sourceUrl` belongs to whatever read the details last.** Enrichment searches
+  for the roaster, finds the roaster's page and stamps it here. It is provenance,
+  and it may change with every lookup.
+- **`vendorUrl` belongs to the user.** It is written once, at capture, from the
+  address they supplied, and nothing overwrites it.
+
+Before the split there was only `sourceUrl`, so enrichment silently replaced the
+Cometeer address the user had entered with a Counter Culture bag they never
+bought. The bean page now shows both when they differ, labelled by host rather
+than by a fixed "the roaster's site" — the app cannot tell a roaster's own
+storefront from a reseller's, so it should not claim to.
+
+The same split covers pods, subscription boxes and any other reseller without
+needing to model them as a concept.
 
 ### Caffeine
 
