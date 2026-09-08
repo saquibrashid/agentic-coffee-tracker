@@ -1,6 +1,7 @@
 import type { ParsedBean } from '@/services/ai';
 import { parsedBeanToUpdate } from '@/services/ai/mapping';
-import type { CoffeeBean } from '@/types';
+import { CAFFEINE_LABELS } from '@/services/beans/caffeine';
+import type { CaffeineLevel, CoffeeBean } from '@/types';
 
 /**
  * Field-level diffing for web enrichment (specs/ui.md).
@@ -20,6 +21,7 @@ export const ENRICHABLE_FIELDS = [
   'origins',
   'process',
   'roastLevel',
+  'caffeine',
   'varietals',
   'tastingNotes',
   'roasterDescription',
@@ -44,6 +46,7 @@ const FIELD_LABELS: Record<EnrichableField, string> = {
   origins: 'Origins',
   process: 'Process',
   roastLevel: 'Roast level',
+  caffeine: 'Caffeine',
   varietals: 'Varietals',
   tastingNotes: 'Tasting notes',
   roasterDescription: 'Roaster description',
@@ -75,6 +78,9 @@ export function formatValue(field: EnrichableField, value: unknown): string | nu
       .join(', ');
   }
   if (Array.isArray(value)) return value.join(', ');
+  if (field === 'caffeine' && typeof value === 'string' && value in CAFFEINE_LABELS) {
+    return CAFFEINE_LABELS[value as CaffeineLevel];
+  }
   return String(value);
 }
 

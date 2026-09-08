@@ -8,6 +8,7 @@ const empty: ParsedBean = {
   origins: [],
   process: null,
   roastLevel: null,
+  caffeine: null,
   tastingNotes: [],
   roastDate: null,
   varietals: [],
@@ -69,6 +70,29 @@ describe('parsedBeanToUpdate', () => {
       });
 
       expect(update.roastLevel).toBeUndefined();
+    });
+  });
+
+  describe('caffeine', () => {
+    it('carries through what the model resolved', () => {
+      expect(parsedBeanToUpdate({ ...empty, caffeine: 'decaf' }).caffeine).toBe('decaf');
+      expect(parsedBeanToUpdate({ ...empty, caffeine: 'half-caf' }).caffeine).toBe('half-caf');
+    });
+
+    it('derives decaf from the name the model was told not to guess from', () => {
+      expect(parsedBeanToUpdate({ ...empty, name: 'Night Light Decaf' }).caffeine).toBe('decaf');
+    });
+
+    it('leaves an unmarked coffee unset rather than claiming it is caffeinated', () => {
+      // Silence about caffeine describes nearly every bag ever printed. Writing
+      // "caffeinated" here would mark the library answered when nobody asked.
+      const update = parsedBeanToUpdate({
+        ...empty,
+        name: 'Southern Weather',
+        roasterDescription: 'A blend built for milk.',
+      });
+
+      expect(update.caffeine).toBeUndefined();
     });
   });
 

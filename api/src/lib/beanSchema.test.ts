@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CAFFEINE_VALUES,
   PARSED_BEAN_SCHEMA,
   PROCESS_VALUES,
   REQUIRED_BEAN_KEYS,
@@ -15,6 +16,7 @@ const valid = {
   origins: [{ country: 'Ethiopia', region: 'Guji', farm: null, producer: null, percentage: 60 }],
   process: 'washed',
   roastLevel: 'medium-light',
+  caffeine: null,
   tastingNotes: ['peach', 'jasmine'],
   roastDate: '2026-01-04',
   varietals: ['Heirloom'],
@@ -69,6 +71,21 @@ describe('validateParsedBean', () => {
     expect(result.valid).toBe(false);
     if (result.valid) return;
     expect(result.errors).toHaveLength(2);
+  });
+
+  it('rejects an out-of-enum caffeine value', () => {
+    expect(validateParsedBean({ ...valid, caffeine: 'extra-strong' }).valid).toBe(false);
+    for (const value of CAFFEINE_VALUES) {
+      expect(validateParsedBean({ ...valid, caffeine: value }).valid).toBe(true);
+    }
+  });
+
+  it('has no "unknown" caffeine value for the model to reach for', () => {
+    // The model answers null when it cannot tell; "unknown" is the client's
+    // word for the same state. Offering both would let the same absence arrive
+    // two different ways and split every downstream comparison.
+    expect(CAFFEINE_VALUES).not.toContain('unknown');
+    expect(validateParsedBean({ ...valid, caffeine: 'unknown' }).valid).toBe(false);
   });
 
   it('rejects confidence outside 0..1', () => {
@@ -132,6 +149,7 @@ describe('PARSED_BEAN_SCHEMA', () => {
   it('declares the same enums the validator enforces', () => {
     expect(PARSED_BEAN_SCHEMA.properties.process.enum).toEqual([...PROCESS_VALUES, null]);
     expect(PARSED_BEAN_SCHEMA.properties.roastLevel.enum).toEqual([...ROAST_LEVEL_VALUES, null]);
+    expect(PARSED_BEAN_SCHEMA.properties.caffeine.enum).toEqual([...CAFFEINE_VALUES, null]);
   });
 
   it('forbids extra properties so structured outputs stay strict', () => {

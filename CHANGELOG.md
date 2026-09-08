@@ -526,6 +526,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Decaf is now tracked separately from caffeinated coffee** (#277, closing the
+  one part of #109 that could not be built). `CoffeeBean.caffeine` is a
+  four-value enum — caffeinated, decaf, half-caf, not known — set from the
+  capture form, extracted by the AI, and filterable in the library. Decaf is
+  not a variant of a coffee: decaffeination strips aromatics and flattens
+  acidity, so a decaf scored 6 and a caffeinated coffee scored 6 are not the
+  same judgement, and averaging them made a decaf the user enjoyed count as
+  evidence against their own taste.
+  - The parse prompt and JSON schema are written to stop the model guessing.
+    Ordinary coffee never labels itself "caffeinated" — it says nothing — so
+    silence returns `null`, not an invented answer.
+  - Bags that only say "Decaf" in the product name are caught by a new
+    inference at the parse boundary, the same place the roast level is derived,
+    so every capture path gets it. A decaffeination method named in prose
+    ("Swiss Water", "sugarcane EA") counts too; a bare "also available as a
+    decaf" in a roaster's blurb deliberately does not, because it is describing
+    a different coffee.
+  - Nothing is assumed about the existing library. Every coffee recorded before
+    the field existed reads as "not known", which compares equal to everything,
+    so no preference or recommendation changes until the user says otherwise.
+  - `schemaVersion` stays at `1`: the field is optional and additive, so older
+    builds round-trip it untouched rather than halting sync.
+
 - **A coffee saved with blanks now tells you they are being looked up.** Adding
   a coffee has always queued a web lookup for whatever you left empty, but it
   did so silently — so the coffee's page showed the same gaps you had just

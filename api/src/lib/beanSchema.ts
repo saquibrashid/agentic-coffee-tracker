@@ -28,8 +28,16 @@ export const ROAST_LEVEL_VALUES = [
   'dark',
 ] as const;
 
+/**
+ * `unknown` is absent here, as it is for process and roast level: the model
+ * says `null` when it cannot tell, and the client maps that to `'unknown'`.
+ * Offering both would give the model two ways to spell the same answer.
+ */
+export const CAFFEINE_VALUES = ['caffeinated', 'decaf', 'half-caf'] as const;
+
 export type ProcessValue = (typeof PROCESS_VALUES)[number];
 export type RoastLevelValue = (typeof ROAST_LEVEL_VALUES)[number];
+export type CaffeineValue = (typeof CAFFEINE_VALUES)[number];
 
 export interface ParsedOrigin {
   country: string | null;
@@ -45,6 +53,7 @@ export interface ParsedBean {
   origins: ParsedOrigin[];
   process: ProcessValue | null;
   roastLevel: RoastLevelValue | null;
+  caffeine: CaffeineValue | null;
   tastingNotes: string[];
   roastDate: string | null;
   varietals: string[];
@@ -60,6 +69,7 @@ export const REQUIRED_BEAN_KEYS = [
   'origins',
   'process',
   'roastLevel',
+  'caffeine',
   'tastingNotes',
   'roastDate',
   'varietals',
@@ -101,6 +111,12 @@ export const PARSED_BEAN_SCHEMA = {
     },
     process: { type: ['string', 'null'], enum: [...PROCESS_VALUES, null] },
     roastLevel: { type: ['string', 'null'], enum: [...ROAST_LEVEL_VALUES, null] },
+    caffeine: {
+      type: ['string', 'null'],
+      enum: [...CAFFEINE_VALUES, null],
+      description:
+        'Only when the text says so — "decaf", "decaffeinated", "Swiss Water", "EA/sugarcane process", or "half-caf". Most coffee is caffeinated and does not advertise it, so silence means null, NOT "caffeinated". Do not infer decaf from a name that merely sounds like an evening drink.',
+    },
     tastingNotes: {
       type: 'array',
       items: { type: 'string' },
@@ -152,6 +168,7 @@ export function normalizeParsedBean(input: unknown): unknown {
     'name',
     'process',
     'roastLevel',
+    'caffeine',
     'roastDate',
     'roasterDescription',
   ]) {
@@ -271,6 +288,7 @@ export function validateParsedBean(input: unknown): ValidationResult {
   checkNullableString(candidate['roasterDescription'], '/roasterDescription', errors);
   checkEnum(candidate['process'], PROCESS_VALUES, '/process', errors);
   checkEnum(candidate['roastLevel'], ROAST_LEVEL_VALUES, '/roastLevel', errors);
+  checkEnum(candidate['caffeine'], CAFFEINE_VALUES, '/caffeine', errors);
   checkStringArray(candidate['tastingNotes'], '/tastingNotes', errors);
   checkStringArray(candidate['varietals'], '/varietals', errors);
   checkOrigins(candidate['origins'], errors);
@@ -295,6 +313,7 @@ export function mockParsedBean(ocrText: string): ParsedBean {
     origins: [{ country: 'Mockland', region: null, farm: null, producer: null, percentage: null }],
     process: 'washed',
     roastLevel: 'medium',
+    caffeine: 'caffeinated',
     tastingNotes: ['chocolate', 'caramel', 'sweet'],
     roastDate: null,
     varietals: [],

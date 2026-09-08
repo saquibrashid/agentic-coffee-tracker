@@ -1,5 +1,6 @@
 /** Maps the LLM contract (`ParsedBean`) onto the local `CoffeeBean` record. */
 import type { ParsedBean } from '@/services/ai';
+import { inferCaffeine } from '@/services/enrich/inferCaffeine';
 import { inferRoastLevel } from '@/services/enrich/inferRoast';
 import type { CoffeeBean, Origin } from '@/types';
 
@@ -30,12 +31,13 @@ function toElevation(parsed: ParsedBean): CoffeeBean['elevationMeters'] {
  * Only fields the model actually resolved are returned, so a sparse parse never
  * blanks out data the user already entered.
  *
- * The one derived value is the roast level. The parse prompt is told not to
- * guess, so a roaster who writes the roast into a sentence or a product name
- * rather than a labelled field yields `null` here. Inferring at this boundary
- * rather than at each caller means every path that turns a parse into a bean --
- * adding by link, adding by photo, the background OCR queue, and the enrichment
- * review -- gets it, and a path added later gets it without remembering to.
+ * The derived values are the roast level and the caffeine content. The parse
+ * prompt is told not to guess, so a roaster who writes either into a sentence
+ * or a product name rather than a labelled field yields `null` here. Inferring
+ * at this boundary rather than at each caller means every path that turns a
+ * parse into a bean -- adding by link, adding by photo, the background OCR
+ * queue, and the enrichment review -- gets it, and a path added later gets it
+ * without remembering to.
  */
 export function parsedBeanToUpdate(parsed: ParsedBean): Partial<CoffeeBean> {
   const update: Partial<CoffeeBean> = {};
@@ -55,6 +57,14 @@ export function parsedBeanToUpdate(parsed: ParsedBean): Partial<CoffeeBean> {
       tastingNotes: parsed.tastingNotes,
     });
     if (inferred) update.roastLevel = inferred.level;
+  }
+  if (parsed.caffeine) update.caffeine = parsed.caffeine;
+  else {
+    const inferred = inferCaffeine({
+      name: parsed.name ?? undefined,
+      roasterDescription: parsed.roasterDescription ?? undefined,
+    });
+    if (inferred) update.caffeine = inferred.level;
   }
   if (parsed.varietals.length > 0) update.varietals = parsed.varietals;
   if (parsed.tastingNotes.length > 0) update.tastingNotes = parsed.tastingNotes;

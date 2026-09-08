@@ -61,6 +61,7 @@ Must include:
 - Origins
 - Process
 - Roast level
+- Caffeine (decaf, half-caf, caffeinated — hidden when nobody has answered)
 - Tasting notes
 - Roast date
 - Ratings timeline

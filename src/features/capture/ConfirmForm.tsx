@@ -13,8 +13,9 @@ import { Select } from '@/components/ui/select';
 import { db } from '@/services/db';
 import { enqueueDelete, enqueueUpsert } from '@/services/sync/outbox';
 import { beanNeedsEnrichment } from '@/services/enrich/autoEnrich';
-import type { CoffeeBean, Process, RoastLevel } from '@/types';
-import { PROCESSES, ROAST_LEVELS } from '@/services/beans/library';
+import type { CaffeineLevel, CoffeeBean, Process, RoastLevel } from '@/types';
+import { CAFFEINE_LEVELS, PROCESSES, ROAST_LEVELS } from '@/services/beans/library';
+import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
 import { ulid } from 'ulid';
 
 /**
@@ -67,6 +68,7 @@ interface FormState {
   roaster: string;
   name: string;
   roastLevel: RoastLevel;
+  caffeine: CaffeineLevel;
   process: Process;
   origin: string;
   tastingNotes: string;
@@ -78,6 +80,7 @@ function toFormState(bean: CoffeeBean): FormState {
     roaster: bean.roaster === 'Unknown' ? '' : bean.roaster,
     name: bean.name === 'Draft from photo' ? '' : bean.name,
     roastLevel: bean.roastLevel ?? 'unknown',
+    caffeine: caffeineOf(bean),
     process: bean.process ?? 'unknown',
     origin: bean.origins?.map((o) => o.country).join(', ') ?? '',
     tastingNotes: bean.tastingNotes?.join(', ') ?? '',
@@ -116,6 +119,7 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
         draft.roaster = form.roaster.trim();
         draft.name = form.name.trim();
         draft.roastLevel = form.roastLevel;
+        draft.caffeine = form.caffeine;
         draft.process = form.process;
         draft.origins = splitList(form.origin).map((country) => ({ country }));
         draft.tastingNotes = splitList(form.tastingNotes);
@@ -205,6 +209,23 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
             {ROAST_LEVELS.map((level) => (
               <option key={level} value={level}>
                 {level}
+              </option>
+            ))}
+          </Select>
+        </div>
+
+        <div>
+          <Label htmlFor="caffeine" className="mb-1 block">
+            Caffeine
+          </Label>
+          <Select
+            id="caffeine"
+            value={form.caffeine}
+            onChange={(e) => set('caffeine', e.target.value as CaffeineLevel)}
+          >
+            {CAFFEINE_LEVELS.map((level) => (
+              <option key={level} value={level}>
+                {CAFFEINE_LABELS[level]}
               </option>
             ))}
           </Select>

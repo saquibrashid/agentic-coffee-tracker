@@ -16,6 +16,7 @@ import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
+import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
 import { markBeanReviewed } from '@/services/beans/review';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
 import {
@@ -419,6 +420,9 @@ export function BeanDetailPage() {
               </Attribute>
               <Attribute label="Process">
                 {bean.process !== undefined && bean.process !== 'unknown' && bean.process}
+              </Attribute>
+              <Attribute label="Caffeine">
+                {caffeineOf(bean) !== 'unknown' && CAFFEINE_LABELS[caffeineOf(bean)]}
               </Attribute>
               <Attribute label="Varietals">
                 {(bean.varietals ?? []).length > 0 && (bean.varietals ?? []).join(', ')}
