@@ -22,6 +22,8 @@ export type RoastLevel = 'light' | 'medium-light' | 'medium' | 'medium-dark' | '
 export type Process =
   'washed' | 'natural' | 'honey' | 'anaerobic' | 'wet-hulled' | 'other' | 'unknown';
 
+export type CaffeineLevel = 'caffeinated' | 'decaf' | 'half-caf' | 'unknown';
+
 export type BrewType =
   | 'espresso'
   | 'latte'
@@ -57,6 +59,7 @@ export interface CoffeeBean {
   origins?: Origin[]; // multi-origin blends supported
   process?: Process;
   roastLevel?: RoastLevel;
+  caffeine?: CaffeineLevel; // absent means nobody has answered; see below
   varietals?: string[]; // e.g. ["Bourbon", "Typica"]
   elevationMeters?: { min?: number; max?: number };
 
@@ -100,6 +103,36 @@ export interface Origin {
 ```
 
 **Required after user confirmation**: `roaster`, `name`. All others optional.
+
+### Caffeine
+
+Decaf is not a variant of a coffee, it is a different drink made from one. The
+decaffeination process strips aromatics and flattens acidity, so a decaf scored
+6 and a caffeinated coffee scored 6 are not the same judgement. Averaging them
+produces a taste profile belonging to nobody, and drags recommendations toward
+whichever group the user drinks more of — usually caffeinated, which makes a
+decaf the user enjoyed count as evidence against their own preferences.
+
+Three rules follow, and every consumer reads them from
+`src/services/beans/caffeine.ts` rather than re-deriving them:
+
+- **Absent means unanswered, never "caffeinated".** Every coffee recorded before
+  this field existed has no value, which is indistinguishable from one nobody
+  has answered for. Both read as `unknown`.
+- **`unknown` compares equal to everything.** Treating it as its own group would
+  split the library in half on the day the field shipped and leave the
+  preference engine nothing to learn from.
+- **`half-caf` is its own value, not a kind of decaf.** It is a distinct
+  product, and folding it in would let the filter and the preference engine
+  disagree about the same bag.
+
+`schemaVersion` stays at `1`. The field is optional and additive, so an older
+build reads and re-writes a record carrying it without loss; bumping the version
+would halt sync on every device that has not updated.
+
+The AI contract (`ParsedBean`) omits `unknown` deliberately — the model answers
+`null` when it cannot tell, and the client maps that to `unknown`. Offering both
+would let the same absence arrive two different ways.
 
 ---
 
@@ -368,6 +401,7 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
     "origins",
     "process",
     "roastLevel",
+    "caffeine",
     "tastingNotes",
     "roastDate",
     "varietals",
@@ -400,6 +434,11 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
     "roastLevel": {
       "type": ["string", "null"],
       "enum": ["light", "medium-light", "medium", "medium-dark", "dark", null]
+    },
+    "caffeine": {
+      "type": ["string", "null"],
+      "enum": ["caffeinated", "decaf", "half-caf", null],
+      "description": "Only when the text says so. Ordinary coffee is not labelled caffeinated; silence means null."
     },
     "tastingNotes": { "type": "array", "items": { "type": "string" } },
     "roastDate": { "type": ["string", "null"], "description": "YYYY-MM-DD" },
@@ -438,7 +477,7 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
 Columns (in order):
 
 ```
-id, roaster, name, origins, process, roastLevel, varietals,
+id, roaster, name, origins, process, roastLevel, caffeine, varietals,
 tastingNotes, roastDate, purchaseDate, bagSizeGrams, priceAmount,
 priceCurrency, source, sourceUrl, isArchived, createdAt, updatedAt
 ```

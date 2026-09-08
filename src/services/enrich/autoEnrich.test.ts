@@ -54,6 +54,7 @@ function parsed(overrides: Record<string, unknown> = {}) {
     origins: [{ country: 'Colombia', region: null, farm: null, producer: null, percentage: null }],
     process: 'washed' as const,
     roastLevel: 'medium-light' as const,
+    caffeine: null,
     tastingNotes: ['chocolate', 'citrus'],
     roastDate: '2025-06-01',
     varietals: ['Caturra'],

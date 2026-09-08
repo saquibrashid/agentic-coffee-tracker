@@ -1,4 +1,5 @@
-import type { CoffeeBean, Process, RoastLevel } from '@/types';
+import type { CaffeineLevel, CoffeeBean, Process, RoastLevel } from '@/types';
+import { caffeineOf } from '@/services/beans/caffeine';
 import { beanNeedsEnrichment } from '@/services/enrich/completeness';
 
 /**
@@ -26,6 +27,15 @@ export const PROCESSES: Process[] = [
   'other',
   'unknown',
 ];
+
+/**
+ * Offered in the filter in the order a drinker thinks in, with `unknown` last.
+ *
+ * Every coffee recorded before this field existed is `unknown`, so that option
+ * is the one which actually finds something on day one; it is still listed last
+ * because it is a gap to fill, not a kind of coffee.
+ */
+export const CAFFEINE_LEVELS: CaffeineLevel[] = ['caffeinated', 'decaf', 'half-caf', 'unknown'];
 
 export type BeanSortKey = 'newest' | 'name' | 'rating';
 
@@ -69,6 +79,14 @@ export interface LibraryFilters {
   roastLevel: RoastLevel | 'all';
   process: Process | 'all';
   /**
+   * Decaf is the reason this exists (#277, and the gap #109 could not close).
+   * It is a four-way choice rather than a decaf toggle because a toggle would
+   * have to decide what an unanswered coffee is, and answering "not decaf" for
+   * a library nobody has labelled is exactly the wrong guess to bake into a
+   * filter.
+   */
+  caffeine: CaffeineLevel | 'all';
+  /**
    * Multi-select facets. Empty means "no constraint", never "match nothing" —
    * an empty array is the natural state, so treating it as an exclusion would
    * hide the whole library by default.
@@ -103,6 +121,7 @@ export const DEFAULT_FILTERS: LibraryFilters = {
   search: '',
   roastLevel: 'all',
   process: 'all',
+  caffeine: 'all',
   roasters: [],
   origins: [],
   varietals: [],
@@ -132,6 +151,7 @@ export function countActiveFilters(filters: LibraryFilters): number {
   if (filters.search.trim() !== '') count += 1;
   if (filters.roastLevel !== 'all') count += 1;
   if (filters.process !== 'all') count += 1;
+  if (filters.caffeine !== 'all') count += 1;
   if (filters.roasters.length > 0) count += 1;
   if (filters.origins.length > 0) count += 1;
   if (filters.varietals.length > 0) count += 1;
@@ -312,6 +332,9 @@ export function filterAndSortBeans(
       return false;
     }
     if (filters.process !== 'all' && (bean.process ?? 'unknown') !== filters.process) {
+      return false;
+    }
+    if (filters.caffeine !== 'all' && caffeineOf(bean) !== filters.caffeine) {
       return false;
     }
     if (!matchesAny(filters.roasters, [bean.roaster])) return false;

@@ -5,6 +5,22 @@
 
 export type RoastLevel = 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark' | 'unknown';
 
+/**
+ * How much caffeine is in the bag.
+ *
+ * A three-way enum with an explicit `unknown`, matching `RoastLevel` and
+ * `Process`, rather than a `decaf` boolean. A boolean has to answer "is this
+ * decaf?" for every coffee ever recorded, including the ones nobody looked at —
+ * and its `false` would mean both "confirmed caffeinated" and "never asked".
+ * That is the exact conflation this field exists to remove, and it would force
+ * extraction to guess on every bag that does not mention caffeine at all.
+ *
+ * `half-caf` is a real product rather than a completeness exercise: blends sold
+ * as half-caf are common enough to buy by accident, and they belong with
+ * neither group when the question is what to drink in the evening.
+ */
+export type CaffeineLevel = 'caffeinated' | 'decaf' | 'half-caf' | 'unknown';
+
 export type Process =
   'washed' | 'natural' | 'honey' | 'anaerobic' | 'wet-hulled' | 'other' | 'unknown';
 
@@ -48,6 +64,20 @@ export interface CoffeeBean {
   origins?: Origin[];
   process?: Process;
   roastLevel?: RoastLevel;
+  /**
+   * Deliberately optional and deliberately not part of `schemaVersion`.
+   *
+   * Bumping the version would make every device running an older build refuse
+   * these records with `NeedsUpgradeError` and halt sync entirely, which is far
+   * worse than the field being absent. An additive optional key needs no such
+   * treatment: old builds ignore it, and because every write is a partial
+   * `db.beans.update()` and sync stores the whole payload, a record that
+   * round-trips through an old device comes back with the value intact.
+   *
+   * Absent means the same as `'unknown'` — every coffee recorded before this
+   * field existed. Read it through `caffeineOf()` rather than directly.
+   */
+  caffeine?: CaffeineLevel;
   varietals?: string[];
   elevationMeters?: { min?: number; max?: number };
 

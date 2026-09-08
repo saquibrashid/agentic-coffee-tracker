@@ -33,6 +33,7 @@ function parsed(overrides: Partial<ParsedBean> = {}): ParsedBean {
     ],
     process: 'washed',
     roastLevel: 'light',
+    caffeine: null,
     tastingNotes: ['peach', 'jasmine'],
     roastDate: null,
     varietals: ['Heirloom'],

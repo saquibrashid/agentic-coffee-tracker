@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import {
+  CAFFEINE_LEVELS,
   FRESHNESS_OPTIONS,
   PROCESSES,
   RATING_OPTIONS,
@@ -31,7 +32,8 @@ import {
   type LibraryFacets,
   type LibraryFilters,
 } from '@/services/beans/library';
-import type { Process, RoastLevel } from '@/types';
+import { CAFFEINE_LABELS } from '@/services/beans/caffeine';
+import type { CaffeineLevel, Process, RoastLevel } from '@/types';
 
 export interface BeanFiltersProps {
   filters: LibraryFilters;
@@ -154,6 +156,24 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
                 {PROCESSES.map((process) => (
                   <option key={process} value={process}>
                     {process}
+                  </option>
+                ))}
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="filter-caffeine" className="mb-1 block">
+                Caffeine
+              </Label>
+              <Select
+                id="filter-caffeine"
+                value={filters.caffeine}
+                onChange={(e) => onChange('caffeine', e.target.value as CaffeineLevel | 'all')}
+              >
+                <option value="all">Caffeinated and decaf</option>
+                {CAFFEINE_LEVELS.map((level) => (
+                  <option key={level} value={level}>
+                    {CAFFEINE_LABELS[level]}
                   </option>
                 ))}
               </Select>

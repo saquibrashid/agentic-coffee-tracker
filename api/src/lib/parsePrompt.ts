@@ -20,4 +20,6 @@ export const PARSE_SYSTEM_PROMPT = `You extract structured coffee bean metadata 
 
 Return ONLY fields present in or strongly implied by the text. Use null for anything unknown — do not invent details the text does not support. Normalize roast level and process to the provided enums. Output must match the supplied JSON schema exactly.
 
+Caffeine deserves particular care, because the absence of a statement is not evidence. Ordinary coffee does not label itself "caffeinated" — it simply says nothing — so return null unless the text names decaf, decaffeinated, a decaffeination method such as Swiss Water, EA or sugarcane, or half-caf. Guessing "caffeinated" from silence would mark the whole library as confirmed when none of it has been checked.
+
 Prose describing the coffee — its story, cooperative, farm, processing or flavour — belongs in roasterDescription. Copy it from the text rather than writing your own, and condense only to remove shipping, pricing, subscription and other boilerplate that is not about the coffee itself.`;

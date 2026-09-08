@@ -124,6 +124,7 @@ export interface ParsedBean {
   origins: ParsedOrigin[];
   process: 'washed' | 'natural' | 'honey' | 'anaerobic' | 'wet-hulled' | 'other' | null;
   roastLevel: 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark' | null;
+  caffeine: 'caffeinated' | 'decaf' | 'half-caf' | null;
   tastingNotes: string[];
   roastDate: string | null;
   varietals: string[];

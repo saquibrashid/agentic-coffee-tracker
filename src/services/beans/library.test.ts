@@ -131,6 +131,26 @@ describe('filterAndSortBeans', () => {
     expect(ids(result)).toEqual(['archived']);
   });
 
+  it('separates decaf from caffeinated', () => {
+    // The whole point of #277: a decaf and a caffeinated coffee are different
+    // drinks, and the library had no way to tell them apart at all.
+    const decafBeans = [
+      bean({ id: 'decaf', name: 'Night Light', caffeine: 'decaf' }),
+      bean({ id: 'caf', name: 'Southern Weather', caffeine: 'caffeinated' }),
+      bean({ id: 'half', name: 'Middle Ground', caffeine: 'half-caf' }),
+      bean({ id: 'legacy', name: 'Recorded Before The Field Existed' }),
+    ];
+    const all = summariseBeans(decafBeans, []);
+
+    expect(ids(filterAndSortBeans(all, filters({ caffeine: 'decaf' })))).toEqual(['decaf']);
+    expect(ids(filterAndSortBeans(all, filters({ caffeine: 'caffeinated' })))).toEqual(['caf']);
+    expect(ids(filterAndSortBeans(all, filters({ caffeine: 'half-caf' })))).toEqual(['half']);
+    // A coffee saved before the field existed has no value at all, and must
+    // land under "not known" rather than being assumed caffeinated.
+    expect(ids(filterAndSortBeans(all, filters({ caffeine: 'unknown' })))).toEqual(['legacy']);
+    expect(ids(filterAndSortBeans(all, filters())).length).toBe(4);
+  });
+
   it('filters to beans the AI flagged for review', () => {
     expect(ids(filterAndSortBeans(summaries, filters({ needsReviewOnly: true })))).toEqual([
       'colombia',
