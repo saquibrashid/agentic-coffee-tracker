@@ -41,6 +41,7 @@
  * confident about.
  */
 import { db } from '@/services/db';
+import { caffeineForNewBean } from '@/services/enrich/inferCaffeine';
 import type { CoffeeBean, Process, Rating, RoastLevel } from '@/types';
 
 /** Prefix on every sample id, so one is recognisable in a debugger or a log. */
@@ -218,6 +219,9 @@ export function buildSampleData(now: number = Date.now()): {
       origins: [{ country: sample.country, ...(sample.region ? { region: sample.region } : {}) }],
       process: sample.process,
       roastLevel: sample.roastLevel,
+      // Sample coffees are all caffeinated, and saying so keeps a demo library
+      // from being the one place in the app where every bean reads "Not known".
+      caffeine: caffeineForNewBean({ name: sample.name }),
       tastingNotes: sample.tastingNotes,
       source: 'manual',
       isArchived: false,

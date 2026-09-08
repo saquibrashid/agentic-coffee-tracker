@@ -2,6 +2,7 @@ import { ulid } from 'ulid';
 import { db } from '@/services/db';
 import { beanNeedsEnrichment } from '@/services/enrich/autoEnrich';
 import { inferRoastLevel } from '@/services/enrich/inferRoast';
+import { caffeineForNewBean } from '@/services/enrich/inferCaffeine';
 import { DEFAULT_BREW_TYPE } from '@/services/ratings/brewTypes';
 import {
   LEGACY_MAX_SCORE,
@@ -443,6 +444,10 @@ export function planCsvImport(text: string, existing: ExistingData): ImportPlan 
         ...(tastingNotes.length > 0 ? { tastingNotes } : {}),
         ...(roastLevel ? { roastLevel } : {}),
         ...(process ? { process } : {}),
+        // Same reasoning as the roast level above: the name is usually the only
+        // place a spreadsheet records this, and leaving the import as `unknown`
+        // hides every row from the decaf/caffeinated split.
+        caffeine: caffeineForNewBean({ name }),
       };
       beansByKey.set(key, bean);
       plan.newBeans.push(bean);

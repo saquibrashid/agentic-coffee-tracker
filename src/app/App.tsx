@@ -67,6 +67,12 @@ function Shell() {
     void import('@/services/enrich/backfillRoast').then((m) => m.backfillRoastLevels());
   }, []);
 
+  // Same shape, same reasoning, for caffeine: pure string matching over text we
+  // already hold, with an assumption of "caffeinated" behind it.
+  useEffect(() => {
+    void import('@/services/enrich/backfillCaffeine').then((m) => m.backfillCaffeine());
+  }, []);
+
   // Sync starts on app open, per specs/sync.md -> Triggers. Lazy for the same
   // reason as the queue runner: neither is needed for first paint, and the
   // Cosmos-facing engine pulls in code a signed-out user never runs.

@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
+import { CAFFEINE_LEVELS } from '@/services/beans/library';
 import { markBeanReviewed } from '@/services/beans/review';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
 import {
@@ -38,7 +39,7 @@ import { EnrichPanel } from './EnrichPanel';
 import { PhotoThumbnail } from './PhotoLightbox';
 import { PhotoPanel } from './PhotoPanel';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
-import type { BrewType, CoffeeBean, Money, Rating } from '@/types';
+import type { BrewType, CaffeineLevel, CoffeeBean, Money, Rating } from '@/types';
 
 const SCORE_OPTIONS = SCORE_CHOICES;
 
@@ -127,6 +128,55 @@ function Attribute({ label, children }: { label: string; children: React.ReactNo
     <div>
       <dt className="text-meta text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 text-sm">{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * The one bean attribute the user can change by hand.
+ *
+ * Everything else on this card is read-only and corrected through a web lookup,
+ * which is the right default for facts a roaster publishes. Caffeine is not one
+ * of those facts: it is assumed rather than read whenever a bag does not say
+ * "decaf" on it, so there has to be somewhere to say otherwise, and a lookup
+ * cannot be that place — it would have to find evidence the bag never printed.
+ *
+ * Saving on change rather than behind an edit/save pair. There is one value, it
+ * comes from a closed list, and choosing it *is* the intent; a confirm step
+ * would only add a way to lose the change.
+ */
+function CaffeineAttribute({ bean }: { bean: CoffeeBean }) {
+  const [saving, setSaving] = useState(false);
+
+  async function onChange(level: CaffeineLevel) {
+    setSaving(true);
+    try {
+      await db.beans.update(bean.id, { caffeine: level, updatedAt: new Date().toISOString() });
+      await enqueueUpsert('bean', bean.id);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <dt className="text-meta text-muted-foreground">
+        <Label htmlFor="bean-caffeine">Caffeine</Label>
+      </dt>
+      <dd className="mt-0.5 text-sm">
+        <Select
+          id="bean-caffeine"
+          value={caffeineOf(bean)}
+          disabled={saving}
+          onChange={(e) => void onChange(e.target.value as CaffeineLevel)}
+        >
+          {CAFFEINE_LEVELS.map((level) => (
+            <option key={level} value={level}>
+              {CAFFEINE_LABELS[level]}
+            </option>
+          ))}
+        </Select>
+      </dd>
     </div>
   );
 }
@@ -391,12 +441,13 @@ export function BeanDetailPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {hasNoAttributes(bean) ? (
-            <p className="text-muted-foreground text-sm">
+          {hasNoAttributes(bean) && (
+            <p className="text-muted-foreground mb-3 text-sm">
               Nothing else is known about this coffee yet. Try{' '}
               <span className="font-medium">Details from the web</span> below.
             </p>
-          ) : (
+          )}
+          {
             /*
               A description list rather than sentences: these are field/value
               pairs, and marking them as such is what lets a screen reader
@@ -408,6 +459,12 @@ export function BeanDetailPage() {
               made four short facts as tall as a paragraph. Wider screens take
               more columns rather than stretching two across the whole line,
               which stranded each label a third of a screen from its value.
+
+              Rendered even when nothing is known, where it collapses to the one
+              caffeine control. That control is the only way to correct a coffee
+              the app assumed was caffeinated, so hiding it behind "we know
+              nothing about this bean" would put it out of reach exactly where a
+              sparse decaf needs it.
             */
             <dl className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
               <Attribute label="Roast">
@@ -421,9 +478,7 @@ export function BeanDetailPage() {
               <Attribute label="Process">
                 {bean.process !== undefined && bean.process !== 'unknown' && bean.process}
               </Attribute>
-              <Attribute label="Caffeine">
-                {caffeineOf(bean) !== 'unknown' && CAFFEINE_LABELS[caffeineOf(bean)]}
-              </Attribute>
+              <CaffeineAttribute bean={bean} />
               <Attribute label="Varietals">
                 {(bean.varietals ?? []).length > 0 && (bean.varietals ?? []).join(', ')}
               </Attribute>
@@ -441,7 +496,7 @@ export function BeanDetailPage() {
                 {bean.pricePaid !== undefined && formatMoney(bean.pricePaid)}
               </Attribute>
             </dl>
-          )}
+          }
           {/*
             Notes and the roaster's blurb sit outside the two-column grid: one
             is a set of short chips that reads better as a row, the other is

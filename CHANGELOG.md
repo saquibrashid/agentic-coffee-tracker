@@ -543,9 +543,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     ("Swiss Water", "sugarcane EA") counts too; a bare "also available as a
     decaf" in a roaster's blurb deliberately does not, because it is describing
     a different coffee.
-  - Nothing is assumed about the existing library. Every coffee recorded before
-    the field existed reads as "not known", which compares equal to everything,
-    so no preference or recommendation changes until the user says otherwise.
+  - Every coffee gets a value. A one-time pass on app start reads decaf out of
+    each existing bean's own text and assumes "caffeinated" for the rest —
+    essentially all coffee is, and decaf is the case a roaster marks. New
+    coffees default the same way. Leaving a library at "not known" would have
+    been honest about the data and wrong about the world, and would have
+    excluded every existing coffee from the one distinction the field draws.
+  - Caffeine is now editable on a coffee's own page — the only bean attribute
+    that is. It has to be: it is the only one assumed rather than read, and a
+    web lookup cannot correct an unmarked decaf, because the product page has no
+    evidence to find.
   - `schemaVersion` stays at `1`: the field is optional and additive, so older
     builds round-trip it untouched rather than halting sync.
   - **"Will I like it?" now reasons about caffeine.** It is weighted above

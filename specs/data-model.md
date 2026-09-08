@@ -116,15 +116,46 @@ decaf the user enjoyed count as evidence against their own preferences.
 Three rules follow, and every consumer reads them from
 `src/services/beans/caffeine.ts` rather than re-deriving them:
 
-- **Absent means unanswered, never "caffeinated".** Every coffee recorded before
-  this field existed has no value, which is indistinguishable from one nobody
-  has answered for. Both read as `unknown`.
+- **Absent means unanswered, never "caffeinated".** `caffeineOf` normalises a
+  missing value to `unknown` and nothing infers otherwise from silence. This is
+  a rule about _reading_ stored data, and it is what lets `caffeine` be an
+  enrichable field: an inference that guessed "caffeinated" from an absence
+  would have every web lookup propose overwriting a decaf set by hand.
 - **`unknown` compares equal to everything.** Treating it as its own group would
   split the library in half on the day the field shipped and leave the
   preference engine nothing to learn from.
 - **`half-caf` is its own value, not a kind of decaf.** It is a distinct
   product, and folding it in would let the filter and the preference engine
   disagree about the same bag.
+
+#### Writing: caffeinated is the default
+
+Reading is agnostic; _writing_ is not. A coffee being recorded now is assumed
+caffeinated unless its own text says otherwise (`DEFAULT_CAFFEINE`, applied via
+`caffeineForNewBean`). That is a claim about the world rather than about the
+data — essentially all coffee sold is caffeinated, and decaf is the case a
+roaster marks prominently, because it is the reason someone buys it.
+
+Storing `unknown` instead would be honest and useless: it records ignorance the
+app does not have, and it excludes the coffee from the one distinction the field
+was added to draw.
+
+The assumption is applied only where it can be corrected — at capture, where it
+is the pre-filled value on a form the user is about to confirm, and by
+`backfillCaffeine`, a self-limiting pass that gives every pre-existing coffee a
+value on app start and never revisits one that has an answer. That pass writes
+locally only — no `updatedAt` bump, no outbox row. It is a pure function of
+`name` and `roasterDescription`, which already sync, so every device derives the
+same answer for itself; uploading it once resurrected a bean deleted on another
+device, because the upsert carried a fresh timestamp and won last-write-wins. A
+corrected value is the opposite case and does sync, being a fact no other device
+can derive.
+
+The correction itself lives on the bean's own page: caffeine is the single bean
+attribute editable by hand, because it is the only one assumed rather than read,
+and a web lookup cannot fix it — there is no evidence on the product page to
+find. Enrichment can still propose decaf over the assumption; it arrives as a
+conflict and is left unchecked rather than applied silently.
 
 `schemaVersion` stays at `1`. The field is optional and additive, so an older
 build reads and re-writes a record carrying it without loss; bumping the version
