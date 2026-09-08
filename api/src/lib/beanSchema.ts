@@ -39,6 +39,31 @@ export type ProcessValue = (typeof PROCESS_VALUES)[number];
 export type RoastLevelValue = (typeof ROAST_LEVEL_VALUES)[number];
 export type CaffeineValue = (typeof CAFFEINE_VALUES)[number];
 
+/**
+ * More origins than any one coffee has, which makes it a signal about the text.
+ *
+ * A coffee added from a Cometeer "build your own box" page came back with some
+ * fifty origins. Nothing had gone wrong in the model's own terms: it was handed
+ * a page describing forty different coffees and told the text was about one, so
+ * it did the only thing that instruction allows and merged them.
+ *
+ * Blends are the reason this is a ceiling rather than a rule against more than
+ * one origin — a holiday blend of five or six components is a real product. But
+ * a coffee with more origins than that is not a recipe, it is two coffees'
+ * worth of text that were never separated. The count is the cheapest reliable
+ * evidence that the input was not about a single coffee.
+ *
+ * The whole result is rejected rather than the list trimmed. Text that merged
+ * forty coffees also merged their names, notes and descriptions, so the origins
+ * are the symptom and not the disease — the observed result carried a site
+ * tagline as the roaster's description and "incredible coffee" as a tasting
+ * note. Trimming to six would leave all of that in place and make it look
+ * deliberate; fifty origins is at least visibly absurd, and six wrong ones are
+ * not. Rejecting sends the caller down the path it already has for a model
+ * answer it cannot use: the bean is flagged for review with the raw text kept.
+ */
+export const MAX_PLAUSIBLE_ORIGINS = 6;
+
 export interface ParsedOrigin {
   country: string | null;
   region: string | null;
@@ -232,6 +257,16 @@ function checkEnum(
 function checkOrigins(value: unknown, errors: string[]): void {
   if (!Array.isArray(value)) {
     errors.push('/origins must be an array');
+    return;
+  }
+  if (value.length > MAX_PLAUSIBLE_ORIGINS) {
+    // Not a schema violation — the shape is fine. It is the count that says the
+    // text described several coffees, and the caller should treat the answer as
+    // unusable rather than record a blend nobody sells.
+    errors.push(
+      `/origins has ${value.length} entries, more than the ${MAX_PLAUSIBLE_ORIGINS} a single ` +
+        'coffee can plausibly have; the text likely described more than one coffee',
+    );
     return;
   }
   value.forEach((origin: unknown, i) => {

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CAFFEINE_VALUES,
+  MAX_PLAUSIBLE_ORIGINS,
   PARSED_BEAN_SCHEMA,
   PROCESS_VALUES,
   REQUIRED_BEAN_KEYS,
@@ -118,6 +119,67 @@ describe('validateParsedBean', () => {
     expect(result.valid).toBe(false);
     if (result.valid) return;
     expect(result.errors.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+/*
+ * A coffee added from a Cometeer "build your own box" page came back with some
+ * fifty origins: the page describes forty coffees, the prompt says the text is
+ * about one, and merging is the only reading that allows. Nothing structural in
+ * the page gives it away — it carries one schema.org Product block, and that
+ * block names the box rather than any coffee — so the count of origins is the
+ * cheapest evidence available that the input was never about a single coffee.
+ */
+describe('implausible origin counts', () => {
+  const origin = (country: string) => ({
+    country,
+    region: null,
+    farm: null,
+    producer: null,
+    percentage: null,
+  });
+  const origins = (n: number) => Array.from({ length: n }, (_, i) => origin(`Country ${i}`));
+
+  it('rejects a coffee with more origins than any blend has', () => {
+    const result = validateParsedBean({ ...valid, origins: origins(50) });
+    expect(result.valid).toBe(false);
+    if (result.valid) return;
+    expect(result.errors.join(' ')).toContain('more than one coffee');
+  });
+
+  it('still accepts a large but real blend', () => {
+    // Holiday blends of five or six components are sold; the ceiling exists to
+    // catch merged text, not to legislate what a blend may contain.
+    const result = validateParsedBean({ ...valid, origins: origins(MAX_PLAUSIBLE_ORIGINS) });
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects one past the ceiling, so the boundary is where it claims to be', () => {
+    expect(
+      validateParsedBean({ ...valid, origins: origins(MAX_PLAUSIBLE_ORIGINS + 1) }).valid,
+    ).toBe(false);
+  });
+
+  it('rejects the whole result rather than trimming the list', () => {
+    // Text that merged forty coffees merged their names and notes too. Trimming
+    // to six would keep all of that and make it look deliberate.
+    const result = validateParsedBean({
+      ...valid,
+      roaster: 'Cometeer',
+      name: 'Build Your Own Box',
+      tastingNotes: ['incredible coffee'],
+      origins: origins(40),
+    });
+    expect(result.valid).toBe(false);
+  });
+
+  it('does not report the merged entries individually', () => {
+    // Fifty per-origin complaints would bury the one fact that matters, and the
+    // entries are not individually malformed — there are simply too many.
+    const result = validateParsedBean({ ...valid, origins: origins(50) });
+    expect(result.valid).toBe(false);
+    if (result.valid) return;
+    expect(result.errors).toHaveLength(1);
   });
 });
 

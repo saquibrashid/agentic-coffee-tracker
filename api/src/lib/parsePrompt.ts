@@ -15,11 +15,24 @@
  * "description" and an instruction not to guess resolves ties towards null.
  * Naming the possible sources, and saying that prose about the coffee *is* the
  * description, is what gives that paragraph somewhere to land.
+ *
+ * The second addition came from the opposite failure. A coffee added from a
+ * Cometeer "build your own box" page came back with some fifty origins, a site
+ * tagline as the roaster's description and "incredible coffee" as a tasting
+ * note. The model was not malfunctioning: it had been handed a page describing
+ * forty coffees and told in the first sentence that the text was about one, and
+ * merging was the only reading that instruction allows. Nothing structural in
+ * the page said otherwise — it carried a single schema.org Product block naming
+ * the box rather than any coffee — so the model is the only thing in the chain
+ * that can see there are forty coffees on the page, and it has to be told that
+ * noticing is allowed.
  */
 export const PARSE_SYSTEM_PROMPT = `You extract structured coffee bean metadata from text about a single coffee. The text may be OCR of a bag label, a roaster's product page, a datasheet, or details a user pasted in, so it ranges from a few label fragments to several paragraphs of prose.
+
+Sometimes the text is not about one coffee at all. A shop's listing page, a "build your own box" page, a category page or a page whose navigation and recommendations swamp the product will describe many different coffees side by side. When you cannot tell which single coffee the text is about, say so by returning nulls and empty lists rather than combining several coffees into one. Merging them produces a coffee that does not exist — a dozen origins, flavour notes from unrelated beans — and that is worse than returning nothing, because nothing is visibly nothing while a merge looks like an answer. Return details only when the text is dominated by one coffee, and never assemble a coffee from parts of several.
 
 Return ONLY fields present in or strongly implied by the text. Use null for anything unknown — do not invent details the text does not support. Normalize roast level and process to the provided enums. Output must match the supplied JSON schema exactly.
 
 Caffeine deserves particular care, because the absence of a statement is not evidence. Ordinary coffee does not label itself "caffeinated" — it simply says nothing — so return null unless the text names decaf, decaffeinated, a decaffeination method such as Swiss Water, EA or sugarcane, or half-caf. Guessing "caffeinated" from silence would mark the whole library as confirmed when none of it has been checked.
 
-Prose describing the coffee — its story, cooperative, farm, processing or flavour — belongs in roasterDescription. Copy it from the text rather than writing your own, and condense only to remove shipping, pricing, subscription and other boilerplate that is not about the coffee itself.`;
+Prose describing the coffee — its story, cooperative, farm, processing or flavour — belongs in roasterDescription. Copy it from the text rather than writing your own, and condense only to remove shipping, pricing, subscription and other boilerplate that is not about the coffee itself. A site-wide tagline or mission statement is not a description of the coffee; leave it out.`;

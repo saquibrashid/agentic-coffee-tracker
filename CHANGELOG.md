@@ -22,6 +22,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A coffee added from a shop's listing page came back as forty coffees merged
+  into one** (#291). A Cometeer “build your own box” URL produced roughly fifty
+  origins, the site's own tagline as the roaster description and “incredible
+  coffee” as a tasting note. The model was not malfunctioning: it was handed a
+  page describing forty coffees and told in the prompt's first sentence that the
+  text was about one, and merging is the only reading that instruction allows.
+  Nothing structural in the page gives it away — it carries a single schema.org
+  `Product` block, and that block names the box rather than any coffee — so the
+  model is the only step in the chain that can see there are forty, and it is
+  now told that noticing is allowed and that nulls beat a merge. A parse
+  returning more than six origins is also rejected outright as a failed parse:
+  blends of five or six components are real, but beyond that the count is not a
+  recipe, it is two coffees' worth of text that were never separated. The whole
+  result is discarded rather than the list trimmed, because text that merged
+  forty coffees merged their names and notes too — trimming would leave that in
+  place and make it look deliberate. Rejected parses take the path that already
+  exists for unusable model output: the coffee is flagged for review with the
+  raw text kept.
+
 - **Photos could never sync, and the app blamed your network for it.** The
   deploy workflow passed the API base URL and the auth flag into the web build
   but not the photo storage account name, which is what puts
