@@ -239,6 +239,29 @@ describe('autoEnrichBean', () => {
     expect(result?.filled).toContain('roastLevel');
   });
 
+  it('leaves the address the user added the coffee from alone', async () => {
+    // The Cometeer case. Enrichment searches for the roaster and finds the
+    // roaster's page, which is right for `sourceUrl` and wrong as the link back
+    // to what the user bought -- so it must not touch `vendorUrl`, and the
+    // update it returns is applied over the bean.
+    findCandidates.mockResolvedValue([
+      { url: 'https://counterculture.example/fast-forward', title: 'Fast Forward', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed(),
+      rawText: 'raw',
+      sourceUrl: 'https://counterculture.example/fast-forward',
+      model: 'gpt-4o',
+    });
+
+    const result = await autoEnrichBean(
+      bean({ vendorUrl: 'https://cometeer.example/build-your-own-box' }),
+    );
+
+    expect(result?.update.sourceUrl).toBe('https://counterculture.example/fast-forward');
+    expect('vendorUrl' in (result?.update ?? {})).toBe(false);
+  });
+
   it('infers the roast level when the page states it only in prose', () => {
     // The parse is instructed not to guess, so a roaster who writes the roast
     // into a sentence rather than a labelled field returns null here.

@@ -526,6 +526,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A coffee can now link to both where you bought it and where its details came
+  from** (#278). Cometeer flash-freezes other roasters' coffee, so a coffee added
+  from Cometeer was documented by Counter Culture's own product page — and
+  enrichment used to overwrite the address the user had entered with the one it
+  found, leaving the coffee linking to a bag they never bought. `vendorUrl` now
+  holds the user's address and nothing overwrites it, while `sourceUrl` stays
+  provenance and may change with every lookup. Both are shown when they differ,
+  labelled by host: the app cannot tell a roaster's own storefront from a
+  reseller's, so it no longer claims "the roaster's site". The same split covers
+  pods and subscription boxes without modelling them.
+
 - **Decaf is now tracked separately from caffeinated coffee** (#277, closing the
   one part of #109 that could not be built). `CoffeeBean.caffeine` is a
   four-value enum — caffeinated, decaf, half-caf, not known — set from the

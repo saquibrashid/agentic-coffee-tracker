@@ -85,6 +85,10 @@ export function AddCoffeePage() {
       name: 'Draft from link',
       source: 'url-scrape',
       sourceUrl: trimmed,
+      // The user chose this address. Enrichment may later point `sourceUrl` at
+      // a roaster's own page, which is right for provenance and wrong as the
+      // link back to what they actually bought.
+      vendorUrl: trimmed,
       caffeine: DEFAULT_CAFFEINE,
       isArchived: false,
       needsReview: true,
@@ -102,6 +106,7 @@ export function AddCoffeePage() {
         ...parsedBeanToUpdate(enriched.parsed),
         ...(photo ?? {}),
         sourceUrl: trimmed,
+        vendorUrl: trimmed,
       });
       await enqueueUpsert('bean', beanId);
       const bean = await db.beans.get(beanId);

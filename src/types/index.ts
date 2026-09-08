@@ -94,6 +94,23 @@ export interface CoffeeBean {
 
   source: EntrySource;
   sourceUrl?: string;
+  /**
+   * The page the user added this coffee from, which is not always the page its
+   * details were read from.
+   *
+   * Cometeer is the case that forced the distinction: it flash-freezes other
+   * roasters' coffee, so a Cometeer product page and Counter Culture's own page
+   * describe the same beans in different packaging. Enrichment searches for the
+   * roaster and finds the roaster's page, then stamps `sourceUrl` with it —
+   * correct as provenance, but it silently replaced the link the user had
+   * supplied, leaving the coffee pointing at a bag they did not buy.
+   *
+   * So the two are kept apart by who owns them. `sourceUrl` belongs to whatever
+   * read the details last and may change with every lookup; this belongs to the
+   * user and is written once, at capture, and never overwritten. The same split
+   * covers pods and subscription boxes without needing to model them.
+   */
+  vendorUrl?: string;
   confidence?: number;
   rawOcrText?: string;
   llmModel?: string;
