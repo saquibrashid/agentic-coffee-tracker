@@ -287,6 +287,61 @@ describe('predict', () => {
     expect(withProcess.score).toBeGreaterThan(index.baseline + 1);
   });
 
+  it('judges a decaf against the user\u2019s decaf history, not their coffee history', () => {
+    // The point of #277. Someone who drinks mostly caffeinated coffee and
+    // scores it well, but rates the few decafs they have tried poorly, should
+    // not be told they will love the next decaf.
+    const caffeinated = history(10, 9, {
+      origins: [{ country: 'Ethiopia' }],
+      caffeine: 'caffeinated',
+    });
+    const decaf = history(4, 4, { origins: [{ country: 'Ethiopia' }], caffeine: 'decaf' });
+    const index = buildIndex(
+      [...caffeinated.beans, ...decaf.beans],
+      [...caffeinated.ratings, ...decaf.ratings],
+    );
+
+    const asDecaf = predict({ origins: [{ country: 'Ethiopia' }], caffeine: 'decaf' }, index);
+    const unstated = predict({ origins: [{ country: 'Ethiopia' }] }, index);
+
+    expect(asDecaf.score).toBeLessThan(unstated.score);
+    const evidence = [...asDecaf.supporting, ...asDecaf.detracting].find(
+      (e) => e.kind === 'caffeine',
+    );
+    expect(evidence?.label).toBe('decaf');
+    expect(evidence?.delta).toBeLessThan(0);
+  });
+
+  it('does not carry evidence between decaf and half-caf', () => {
+    // Roast level and process are scales, so a neighbour stands in for a value
+    // never rated. Caffeine is not: half-caf has not been through the
+    // decaffeination that flattens a decaf, so a decaf history says nothing
+    // about it and must be reported as unrated rather than approximated.
+    const decaf = history(6, 3, { caffeine: 'decaf' });
+    const index = buildIndex(decaf.beans, decaf.ratings);
+
+    const result = predict({ caffeine: 'half-caf' }, index);
+
+    expect([...result.supporting, ...result.detracting]).not.toContainEqual(
+      expect.objectContaining({ kind: 'caffeine' }),
+    );
+    expect(result.unknowns).toContain('half-caf');
+  });
+
+  it('ignores caffeine on a library that predates the field', () => {
+    // Every bean saved before #277 has no value at all. Indexing that as a
+    // value would build one bucket holding the entire history and present it
+    // as evidence about caffeine.
+    const legacy = history(8, 7, { origins: [{ country: 'Peru' }] });
+    const index = buildIndex(legacy.beans, legacy.ratings);
+
+    expect(index.caffeine.size).toBe(0);
+
+    // And an unstated candidate must not be scored as if it were anything.
+    const result = predict({ origins: [{ country: 'Peru' }] }, index);
+    expect(result.missing).toContain('caffeine');
+  });
+
   it('treats roast level as a scale, not as unrelated labels', () => {
     // A candidate roast the user has never rated used to count as no evidence at
     // all, even with plenty of history one step along the scale.

@@ -548,6 +548,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     so no preference or recommendation changes until the user says otherwise.
   - `schemaVersion` stays at `1`: the field is optional and additive, so older
     builds round-trip it untouched rather than halting sync.
+  - **"Will I like it?" now reasons about caffeine.** It is weighted above
+    origin, because caffeine changes what the drink _is_ rather than how it
+    tastes within a kind — so how you score decaf predicts your next decaf
+    better than any origin match does. Unlike roast level and process it is
+    matched exactly, never by a neighbour: half-caf sits numerically between
+    decaf and caffeinated, but it has not been through the decaffeination that
+    flattens a decaf, so carrying evidence across that line would be wrong.
+    Coffees with no caffeine recorded are skipped entirely, so a library that
+    predates the field predicts exactly as it did before.
 
 - **A coffee saved with blanks now tells you they are being looked up.** Adding
   a coffee has always queued a web lookup for whatever you left empty, but it
