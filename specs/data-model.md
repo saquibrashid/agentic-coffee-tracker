@@ -515,14 +515,33 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
 }
 ```
 
-**System prompt (canonical):**
+**System prompt:** `api/src/lib/parsePrompt.ts` holds the canonical text, and
+`parsePrompt.test.ts` pins the clauses that were added to fix a specific
+misparse. It is not reproduced here — a copy in prose drifts from the one that
+actually runs, and this section already had, telling the model its input was
+always "OCR text of a coffee bag" long after the endpoint began receiving
+product pages, datasheets and pasted prose.
 
-> You extract structured coffee bean metadata from OCR text of a coffee bag. Return ONLY fields present in or strongly implied by the text. Use null for anything unknown — do not guess. Normalize roast level and process to the provided enums. Output must match the supplied JSON schema exactly.
+**Not every page is about one coffee.** A shop's listing page, a "build your own
+box" page or a category page describes many coffees at once. The prompt tells
+the model to return nulls in that case rather than merge them, because a merged
+coffee does not exist and looks like an answer. Nothing structural in the page
+reveals this reliably: the Cometeer page that prompted the rule carries a single
+schema.org `Product` block, and that block names the box rather than any coffee.
+The model is the only step in the chain that can see the page holds forty
+coffees, so it has to be permitted to say so.
 
 **Failure handling:**
 
 - JSON parse failure → retry once at temperature 0.
 - Schema validation failure → mark task `needsReview = true`, surface raw text to user.
+- More than `MAX_PLAUSIBLE_ORIGINS` (6) origins → rejected as a failed parse, on
+  the same path. Blends of five or six components are real, so this is a ceiling
+  rather than a rule against multiple origins; beyond it the count is not a
+  recipe but evidence that two coffees' worth of text were never separated. The
+  whole result is discarded rather than the list trimmed, because text that
+  merged forty coffees merged their names and notes too — trimming would leave
+  that in place and make it look deliberate.
 - All fields null → suggest manual entry.
 
 ---

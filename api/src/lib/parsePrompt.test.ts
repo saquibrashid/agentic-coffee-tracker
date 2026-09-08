@@ -32,4 +32,25 @@ describe('PARSE_SYSTEM_PROMPT', () => {
   it('copies the roaster rather than writing new marketing copy', () => {
     expect(PARSE_SYSTEM_PROMPT).toMatch(/copy it from the text/i);
   });
+
+  /*
+   * The opposite failure to the one above. A Cometeer "build your own box" page
+   * describes forty coffees; the prompt's first sentence promised one, so the
+   * model merged them into a coffee that does not exist. Nothing structural in
+   * the page reveals this, so the model is the only thing in the chain that can
+   * notice — and it had been told not to.
+   */
+  it('allows the model to say the text is not about one coffee', () => {
+    expect(PARSE_SYSTEM_PROMPT).toMatch(/not about one coffee|many different coffees/i);
+    expect(PARSE_SYSTEM_PROMPT).toMatch(/listing page|category page/i);
+  });
+
+  it('asks for nothing rather than a merge', () => {
+    expect(PARSE_SYSTEM_PROMPT).toMatch(/rather than combining several coffees/i);
+    expect(PARSE_SYSTEM_PROMPT).toMatch(/never assemble a coffee from parts of several/i);
+  });
+
+  it('keeps a site-wide tagline out of the coffee description', () => {
+    expect(PARSE_SYSTEM_PROMPT).toMatch(/tagline|mission statement/i);
+  });
 });
