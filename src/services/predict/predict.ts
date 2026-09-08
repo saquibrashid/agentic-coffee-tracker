@@ -23,7 +23,8 @@
  */
 import { MAX_SCORE, NEUTRAL_SCORE, clampToScale } from '@/services/ratings/scale';
 import { flavourFamily, originFamily, PROCESS_NEIGHBOUR_DISCOUNT, PROCESS_ORDER } from './families';
-import type { CoffeeBean, Origin, Process, Rating, RoastLevel } from '@/types';
+import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
+import type { CaffeineLevel, CoffeeBean, Origin, Process, Rating, RoastLevel } from '@/types';
 
 /**
  * Strength of the pull toward the baseline, in units of evidence weight. At
@@ -36,8 +37,15 @@ const PRIOR_STRENGTH = 2.5;
  * How much each kind of match counts. Origin and process are the strongest
  * palate signals; a roaster is a decent proxy for house style; flavour notes are
  * noisy marketing copy, so they are individually weak and collectively capped.
+ *
+ * Caffeine is weighted above all of them because it is the one attribute that
+ * changes what the drink *is* rather than how it tastes within a kind.
+ * Decaffeination strips aromatics and flattens acidity, so knowing how someone
+ * scores decaf tells you more about how they will score another decaf than any
+ * origin or roast match does (#277).
  */
 const ATTRIBUTE_WEIGHTS = {
+  caffeine: 1.1,
   origin: 1,
   process: 0.9,
   roaster: 0.85,
@@ -96,6 +104,7 @@ export interface PredictionIndex {
   origins: Map<string, AttributeStats>;
   processes: Map<string, AttributeStats>;
   roastLevels: Map<string, AttributeStats>;
+  caffeine: Map<string, AttributeStats>;
   flavours: Map<string, AttributeStats>;
   /** The user's overall average — what a coffee scores absent any other signal. */
   baseline: number;
@@ -150,6 +159,7 @@ export interface Candidate {
   origins?: Origin[] | undefined;
   process?: Process | undefined;
   roastLevel?: RoastLevel | undefined;
+  caffeine?: CaffeineLevel | undefined;
   tastingNotes?: string[] | undefined;
 }
 
@@ -186,6 +196,7 @@ export function buildIndex(beans: CoffeeBean[], ratings: Rating[]): PredictionIn
     origins: new Map(),
     processes: new Map(),
     roastLevels: new Map(),
+    caffeine: new Map(),
     flavours: new Map(),
     baseline: NEUTRAL_SCORE,
     totalRatings: ratings.length,
@@ -209,6 +220,11 @@ export function buildIndex(beans: CoffeeBean[], ratings: Rating[]): PredictionIn
     if (bean.roastLevel && bean.roastLevel !== 'unknown') {
       accumulate(index.roastLevels, bean.roastLevel, score);
     }
+    // `unknown` is skipped like every other attribute: it is the state of every
+    // coffee recorded before the field existed, so indexing it would build a
+    // bucket holding the whole history and claim it as evidence about caffeine.
+    const caffeine = caffeineOf(bean);
+    if (caffeine !== 'unknown') accumulate(index.caffeine, caffeine, score);
     for (const origin of bean.origins ?? []) {
       if (origin.country) accumulate(index.origins, origin.country, score);
     }
@@ -464,6 +480,11 @@ export function predict(candidate: Candidate, index: PredictionIndex): Predictio
   };
 
   consider(candidate.roaster, index.roasters, 'roaster');
+  // Deliberately the plain matcher, not the ordinal one. Caffeine is not a
+  // scale: half-caf sits numerically between decaf and caffeinated but the
+  // decaffeination that flattens a decaf has not been done to it, so a
+  // neighbour discount would carry evidence across a line the process draws.
+  consider(candidate.caffeine, index.caffeine, 'caffeine');
   considerOrdinal(
     candidate.process,
     index.processes,
@@ -616,5 +637,9 @@ export function explain(evidence: Evidence): string {
       return evidence.approximate
         ? `You have not rated this note, but related ones — ${evidence.label} — average ${average}/${MAX_SCORE} across ${ratings}.`
         : `Coffees noting "${evidence.label}" average ${average}/${MAX_SCORE} across ${ratings}.`;
+    case 'caffeine':
+      return evidence.label === 'decaf'
+        ? `Your decaf averages ${average}/${MAX_SCORE} across ${ratings}.`
+        : `${CAFFEINE_LABELS[evidence.label as CaffeineLevel] ?? evidence.label} coffees average ${average}/${MAX_SCORE} across ${ratings}.`;
   }
 }

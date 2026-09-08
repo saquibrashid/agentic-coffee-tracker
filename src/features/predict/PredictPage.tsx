@@ -51,7 +51,8 @@ import { predict, type Prediction } from '@/services/predict/predict';
 import { VerdictHero } from './VerdictHero';
 import { WizardSteps, type PredictStep } from './WizardSteps';
 import type { ParsedBean } from '@/services/ai';
-import type { Process, RoastLevel } from '@/types';
+import type { CaffeineLevel, Process, RoastLevel } from '@/types';
+import { parsedBeanToUpdate } from '@/services/ai/mapping';
 
 const PROCESS_OPTIONS: { value: Process | ''; label: string }[] = [
   { value: '', label: 'Not sure' },
@@ -72,6 +73,13 @@ const ROAST_OPTIONS: { value: RoastLevel | ''; label: string }[] = [
   { value: 'dark', label: 'Dark' },
 ];
 
+const CAFFEINE_OPTIONS: { value: CaffeineLevel | ''; label: string }[] = [
+  { value: '', label: 'Not sure' },
+  { value: 'caffeinated', label: 'Caffeinated' },
+  { value: 'decaf', label: 'Decaf' },
+  { value: 'half-caf', label: 'Half-caf' },
+];
+
 interface FormState {
   /**
    * The coffee's own name. Carried purely as a label — see `handlePredict`,
@@ -82,6 +90,7 @@ interface FormState {
   origin: string;
   process: Process | '';
   roastLevel: RoastLevel | '';
+  caffeine: CaffeineLevel | '';
   tastingNotes: string;
 }
 
@@ -91,6 +100,7 @@ const EMPTY_FORM: FormState = {
   origin: '',
   process: '',
   roastLevel: '',
+  caffeine: '',
   tastingNotes: '',
 };
 
@@ -275,6 +285,9 @@ function formFromParsed(parsed: ParsedBean): FormState {
       .join(', '),
     process: parsed.process ?? '',
     roastLevel: parsed.roastLevel ?? '',
+    // The mapper is the one place that also reads a "Decaf" sitting only in the
+    // product name, so go through it rather than reading `parsed` directly.
+    caffeine: parsedBeanToUpdate(parsed).caffeine ?? '',
     tastingNotes: parsed.tastingNotes.join(', '),
   };
 }
@@ -461,6 +474,7 @@ export function PredictPage() {
           origins: splitList(form.origin).map((country) => ({ country })),
           process: form.process || undefined,
           roastLevel: form.roastLevel || undefined,
+          caffeine: form.caffeine || undefined,
           tastingNotes: splitList(form.tastingNotes),
         },
         index,
@@ -497,7 +511,8 @@ export function PredictPage() {
     form.origin.trim() !== '' ||
     form.tastingNotes.trim() !== '' ||
     form.process !== '' ||
-    form.roastLevel !== '';
+    form.roastLevel !== '' ||
+    form.caffeine !== '';
 
   if (!index) {
     return <Skeleton className="h-64 w-full" />;
@@ -720,6 +735,23 @@ export function PredictPage() {
                     disabled={busy !== null}
                   >
                     {ROAST_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="predict-caffeine" className="mb-1 block">
+                    Caffeine
+                  </Label>
+                  <Select
+                    id="predict-caffeine"
+                    value={form.caffeine}
+                    onChange={(e) => update({ caffeine: e.target.value as CaffeineLevel | '' })}
+                    disabled={busy !== null}
+                  >
+                    {CAFFEINE_OPTIONS.map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>
