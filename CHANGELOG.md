@@ -574,21 +574,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **A coffee bought from a shop other than its roaster now says so** (#296).
-  A Cometeer box has “Cometeer” printed on it, and the OCR always read that
-  word — the parse schema simply had nowhere to put it, so the only name that
-  survived was the roaster a later web lookup happened to find, and the bean
-  page read “Counter Culture” with no hint of where the box came from. The
-  parse now returns a `vendor`, and the detail page shows “Counter Culture ·
-  via Cometeer”. Null stays the normal answer: most coffee is bought from the
-  people who roasted it, the prompt is told never to repeat the roaster here,
-  and the value is collapsed anyway when it matches. A missing vendor is not
-  treated as a gap, so it never triggers a lookup — and because background
-  enrichment can only write fields on that same list, a later visit to the
-  roaster's own page cannot erase a shop the bag established. The explicit
-  “Fetch missing info” panel can still offer one, since the user is there to
-  refuse it. The name is never turned into a link: `cometeer.com` would be
-  invented, and `vendorUrl` remains the user's to write.
+- **A coffee that comes as pods or pre-ground now says so** (#299, replacing
+  the field added in #296). That field shipped as `vendor`, "the shop that sold
+  it", on the reading that a Cometeer box is coffee sold by Cometeer. It is
+  not: Cometeer flash-freezes _other roasters'_ brewed coffee into pucks, so
+  the box is Counter Culture's coffee in a different form, and the shop it was
+  actually carried out of was a grocery store. Which shop a coffee came from
+  says nothing about the coffee, so it is no longer asked for or stored.
+
+  What is worth knowing is the form it arrives in, and `format` now records it
+  — `whole-bean`, `ground`, `cometeer`, `nespresso`, `k-cup` or `instant` — as
+  a **closed enum rather than free text**. That is the part that matters: free
+  text is what let a shop name become a property of the coffee, and it would
+  have done so again the first time a receipt was parsed. The parse prompt was
+  live asking for a seller; against an Amazon listing it would have found one.
+
+  The bean page reads "Counter Culture · Cometeer", with the roaster left where
+  it belongs. Whole bean is never displayed, since nearly every coffee is one.
+  The default is applied on read rather than written, so a coffee saved before
+  the field existed answers the same as a plain bag saved today. Enrichment
+  still cannot write the field: a background lookup of the roaster's own page
+  describes a bag of beans and must not "correct" a frozen puck into one.
+
+  A Dexie v6 upgrade moves any stored `vendor` naming a system we model onto
+  `format`, drops the rest, and removes the key so it stops syncing.
 
 - **A coffee can now link to both where you bought it and where its details came
   from** (#278). Cometeer flash-freezes other roasters' coffee, so a coffee added

@@ -4,7 +4,7 @@ import type { ParsedBean } from './index';
 
 const empty: ParsedBean = {
   roaster: null,
-  vendor: null,
+  format: null,
   name: null,
   origins: [],
   process: null,
@@ -24,62 +24,40 @@ describe('parsedBeanToUpdate', () => {
   });
 
   /*
-   * A Cometeer box says "Cometeer" on it and the OCR reads it, but before the
-   * schema had a vendor the word was dropped -- so a coffee bought from a
-   * reseller kept only the roaster an enrichment search later found.
+   * A Cometeer box says "Cometeer" on it and the OCR reads it, but the schema
+   * had nowhere to put the word, so the coffee kept only the roaster an
+   * enrichment search later found.
+   *
+   * The field was briefly modelled as a *seller*, which was wrong: Cometeer
+   * flash-freezes other roasters' brewed coffee, so the box is still the
+   * roaster's coffee in another form. What matters is the form, and the shop
+   * it was carried out of is not recorded at all.
    */
-  describe('vendor', () => {
-    it('records a shop that is not the roaster', () => {
+  describe('format', () => {
+    it('records the form without disturbing the roaster', () => {
       const update = parsedBeanToUpdate({
         ...empty,
         roaster: 'Counter Culture Coffee',
-        vendor: 'Cometeer',
+        format: 'cometeer',
       });
 
-      expect(update.vendor).toBe('Cometeer');
+      expect(update.format).toBe('cometeer');
       expect(update.roaster).toBe('Counter Culture Coffee');
     });
 
-    it('drops a vendor that is only the roaster again', () => {
-      // The prompt says not to repeat the roaster, but an instruction is not a
-      // guarantee, and "Onyx · via Onyx" is worse than nothing.
-      const update = parsedBeanToUpdate({
-        ...empty,
-        roaster: 'Onyx Coffee Lab',
-        vendor: 'Onyx Coffee Lab',
-      });
+    it('leaves the field absent when the text does not say', () => {
+      // Deliberately not defaulted here. `parsedBeanToUpdate` also serves
+      // enrichment, and a silent lookup at the roaster's own page must not be
+      // able to "correct" a Cometeer puck to a bag of beans.
+      const update = parsedBeanToUpdate({ ...empty, roaster: 'Onyx Coffee Lab', format: null });
 
-      expect(update.vendor).toBeUndefined();
+      expect('format' in update).toBe(false);
     });
 
-    it('ignores casing and padding when comparing the two', () => {
-      const update = parsedBeanToUpdate({
-        ...empty,
-        roaster: 'Onyx Coffee Lab',
-        vendor: '  onyx coffee lab ',
-      });
+    it('keeps the form even when the roaster is unknown', () => {
+      const update = parsedBeanToUpdate({ ...empty, roaster: null, format: 'nespresso' });
 
-      expect(update.vendor).toBeUndefined();
-    });
-
-    it('keeps a vendor even when the roaster is unknown', () => {
-      // A bag photographed badly can yield the shop and not the roaster; the
-      // one fact that survived is still worth keeping.
-      const update = parsedBeanToUpdate({ ...empty, roaster: null, vendor: 'Cometeer' });
-
-      expect(update.vendor).toBe('Cometeer');
-    });
-
-    it('treats whitespace as no vendor at all', () => {
-      const update = parsedBeanToUpdate({ ...empty, vendor: '   ' });
-
-      expect(update.vendor).toBeUndefined();
-    });
-
-    it('leaves the field alone for the ordinary coffee bought from its roaster', () => {
-      const update = parsedBeanToUpdate({ ...empty, roaster: 'Onyx Coffee Lab', vendor: null });
-
-      expect('vendor' in update).toBe(false);
+      expect(update.format).toBe('nespresso');
     });
   });
 

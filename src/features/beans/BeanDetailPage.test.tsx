@@ -527,21 +527,23 @@ describe('BeanDetailPage source links', () => {
     expect(await screen.findByRole('link', { name: 'highwirecoffee.com' })).toBeInTheDocument();
   });
 
-  it('names the shop beside the roaster when one sold the coffee', async () => {
-    await db.beans.update('bean-1', { vendor: 'Cometeer' });
+  it('names the packaging beside the roaster when it is not a bag of beans', async () => {
+    await db.beans.update('bean-1', { format: 'cometeer' });
     renderPage();
 
-    // Identity, not a tasting attribute -- "via" because the roaster made it
-    // and the shop only sold it.
-    expect(await screen.findByText(/via Cometeer/)).toBeInTheDocument();
+    // The roaster still made the coffee -- Cometeer only froze it -- so the
+    // roaster stays and the form is added beside it.
+    expect(await screen.findByText(/Cometeer/)).toBeInTheDocument();
     expect(screen.getByText(/Stumptown Coffee Roasters/)).toBeInTheDocument();
   });
 
-  it('says nothing about a shop for a coffee bought from its roaster', async () => {
+  it('says nothing about packaging for an ordinary bag of beans', async () => {
     renderPage();
 
     await screen.findByText('Holler Mtn.');
-    expect(screen.queryByText(/via /)).not.toBeInTheDocument();
+    // Nearly every coffee is whole bean, so labelling each one would add a word
+    // that distinguishes nothing.
+    expect(screen.queryByText(/Whole bean/)).not.toBeInTheDocument();
   });
 
   it('shows no links when the coffee has no address, but still offers to take one', async () => {

@@ -87,7 +87,7 @@ describe('v2 rating-scale migration', () => {
     const db = await openUpgraded('migrate-fresh');
 
     expect(await db.ratings.count()).toBe(0);
-    expect(db.verno).toBe(5);
+    expect(db.verno).toBe(6);
   });
 });
 
@@ -111,5 +111,79 @@ describe('v4 pendingAiTasks.beanId index', () => {
 
     expect(await db.pendingAiTasks.where('beanId').equals('b1').count()).toBe(1);
     expect(await db.pendingAiTasks.where('beanId').equals('b2').count()).toBe(0);
+  });
+});
+
+/**
+ * Seeds beans carrying the retired `vendor` field, which shipped briefly on the
+ * wrong idea that a Cometeer box is coffee *sold by* Cometeer.
+ */
+async function seedWithVendors(name: string, vendors: (string | undefined)[]): Promise<void> {
+  const legacy = new Dexie(name);
+  legacy.version(1).stores({
+    beans: 'id, roaster, createdAt, isArchived, needsReview, *tastingNotes',
+    ratings: 'id, beanId, ratedAt, brewType',
+    photos: 'id, kind',
+    ocrResults: 'id, photoId',
+    preferences: 'id',
+    pendingAiTasks: 'id, type, nextAttemptAt',
+    meta: 'key',
+  });
+  await legacy.open();
+  await legacy.table('beans').bulkAdd(
+    vendors.map((vendor, i) => ({
+      id: `b${i}`,
+      schemaVersion: 1,
+      name: `Coffee ${i}`,
+      roaster: 'Counter Culture Coffee',
+      source: 'photo',
+      isArchived: false,
+      needsReview: false,
+      createdAt: '2026-01-02T00:00:00.000Z',
+      updatedAt: '2026-01-02T00:00:00.000Z',
+      ...(vendor === undefined ? {} : { vendor }),
+    })),
+  );
+  legacy.close();
+}
+
+describe('v6 vendor-to-format migration', () => {
+  it('moves a vendor that named a delivery system onto format', async () => {
+    await seedWithVendors('migrate-fmt-known', ['Cometeer', 'nespresso', 'Keurig']);
+
+    const db = await openUpgraded('migrate-fmt-known');
+    const beans = await db.beans.orderBy('id').toArray();
+
+    expect(beans.map((b) => b.format)).toEqual(['cometeer', 'nespresso', 'k-cup']);
+  });
+
+  it('discards a vendor that was only ever a shop', async () => {
+    // The whole point of the correction: where a coffee was bought says nothing
+    // about the coffee, so "Sprouts" is dropped rather than relabelled.
+    await seedWithVendors('migrate-fmt-shop', ['Sprouts']);
+
+    const db = await openUpgraded('migrate-fmt-shop');
+    const bean = await db.beans.get('b0');
+
+    expect(bean?.format).toBeUndefined();
+  });
+
+  it('removes the field itself so it stops syncing between devices', async () => {
+    await seedWithVendors('migrate-fmt-drop', ['Cometeer', 'Sprouts']);
+
+    const db = await openUpgraded('migrate-fmt-drop');
+    const beans = await db.beans.toArray();
+
+    expect(beans.every((b) => !('vendor' in b))).toBe(true);
+  });
+
+  it('leaves a coffee that never had a vendor untouched', async () => {
+    await seedWithVendors('migrate-fmt-none', [undefined]);
+
+    const db = await openUpgraded('migrate-fmt-none');
+    const bean = await db.beans.get('b0');
+
+    expect(bean?.format).toBeUndefined();
+    expect(bean?.roaster).toBe('Counter Culture Coffee');
   });
 });

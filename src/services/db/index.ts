@@ -2,6 +2,7 @@ import Dexie, { type Table } from 'dexie';
 import { rescaleLegacyScore } from '@/services/ratings/scale';
 import type {
   CoffeeBean,
+  CoffeeFormat,
   Rating,
   PhotoBlob,
   OcrResult,
@@ -14,6 +15,19 @@ interface MetaRecord {
   key: string;
   value: unknown;
 }
+
+/**
+ * Values the retired `vendor` field could hold that name a format we now model.
+ *
+ * Keyed case-folded. Anything absent from this table was a shop rather than a
+ * format and is discarded by the v6 upgrade.
+ */
+const LEGACY_VENDOR_FORMATS: Record<string, CoffeeFormat> = {
+  cometeer: 'cometeer',
+  nespresso: 'nespresso',
+  'k-cup': 'k-cup',
+  keurig: 'k-cup',
+};
 
 /**
  * Single Dexie database for the app. See specs/data-model.md for the store layout
@@ -91,6 +105,30 @@ export class CoffeeDB extends Dexie {
     // have no such field and are simply absent from the index.
     this.version(5).stores({
       photos: 'id, kind, sourcePhotoId',
+    });
+
+    // v6 retires `vendor`, which shipped briefly on the wrong idea that a
+    // Cometeer box is coffee *sold by* Cometeer. It is not: Cometeer
+    // flash-freezes other roasters' brewed coffee into pucks, so the box is
+    // still the roaster's coffee in a different form, and the shop it was
+    // actually carried out of says nothing about the coffee.
+    //
+    // Any value that names a format we now model is moved onto `format`;
+    // anything else was a shop name and is dropped, which is the point of the
+    // change. The field is deleted either way so it stops syncing between
+    // devices. No `.stores()` call is needed: `vendor` was never indexed.
+    this.version(6).upgrade(async (tx) => {
+      await tx
+        .table<CoffeeBean & { vendor?: string }>('beans')
+        .toCollection()
+        .modify((bean) => {
+          const vendor = bean.vendor?.trim().toLowerCase();
+          if (!vendor) return;
+          delete bean.vendor;
+          if (bean.format) return;
+          const known = LEGACY_VENDOR_FORMATS[vendor];
+          if (known) bean.format = known;
+        });
     });
   }
 }

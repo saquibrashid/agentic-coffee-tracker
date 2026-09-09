@@ -29,11 +29,18 @@
  *
  * The third came from the same box, photographed rather than scraped. The word
  * "Cometeer" is printed on it and the OCR read it, but the schema had nowhere
- * to put a seller, so the only name that survived was the roaster the
- * enrichment search then found — and the coffee lost every trace of where it
- * came from. The instruction has to lean hard towards null: most coffee is
- * bought from its roaster, and a shop invented for a bag that never came from
- * one is a worse error than the blank it replaces.
+ * to put it, so the only name that survived was the roaster the enrichment
+ * search then found — and the coffee lost every trace of the form it came in.
+ *
+ * That field was first modelled as a *seller*, which was wrong and briefly
+ * shipped as one. Cometeer flash-freezes other roasters' brewed coffee into
+ * pucks; a Cometeer box of Counter Culture coffee is Counter Culture's coffee,
+ * delivered frozen. The shop in that case was a Sprouts grocery store, and
+ * where a coffee was bought says nothing about the coffee. Asking for the
+ * seller made the model's job to find one — against a receipt or an Amazon
+ * listing it would have found exactly the noise nobody wanted. The question is
+ * therefore what *form* the coffee arrives in, answered from a closed enum, so
+ * that a shop name has nowhere to land even if the model tries.
  */
 export const PARSE_SYSTEM_PROMPT = `You extract structured coffee bean metadata from text about a single coffee. The text may be OCR of a bag label, a roaster's product page, a datasheet, or details a user pasted in, so it ranges from a few label fragments to several paragraphs of prose.
 
@@ -43,6 +50,6 @@ Return ONLY fields present in or strongly implied by the text. Use null for anyt
 
 Caffeine deserves particular care, because the absence of a statement is not evidence. Ordinary coffee does not label itself "caffeinated" — it simply says nothing — so return null unless the text names decaf, decaffeinated, a decaffeination method such as Swiss Water, EA or sugarcane, or half-caf. Guessing "caffeinated" from silence would mark the whole library as confirmed when none of it has been checked.
 
-The roaster and the seller are not always the same company. Subscription boxes, pod services and resellers — Cometeer, Trade, Atlas and the like — sell other roasters' coffee under their own packaging, so the text may carry two names: the roaster who made it and the shop that sold it. Put the roaster in roaster and the shop in vendor. Most coffee is bought straight from its roaster, so vendor is null far more often than not; return it only when the text names a seller genuinely distinct from the roaster, and never repeat the roaster's name there. Give the seller's name as text, never a web address. Getting this wrong in the direction of guessing is worse than leaving it null, because a coffee attributed to a shop it never came from misstates where the user bought it.
+Coffee does not always arrive as a bag of whole beans. Cometeer flash-freezes brewed coffee into pucks, Nespresso and K-Cup are capsule systems, instant is its own thing, and plenty of bags are sold pre-ground. Record that in format, using the provided enum. A format is not a roaster and not a shop: a Cometeer box of Counter Culture coffee is Counter Culture's coffee delivered frozen, so the roaster still goes in roaster. Never put a retailer in format — a grocery store, a marketplace or any other shop that merely resold the coffee is not a format, and where a coffee was bought is not recorded at all. Return null when the text does not say what form the coffee comes in; whole beans are the ordinary case and are assumed later, so silence needs no guess from you.
 
 Prose describing the coffee — its story, cooperative, farm, processing or flavour — belongs in roasterDescription. Copy it from the text rather than writing your own, and condense only to remove shipping, pricing, subscription and other boilerplate that is not about the coffee itself. A site-wide tagline or mission statement is not a description of the coffee; leave it out.`;

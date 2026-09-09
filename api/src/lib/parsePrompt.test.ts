@@ -53,4 +53,27 @@ describe('PARSE_SYSTEM_PROMPT', () => {
   it('keeps a site-wide tagline out of the coffee description', () => {
     expect(PARSE_SYSTEM_PROMPT).toMatch(/tagline|mission statement/i);
   });
+
+  /*
+   * This paragraph first shipped asking for "the shop that sold it", on the
+   * reading that a Cometeer box is coffee sold by Cometeer. It is not — Cometeer
+   * flash-freezes other roasters' brewed coffee — and the shop in the reporting
+   * case was a grocery store, which says nothing about the coffee. Asking for a
+   * seller made it the model's job to find one.
+   */
+  it('asks what form the coffee comes in, not who sold it', () => {
+    expect(PARSE_SYSTEM_PROMPT).toMatch(/format/);
+    expect(PARSE_SYSTEM_PROMPT).not.toMatch(/the shop that sold it/i);
+    expect(PARSE_SYSTEM_PROMPT).not.toMatch(/\bvendor\b/i);
+  });
+
+  it('forbids a retailer from being recorded as a format', () => {
+    expect(PARSE_SYSTEM_PROMPT).toMatch(/never put a retailer/i);
+    expect(PARSE_SYSTEM_PROMPT).toMatch(/grocery store|marketplace/i);
+  });
+
+  it('keeps the roaster with the roaster when the format is a pod system', () => {
+    // The failure this guards against is Cometeer displacing Counter Culture.
+    expect(PARSE_SYSTEM_PROMPT).toMatch(/still goes in roaster|roaster still goes/i);
+  });
 });

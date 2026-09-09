@@ -59,6 +59,7 @@ export interface CoffeeBean {
   origins?: Origin[]; // multi-origin blends supported
   process?: Process;
   roastLevel?: RoastLevel;
+  format?: CoffeeFormat; // how it is packaged; absent means whole bean
   caffeine?: CaffeineLevel; // absent means nobody has answered; see below
   varietals?: string[]; // e.g. ["Bourbon", "Typica"]
   elevationMeters?: { min?: number; max?: number };
@@ -80,7 +81,6 @@ export interface CoffeeBean {
   // Provenance of data
   source: EntrySource;
   sourceUrl?: string; // where the details were last read from
-  vendor?: string; // the shop that sold it, when not the roaster; read off the bag
   vendorUrl?: string; // who sold it to the user; only ever written by the user
   confidence?: number; // 0–1, from LLM
   rawOcrText?: string; // kept for debugging / re-parsing
@@ -142,28 +142,47 @@ storefront from a reseller's, so it should not claim to.
 The same split covers pods, subscription boxes and any other reseller without
 needing to model them as a concept.
 
-### The shop that sold it
+### The form it arrives in
 
-`vendor` is the seller's _name_, and it is read off the bag exactly the way the
-roaster is. A Cometeer box says "Cometeer" on it; before this field existed the
-OCR read that word and the schema threw it away, so the only name that survived
-was the roaster a later enrichment search happened to find.
+`format` records packaging: `whole-bean`, `ground`, `cometeer`, `nespresso`,
+`k-cup`, `instant`.
 
-Three rules keep it honest:
+This field first shipped as `vendor`, a free-text "shop that sold it", on the
+reading that a Cometeer box is coffee sold by Cometeer. That was wrong.
+Cometeer flash-freezes _other roasters'_ brewed coffee into pucks, so the box
+is Counter Culture's coffee in a different form; the shop it was actually
+carried out of was a grocery store, and which shop a coffee came from says
+nothing about the coffee. Nespresso pods bought on a marketplace are the same
+shape of thing. Where a coffee was purchased is not modelled at all.
 
-- **Null is the normal answer.** Most coffee is bought from the people who
-  roasted it. The parse prompt leans hard towards null and is told never to
-  repeat the roaster here; `parsedBeanToUpdate` collapses the value anyway when
-  it matches the roaster, since an instruction is not a guarantee.
-- **It is never a gap.** `vendor` is deliberately absent from
-  `services/enrich/completeness.ts`, so a missing seller never triggers a
-  lookup and — because `fillMissingFields` filters on that same list — a later
-  lookup against the roaster's own page cannot erase a shop the bag established.
-  Background enrichment cannot write this field at all; the explicit lookup
-  panel can offer it, because the user is there to accept or refuse.
-- **A name is not an address.** Turning "Cometeer" into `cometeer.com` would be
-  inventing a link. `vendorUrl` is where an address goes, and only the user
-  writes it.
+Four rules follow:
+
+- **A closed enum, not a string.** This is the structural part. Free text is
+  what let a shop name become a property of the coffee in the first place, and
+  it would do so again the moment a receipt is parsed. `process` and
+  `roastLevel` are shaped the same way.
+- **The roaster stays the roaster.** A Cometeer box of Counter Culture coffee
+  has Counter Culture in `roaster` and `cometeer` in `format`. The prompt says
+  so explicitly, because displacing the roaster is the failure that started it.
+- **The default is applied on read, not written.** `services/beans/format.ts`
+  maps absent to `whole-bean`. `caffeine` took the other route and needed both
+  a `caffeineForNewBean` and a separate rule for older records; defaulting on
+  read means a coffee saved before the field existed and a plain bag saved
+  today answer identically, with no migration. It also keeps a stored
+  `whole-bean` from ever being confused with one the packaging claimed.
+- **Enrichment cannot write it.** `format` is absent from
+  `services/enrich/completeness.ts`, so a background lookup against the
+  roaster's own product page — which describes a bag of beans — cannot
+  "correct" a frozen puck into whole beans. The explicit review panel may
+  propose it, because the user is there to refuse.
+
+Whole bean is not displayed. Nearly every coffee is one, so the label would add
+a word to every row that distinguishes nothing; `hasNotableFormat` is what the
+screens ask.
+
+A Dexie v6 upgrade retires the old field: a `vendor` naming a system we model
+becomes the matching `format`, anything else was a shop and is dropped, and the
+key is deleted either way so it stops syncing.
 
 ### Caffeine
 
@@ -489,11 +508,11 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
   "additionalProperties": false,
   "required": [
     "roaster",
-    "vendor",
     "name",
     "origins",
     "process",
     "roastLevel",
+    "format",
     "caffeine",
     "tastingNotes",
     "roastDate",
@@ -504,10 +523,6 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
   ],
   "properties": {
     "roaster": { "type": ["string", "null"] },
-    "vendor": {
-      "type": ["string", "null"],
-      "description": "The shop that sold it, only when the text names one distinct from the roaster. Null for the ordinary coffee bought from its roaster. A name, never a URL."
-    },
     "name": { "type": ["string", "null"] },
     "origins": {
       "type": "array",
@@ -531,6 +546,11 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
     "roastLevel": {
       "type": ["string", "null"],
       "enum": ["light", "medium-light", "medium", "medium-dark", "dark", null]
+    },
+    "format": {
+      "type": ["string", "null"],
+      "enum": ["whole-bean", "ground", "cometeer", "nespresso", "k-cup", "instant", null],
+      "description": "The form the coffee arrives in, when the text says. Never who sold it. Null when unstated; whole bean is assumed on read, not written here."
     },
     "caffeine": {
       "type": ["string", "null"],

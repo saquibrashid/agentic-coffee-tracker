@@ -35,9 +35,33 @@ export const ROAST_LEVEL_VALUES = [
  */
 export const CAFFEINE_VALUES = ['caffeinated', 'decaf', 'half-caf'] as const;
 
+/**
+ * The form the coffee arrives in — not who sold it.
+ *
+ * This began life as a free-text `vendor` on the reading that a Cometeer box is
+ * coffee sold by Cometeer. It is not: Cometeer flash-freezes other roasters'
+ * brewed coffee into pucks, so the box is Counter Culture's coffee in a
+ * different form. The shop was a grocery store, and which shop a coffee came
+ * from says nothing about the coffee.
+ *
+ * A closed enum rather than a string is the point. Free text invites a retailer
+ * straight back into the field the moment the model reads a receipt; an enum
+ * gives "Sprouts" nowhere to land. `process` and `roastLevel` are shaped the
+ * same way for the same reason.
+ */
+export const FORMAT_VALUES = [
+  'whole-bean',
+  'ground',
+  'cometeer',
+  'nespresso',
+  'k-cup',
+  'instant',
+] as const;
+
 export type ProcessValue = (typeof PROCESS_VALUES)[number];
 export type RoastLevelValue = (typeof ROAST_LEVEL_VALUES)[number];
 export type CaffeineValue = (typeof CAFFEINE_VALUES)[number];
+export type FormatValue = (typeof FORMAT_VALUES)[number];
 
 /**
  * More origins than any one coffee has, which makes it a signal about the text.
@@ -74,11 +98,11 @@ export interface ParsedOrigin {
 
 export interface ParsedBean {
   roaster: string | null;
-  vendor: string | null;
   name: string | null;
   origins: ParsedOrigin[];
   process: ProcessValue | null;
   roastLevel: RoastLevelValue | null;
+  format: FormatValue | null;
   caffeine: CaffeineValue | null;
   tastingNotes: string[];
   roastDate: string | null;
@@ -91,11 +115,11 @@ export interface ParsedBean {
 /** Keys that must be present on a valid parse result, in spec order. */
 export const REQUIRED_BEAN_KEYS = [
   'roaster',
-  'vendor',
   'name',
   'origins',
   'process',
   'roastLevel',
+  'format',
   'caffeine',
   'tastingNotes',
   'roastDate',
@@ -120,11 +144,6 @@ export const PARSED_BEAN_SCHEMA = {
   required: [...REQUIRED_BEAN_KEYS],
   properties: {
     roaster: { type: ['string', 'null'] },
-    vendor: {
-      type: ['string', 'null'],
-      description:
-        "The shop or service that sold this coffee, when the text names one and it is NOT the roaster — a subscription box, pod service or reseller such as Cometeer, Trade or Blue Bottle at Target. Most coffee is bought from the roaster, so null is the normal answer. Return the seller's name only, never a web address, and never repeat the roaster here.",
-    },
     name: { type: ['string', 'null'] },
     origins: {
       type: 'array',
@@ -143,6 +162,12 @@ export const PARSED_BEAN_SCHEMA = {
     },
     process: { type: ['string', 'null'], enum: [...PROCESS_VALUES, null] },
     roastLevel: { type: ['string', 'null'], enum: [...ROAST_LEVEL_VALUES, null] },
+    format: {
+      type: ['string', 'null'],
+      enum: [...FORMAT_VALUES, null],
+      description:
+        'The form the coffee arrives in, when the text says: "cometeer" for Cometeer\'s flash-frozen pucks, "nespresso" or "k-cup" for those capsules, "ground" for pre-ground bags, "instant", "whole-bean" when stated outright. This is NOT who sold it: a Cometeer box of Counter Culture coffee still has Counter Culture as its roaster, and a grocery store or online marketplace is never a format. Whole beans are the ordinary case and are assumed downstream, so return null when the text does not say.',
+    },
     caffeine: {
       type: ['string', 'null'],
       enum: [...CAFFEINE_VALUES, null],
@@ -197,10 +222,10 @@ export function normalizeParsedBean(input: unknown): unknown {
 
   for (const key of [
     'roaster',
-    'vendor',
     'name',
     'process',
     'roastLevel',
+    'format',
     'caffeine',
     'roastDate',
     'roasterDescription',
@@ -326,12 +351,12 @@ export function validateParsedBean(input: unknown): ValidationResult {
   }
 
   checkNullableString(candidate['roaster'], '/roaster', errors);
-  checkNullableString(candidate['vendor'], '/vendor', errors);
   checkNullableString(candidate['name'], '/name', errors);
   checkNullableString(candidate['roastDate'], '/roastDate', errors);
   checkNullableString(candidate['roasterDescription'], '/roasterDescription', errors);
   checkEnum(candidate['process'], PROCESS_VALUES, '/process', errors);
   checkEnum(candidate['roastLevel'], ROAST_LEVEL_VALUES, '/roastLevel', errors);
+  checkEnum(candidate['format'], FORMAT_VALUES, '/format', errors);
   checkEnum(candidate['caffeine'], CAFFEINE_VALUES, '/caffeine', errors);
   checkStringArray(candidate['tastingNotes'], '/tastingNotes', errors);
   checkStringArray(candidate['varietals'], '/varietals', errors);
@@ -353,11 +378,11 @@ export function validateParsedBean(input: unknown): ValidationResult {
 export function mockParsedBean(ocrText: string): ParsedBean {
   return {
     roaster: 'Mock Roaster',
-    vendor: null,
     name: 'Espresso Blend',
     origins: [{ country: 'Mockland', region: null, farm: null, producer: null, percentage: null }],
     process: 'washed',
     roastLevel: 'medium',
+    format: null,
     caffeine: 'caffeinated',
     tastingNotes: ['chocolate', 'caramel', 'sweet'],
     roastDate: null,
