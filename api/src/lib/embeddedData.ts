@@ -55,6 +55,12 @@ const PRODUCT_FIELDS = new Set([
   'label',
   'value',
   'producttype',
+  // Who roasted it. schema.org puts the roaster here rather than in the
+  // product's own name, and on a reseller's page it is the only field that
+  // names them: Cometeer's markup for Counter Culture's Fast Forward carries
+  // `brand: { name: "Counter Culture" }` while the seller is Cometeer. Without
+  // this the coffee arrives with no roaster at all, or borrows the shop's.
+  'brand',
 ]);
 
 /** Guards against a hostile or pathological document walking forever. */
@@ -158,8 +164,10 @@ function flatten(value: unknown, out: string[], depth = 0): void {
   if (!isRecord(value)) return;
   for (const [key, nested] of Object.entries(value)) {
     // Underscored keys are the platform's own bookkeeping — revisions, types,
-    // internal ids — and never describe the coffee.
-    if (key.startsWith('_') || key === 'slug' || key === 'handle') continue;
+    // internal ids — and never describe the coffee. `@`-prefixed keys are the
+    // same thing in JSON-LD: `brand: { "@type": "Thing", name: "..." }` would
+    // otherwise read as "Thing, Counter Culture".
+    if (key.startsWith('_') || key.startsWith('@') || key === 'slug' || key === 'handle') continue;
     flatten(nested, out, depth + 1);
   }
 }

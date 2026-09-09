@@ -22,6 +22,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Coffees from shops that build their pages in the browser came back empty or
+  wrong** (#293). Scraping assumed the words are in the HTML, and fell back to a
+  page's embedded product data only when the markup came back _empty_. Cometeer
+  showed why length is the wrong test: its product page returns 7,769 characters
+  — navigation, cart, sustainability copy, recipes, footer — and not one word
+  about the coffee, which clears the “did we get anything” bar seventeen times
+  over while containing exactly as much detail as a blank page. The fallback now
+  also fires when the page's own description of the product is nowhere in the
+  text it rendered. That is evidence rather than a threshold: the embedded block
+  is the page's statement of what it is selling, so if the page never rendered
+  it, the text is not about the product. Measured against five real storefronts,
+  exactly one changes behaviour — the broken one. The embedded block is consulted
+  and not preferred, and the comparison deliberately ignores the product's
+  _name_: on a listing page that would hand back the box as though it were a
+  coffee, which is the confident wrong answer #291 was about. The roaster now
+  also survives, because schema.org keeps it in `brand` and on a reseller's page
+  that is the only field naming them — the seller is the shop.
+
 - **A coffee added from a shop's listing page came back as forty coffees merged
   into one** (#291). A Cometeer “build your own box” URL produced roughly fifty
   origins, the site's own tagline as the roaster description and “incredible
