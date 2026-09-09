@@ -22,6 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A blend of two lots from one country read “Guatemala, Guatemala” and counted
+  twice.** Counter Culture's “Fast Forward” is half Manos Campesinas and half
+  Finca La Hermosa, both Guatemalan; two entries is the right record of that
+  coffee, but the farm that tells them apart is deliberately left out of the
+  origin line as too long for a blend, so the line repeated itself. The farm is
+  now added back only to the entries that would otherwise read identically, and
+  exact repeats are collapsed on read, which also repairs coffees already
+  stored. Separately, and the more damaging half: your taste map, Analytics and
+  the score prediction each counted one rating of that blend as _two_
+  observations of Guatemala, so a single cup could outweigh a country you had
+  genuinely drunk twice. All three now count each country once per rating, from
+  one shared definition, so they cannot drift apart again (#202).
+
 - **A coffee added from a photo had no way to say where it came from.** Only the
   link path had an address to record; photograph a Cometeer box and the app
   reads the label, searches for the roaster and lands on Counter Culture's own

@@ -177,3 +177,35 @@ describe('computeAnalyticsFrom', () => {
     });
   });
 });
+
+describe('a blend listing one country twice (#297)', () => {
+  const now = new Date('2026-08-13T12:00:00.000Z');
+  const blend = bean('fastforward', {
+    origins: [
+      { country: 'Guatemala', farm: 'Manos Campesinas' },
+      { country: 'Guatemala', farm: 'Finca La Hermosa' },
+    ],
+  });
+
+  it('counts one rating of it as one observation of Guatemala, not two', () => {
+    const result = computeAnalyticsFrom(
+      [blend],
+      [rating('r1', 'fastforward', 8, '2026-08-12T00:00:00.000Z')],
+      'all',
+      now,
+    );
+    const guatemala = result.topOrigins.find((item) => item.value === 'Guatemala');
+    expect(guatemala?.count).toBe(1);
+    expect(guatemala?.beanCount).toBe(1);
+  });
+
+  it('agrees with the roaster count drawn from the same rating', () => {
+    const result = computeAnalyticsFrom(
+      [blend],
+      [rating('r1', 'fastforward', 8, '2026-08-12T00:00:00.000Z')],
+      'all',
+      now,
+    );
+    expect(result.topOrigins[0]?.count).toBe(result.topRoasters[0]?.count);
+  });
+});

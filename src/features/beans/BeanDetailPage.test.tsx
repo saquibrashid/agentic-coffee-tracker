@@ -196,6 +196,29 @@ describe('BeanDetailPage', () => {
   });
 
   /*
+   * The reported symptom of #297: a blend of two Guatemalan lots read
+   * "Guatemala, Guatemala", because the farm that distinguishes them is
+   * deliberately left out of the line as too long for a blend. It is added
+   * back only where the line would otherwise repeat itself.
+   */
+  it('tells two lots from one country apart rather than repeating the country', async () => {
+    await db.beans.clear();
+    await db.beans.add({
+      ...bean,
+      origins: [
+        { country: 'Guatemala', farm: 'Manos Campesinas' },
+        { country: 'Guatemala', farm: 'Finca La Hermosa' },
+      ],
+    });
+    renderPage();
+
+    expect(
+      await screen.findByText('Guatemala (Manos Campesinas), Guatemala (Finca La Hermosa)'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Guatemala, Guatemala')).not.toBeInTheDocument();
+  });
+
+  /*
    * Everything the record can hold used to reach this page and stop: only
    * roast, origin, process and roast date were rendered, so tasting notes,
    * varietals, elevation, purchase date, bag size, price and the roaster's

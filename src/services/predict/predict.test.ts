@@ -619,3 +619,25 @@ describe('explain', () => {
     );
   });
 });
+
+describe('a blend listing one country twice (#297)', () => {
+  it('counts one rating of it as one observation of Guatemala, not two', () => {
+    const blend = bean({
+      origins: [
+        { country: 'Guatemala', farm: 'Manos Campesinas' },
+        { country: 'Guatemala', farm: 'Finca La Hermosa' },
+      ],
+    });
+    const index = buildIndex([blend], [rating(blend.id, 8)]);
+    expect(index.origins.get('guatemala')?.count).toBe(1);
+  });
+
+  it('does not let the repeat pull the running average off the single score', () => {
+    const blend = bean({
+      origins: [{ country: 'Guatemala' }, { country: 'Guatemala' }],
+    });
+    const index = buildIndex([blend], [rating(blend.id, 8)]);
+    expect(index.origins.get('guatemala')?.count).toBe(1);
+    expect(index.origins.get('guatemala')?.averageScore).toBe(8);
+  });
+});
