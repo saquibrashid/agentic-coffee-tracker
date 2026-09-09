@@ -50,6 +50,7 @@ function bean(overrides: Partial<CoffeeBean> = {}): CoffeeBean {
 function parsed(overrides: Record<string, unknown> = {}) {
   return {
     roaster: 'Onyx Coffee Lab',
+    vendor: null,
     name: 'Southern Weather',
     origins: [{ country: 'Colombia', region: null, farm: null, producer: null, percentage: null }],
     process: 'washed' as const,
@@ -260,6 +261,47 @@ describe('autoEnrichBean', () => {
 
     expect(result?.update.sourceUrl).toBe('https://counterculture.example/fast-forward');
     expect('vendorUrl' in (result?.update ?? {})).toBe(false);
+  });
+
+  it('leaves the shop read off the bag alone', async () => {
+    // The same case for the vendor *name*. A photographed Cometeer box records
+    // "Cometeer"; the enrichment search then finds Counter Culture's own page,
+    // which names no separate seller. `vendor` is deliberately absent from the
+    // completeness field list, so `fillMissingFields` drops it and the fact the
+    // photo established cannot be erased by a later lookup.
+    findCandidates.mockResolvedValue([
+      { url: 'https://counterculture.example/fast-forward', title: 'Fast Forward', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed({ roaster: 'Counter Culture Coffee', vendor: null }),
+      rawText: 'raw',
+      sourceUrl: 'https://counterculture.example/fast-forward',
+      model: 'gpt-4o',
+    });
+
+    const result = await autoEnrichBean(bean({ vendor: 'Cometeer' }));
+
+    expect('vendor' in (result?.update ?? {})).toBe(false);
+  });
+
+  it('does not add a shop to a coffee even when the page names one', async () => {
+    // Enrichment is not allowed to establish this field at all: it runs
+    // unattended against a page the user never saw, and "sold by" is a claim
+    // about their purchase. The explicit lookup panel can offer it; the
+    // background queue cannot write it.
+    findCandidates.mockResolvedValue([
+      { url: 'https://cometeer.example/fast-forward', title: 'Fast Forward', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed({ vendor: 'Cometeer' }),
+      rawText: 'raw',
+      sourceUrl: 'https://cometeer.example/fast-forward',
+      model: 'gpt-4o',
+    });
+
+    const result = await autoEnrichBean(bean());
+
+    expect('vendor' in (result?.update ?? {})).toBe(false);
   });
 
   it('infers the roast level when the page states it only in prose', () => {

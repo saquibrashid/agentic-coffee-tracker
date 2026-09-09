@@ -4,6 +4,7 @@ import type { ParsedBean } from './index';
 
 const empty: ParsedBean = {
   roaster: null,
+  vendor: null,
   name: null,
   origins: [],
   process: null,
@@ -20,6 +21,66 @@ const empty: ParsedBean = {
 describe('parsedBeanToUpdate', () => {
   it('omits every field the model could not resolve', () => {
     expect(parsedBeanToUpdate(empty)).toEqual({ confidence: 0 });
+  });
+
+  /*
+   * A Cometeer box says "Cometeer" on it and the OCR reads it, but before the
+   * schema had a vendor the word was dropped -- so a coffee bought from a
+   * reseller kept only the roaster an enrichment search later found.
+   */
+  describe('vendor', () => {
+    it('records a shop that is not the roaster', () => {
+      const update = parsedBeanToUpdate({
+        ...empty,
+        roaster: 'Counter Culture Coffee',
+        vendor: 'Cometeer',
+      });
+
+      expect(update.vendor).toBe('Cometeer');
+      expect(update.roaster).toBe('Counter Culture Coffee');
+    });
+
+    it('drops a vendor that is only the roaster again', () => {
+      // The prompt says not to repeat the roaster, but an instruction is not a
+      // guarantee, and "Onyx · via Onyx" is worse than nothing.
+      const update = parsedBeanToUpdate({
+        ...empty,
+        roaster: 'Onyx Coffee Lab',
+        vendor: 'Onyx Coffee Lab',
+      });
+
+      expect(update.vendor).toBeUndefined();
+    });
+
+    it('ignores casing and padding when comparing the two', () => {
+      const update = parsedBeanToUpdate({
+        ...empty,
+        roaster: 'Onyx Coffee Lab',
+        vendor: '  onyx coffee lab ',
+      });
+
+      expect(update.vendor).toBeUndefined();
+    });
+
+    it('keeps a vendor even when the roaster is unknown', () => {
+      // A bag photographed badly can yield the shop and not the roaster; the
+      // one fact that survived is still worth keeping.
+      const update = parsedBeanToUpdate({ ...empty, roaster: null, vendor: 'Cometeer' });
+
+      expect(update.vendor).toBe('Cometeer');
+    });
+
+    it('treats whitespace as no vendor at all', () => {
+      const update = parsedBeanToUpdate({ ...empty, vendor: '   ' });
+
+      expect(update.vendor).toBeUndefined();
+    });
+
+    it('leaves the field alone for the ordinary coffee bought from its roaster', () => {
+      const update = parsedBeanToUpdate({ ...empty, roaster: 'Onyx Coffee Lab', vendor: null });
+
+      expect('vendor' in update).toBe(false);
+    });
   });
 
   describe('roast level inference', () => {

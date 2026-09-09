@@ -17,6 +17,7 @@ import type { CaffeineLevel, CoffeeBean } from '@/types';
  * product page cannot know those. */
 export const ENRICHABLE_FIELDS = [
   'roaster',
+  'vendor',
   'name',
   'origins',
   'process',
@@ -42,6 +43,7 @@ export interface FieldProposal {
 
 const FIELD_LABELS: Record<EnrichableField, string> = {
   roaster: 'Roaster',
+  vendor: 'Sold by',
   name: 'Name',
   origins: 'Origins',
   process: 'Process',

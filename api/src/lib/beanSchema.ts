@@ -74,6 +74,7 @@ export interface ParsedOrigin {
 
 export interface ParsedBean {
   roaster: string | null;
+  vendor: string | null;
   name: string | null;
   origins: ParsedOrigin[];
   process: ProcessValue | null;
@@ -90,6 +91,7 @@ export interface ParsedBean {
 /** Keys that must be present on a valid parse result, in spec order. */
 export const REQUIRED_BEAN_KEYS = [
   'roaster',
+  'vendor',
   'name',
   'origins',
   'process',
@@ -118,6 +120,11 @@ export const PARSED_BEAN_SCHEMA = {
   required: [...REQUIRED_BEAN_KEYS],
   properties: {
     roaster: { type: ['string', 'null'] },
+    vendor: {
+      type: ['string', 'null'],
+      description:
+        "The shop or service that sold this coffee, when the text names one and it is NOT the roaster — a subscription box, pod service or reseller such as Cometeer, Trade or Blue Bottle at Target. Most coffee is bought from the roaster, so null is the normal answer. Return the seller's name only, never a web address, and never repeat the roaster here.",
+    },
     name: { type: ['string', 'null'] },
     origins: {
       type: 'array',
@@ -190,6 +197,7 @@ export function normalizeParsedBean(input: unknown): unknown {
 
   for (const key of [
     'roaster',
+    'vendor',
     'name',
     'process',
     'roastLevel',
@@ -318,6 +326,7 @@ export function validateParsedBean(input: unknown): ValidationResult {
   }
 
   checkNullableString(candidate['roaster'], '/roaster', errors);
+  checkNullableString(candidate['vendor'], '/vendor', errors);
   checkNullableString(candidate['name'], '/name', errors);
   checkNullableString(candidate['roastDate'], '/roastDate', errors);
   checkNullableString(candidate['roasterDescription'], '/roasterDescription', errors);
@@ -344,6 +353,7 @@ export function validateParsedBean(input: unknown): ValidationResult {
 export function mockParsedBean(ocrText: string): ParsedBean {
   return {
     roaster: 'Mock Roaster',
+    vendor: null,
     name: 'Espresso Blend',
     origins: [{ country: 'Mockland', region: null, farm: null, producer: null, percentage: null }],
     process: 'washed',

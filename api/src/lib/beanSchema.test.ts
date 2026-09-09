@@ -32,6 +32,23 @@ describe('validateParsedBean', () => {
     expect(result.valid).toBe(true);
   });
 
+  it('accepts a coffee sold by someone other than its roaster', () => {
+    const result = validateParsedBean({ ...valid, vendor: 'Cometeer' });
+    expect(result.valid).toBe(true);
+    if (!result.valid) return;
+    expect(result.value.vendor).toBe('Cometeer');
+  });
+
+  it('rejects a vendor that is not a string', () => {
+    const result = validateParsedBean({ ...valid, vendor: { name: 'Cometeer' } });
+    expect(result.valid).toBe(false);
+    if (result.valid) return;
+    // Specifically a type complaint. Before `vendor` was part of the contract
+    // this same input failed as "not an allowed property", so asserting only
+    // that `/vendor` appears would pass against a schema that has no such field.
+    expect(result.errors).toContain('/vendor must be a string or null');
+  });
+
   it('accepts the mock response so mock mode never 422s', () => {
     const result = validateParsedBean(mockParsedBean('SOME OCR TEXT'));
     expect(result).toEqual({ valid: true, value: mockParsedBean('SOME OCR TEXT') });
@@ -199,6 +216,23 @@ describe('normalizeParsedBean', () => {
       producer: null,
       percentage: null,
     });
+  });
+
+  it('fills an omitted vendor with null, the ordinary answer', () => {
+    const out = normalizeParsedBean({ roaster: 'Onyx' }) as Record<string, unknown>;
+    expect(out['vendor']).toBeNull();
+  });
+
+  /*
+   * Collapsing a vendor that merely repeats the roaster is deliberately NOT
+   * done here. This function fills keys the model omitted; rewriting a value it
+   * did send would make it a different kind of thing, and the API is the wrong
+   * layer for a display concern. `parsedBeanToUpdate` handles it on the client,
+   * beside the other derivations, so every path that builds a bean gets it.
+   */
+  it('leaves a vendor that repeats the roaster for the client to collapse', () => {
+    const out = normalizeParsedBean({ roaster: 'Onyx', vendor: 'Onyx' }) as Record<string, unknown>;
+    expect(out['vendor']).toBe('Onyx');
   });
 });
 

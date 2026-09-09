@@ -594,7 +594,14 @@ export function BeanDetailPage() {
             />
             <div className="min-w-0 flex-1">
               <CardTitle>{bean.name}</CardTitle>
-              <p className="text-muted-foreground text-sm">{bean.roaster}</p>
+              <p className="text-muted-foreground text-sm">
+                {bean.roaster}
+                {/* Identity, not a tasting attribute, so it sits with the
+                    roaster rather than in the grid below. "via" because the
+                    roaster made it and the vendor only sold it -- a Cometeer
+                    box is Counter Culture's coffee. */}
+                {bean.vendor && <span> · via {bean.vendor}</span>}
+              </p>
             </div>
             <ScoreBlock ratings={ratings} />
           </div>

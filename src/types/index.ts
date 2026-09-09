@@ -95,6 +95,20 @@ export interface CoffeeBean {
   source: EntrySource;
   sourceUrl?: string;
   /**
+   * The shop that sold this coffee, when that is not the roaster.
+   *
+   * Read off the packaging or the page, the same way the roaster is: a Cometeer
+   * box says "Cometeer" on it, and before this field existed that word was
+   * discarded because the schema had nowhere to put it. Absent is the normal
+   * answer — most coffee is bought straight from the people who roasted it —
+   * so a blank here means "no separate seller", not "not yet known", and
+   * nothing treats it as a gap worth looking up.
+   *
+   * A name, never an address. Turning "Cometeer" into a URL would be inventing
+   * a link; `vendorUrl` is where an address goes, and only the user writes it.
+   */
+  vendor?: string;
+  /**
    * The page the user added this coffee from, which is not always the page its
    * details were read from.
    *

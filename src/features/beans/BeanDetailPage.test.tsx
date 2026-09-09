@@ -527,6 +527,23 @@ describe('BeanDetailPage source links', () => {
     expect(await screen.findByRole('link', { name: 'highwirecoffee.com' })).toBeInTheDocument();
   });
 
+  it('names the shop beside the roaster when one sold the coffee', async () => {
+    await db.beans.update('bean-1', { vendor: 'Cometeer' });
+    renderPage();
+
+    // Identity, not a tasting attribute -- "via" because the roaster made it
+    // and the shop only sold it.
+    expect(await screen.findByText(/via Cometeer/)).toBeInTheDocument();
+    expect(screen.getByText(/Stumptown Coffee Roasters/)).toBeInTheDocument();
+  });
+
+  it('says nothing about a shop for a coffee bought from its roaster', async () => {
+    renderPage();
+
+    await screen.findByText('Holler Mtn.');
+    expect(screen.queryByText(/via /)).not.toBeInTheDocument();
+  });
+
   it('shows no links when the coffee has no address, but still offers to take one', async () => {
     renderPage();
 
