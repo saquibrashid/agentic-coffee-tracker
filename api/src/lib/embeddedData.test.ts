@@ -148,6 +148,20 @@ describe('productNodeToText', () => {
     const text = productNodeToText({ name: ['Night Light', 'Night Light', 'night light'] });
     expect(text).toBe('name: Night Light');
   });
+
+  it('reads the roaster out of schema.org brand', () => {
+    // On a reseller's page this is the only field that names the roaster: the
+    // seller is the shop. Cometeer's markup for Counter Culture's Fast Forward
+    // carries `brand: { name: "Counter Culture" }` and `seller: Cometeer`.
+    const text = productNodeToText({ brand: { '@type': 'Thing', name: 'Counter Culture' } });
+    expect(text).toBe('brand: Counter Culture');
+  });
+
+  it('leaves JSON-LD bookkeeping out of the text', () => {
+    // `@type` is how the standard labels a node, not something about a coffee;
+    // collecting it would read as "Thing, Counter Culture".
+    expect(productNodeToText({ brand: { '@type': 'Thing', name: 'Onyx' } })).not.toContain('Thing');
+  });
 });
 
 describe('productNodeToImageUrl', () => {
