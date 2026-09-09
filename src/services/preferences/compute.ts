@@ -18,6 +18,7 @@
  * Everything is computed locally — preferences never leave the device except as
  * the small, anonymous summary sent to `/api/recommend`.
  */
+import { uniqueOriginCountries } from '@/services/beans/origins';
 import { NEUTRAL_SCORE } from '@/services/ratings/scale';
 import { shrinkToBaseline } from '@/services/ratings/shrink';
 import { db } from '@/services/db';
@@ -104,8 +105,8 @@ export function computePreferencesFrom(beans: CoffeeBean[], ratings: Rating[]): 
     if (bean.roaster) add(roasters, bean.roaster, score);
     if (bean.process && bean.process !== 'unknown') add(processes, bean.process, score);
     if (bean.roastLevel && bean.roastLevel !== 'unknown') add(roastLevels, bean.roastLevel, score);
-    for (const origin of bean.origins ?? []) {
-      if (origin.country) add(origins, origin.country, score);
+    for (const country of uniqueOriginCountries(bean.origins)) {
+      add(origins, country, score);
     }
     for (const note of bean.tastingNotes ?? []) {
       add(flavors, note.toLowerCase(), score);

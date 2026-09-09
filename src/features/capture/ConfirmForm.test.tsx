@@ -171,3 +171,26 @@ describe('ConfirmForm lookup notice', () => {
     expect(screen.getByText(/looked up on the roaster.s page automatically/i)).toBeInTheDocument();
   });
 });
+
+describe('a blend listing one country twice (#297)', () => {
+  it('offers the country once in the origin field rather than repeating it', async () => {
+    const bean = makeBean({
+      origins: [
+        { country: 'Guatemala', farm: 'Manos Campesinas' },
+        { country: 'Guatemala', farm: 'Finca La Hermosa' },
+      ],
+    });
+    await seed(bean);
+    renderForm(bean);
+
+    expect(screen.getByLabelText(/origin/i)).toHaveValue('Guatemala');
+  });
+
+  it('still lists genuinely different countries', async () => {
+    const bean = makeBean({ origins: [{ country: 'Peru' }, { country: 'Ethiopia' }] });
+    await seed(bean);
+    renderForm(bean);
+
+    expect(screen.getByLabelText(/origin/i)).toHaveValue('Peru, Ethiopia');
+  });
+});

@@ -18,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
 import { formatLabel, hasNotableFormat } from '@/services/beans/format';
+import { formatOriginList } from '@/services/beans/origins';
 import { CAFFEINE_LEVELS } from '@/services/beans/library';
 import { markBeanReviewed } from '@/services/beans/review';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
@@ -360,18 +361,6 @@ function hasNoAttributes(bean: CoffeeBean): boolean {
   );
 }
 
-/** Country plus whichever narrowing detail the roaster gave, e.g.
- * "Colombia (Huila)". Farm and producer stay out: they are long, and a blend
- * would run several of them into an unreadable line. */
-function formatOrigins(origins: NonNullable<CoffeeBean['origins']>): string {
-  return origins
-    .map((o) => {
-      const place = o.region ? `${o.country} (${o.region})` : o.country;
-      return o.percentage !== undefined ? `${place} ${o.percentage}%` : place;
-    })
-    .join(', ');
-}
-
 /** A bare date like `2026-06-01`, read as calendar text rather than an instant.
  * Parsing it as a Date would apply the local timezone and can show the day
  * before. */
@@ -642,7 +631,7 @@ export function BeanDetailPage() {
                 )}
               </Attribute>
               <Attribute label="Origin">
-                {(bean.origins ?? []).length > 0 && formatOrigins(bean.origins ?? [])}
+                {(bean.origins ?? []).length > 0 && formatOriginList(bean.origins)}
               </Attribute>
               <Attribute label="Process">
                 {bean.process !== undefined && bean.process !== 'unknown' && bean.process}

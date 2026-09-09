@@ -16,6 +16,7 @@ import { beanNeedsEnrichment } from '@/services/enrich/autoEnrich';
 import type { CaffeineLevel, CoffeeBean, Process, RoastLevel } from '@/types';
 import { CAFFEINE_LEVELS, PROCESSES, ROAST_LEVELS } from '@/services/beans/library';
 import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
+import { uniqueOriginCountries } from '@/services/beans/origins';
 import { ulid } from 'ulid';
 
 /**
@@ -82,7 +83,7 @@ function toFormState(bean: CoffeeBean): FormState {
     roastLevel: bean.roastLevel ?? 'unknown',
     caffeine: caffeineOf(bean),
     process: bean.process ?? 'unknown',
-    origin: bean.origins?.map((o) => o.country).join(', ') ?? '',
+    origin: uniqueOriginCountries(bean.origins).join(', '),
     tastingNotes: bean.tastingNotes?.join(', ') ?? '',
     roastDate: bean.roastDate ?? '',
   };

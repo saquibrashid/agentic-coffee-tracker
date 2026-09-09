@@ -24,6 +24,7 @@
 import { MAX_SCORE, NEUTRAL_SCORE, clampToScale } from '@/services/ratings/scale';
 import { flavourFamily, originFamily, PROCESS_NEIGHBOUR_DISCOUNT, PROCESS_ORDER } from './families';
 import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
+import { uniqueOriginCountries } from '@/services/beans/origins';
 import type { CaffeineLevel, CoffeeBean, Origin, Process, Rating, RoastLevel } from '@/types';
 
 /**
@@ -225,8 +226,8 @@ export function buildIndex(beans: CoffeeBean[], ratings: Rating[]): PredictionIn
     // bucket holding the whole history and claim it as evidence about caffeine.
     const caffeine = caffeineOf(bean);
     if (caffeine !== 'unknown') accumulate(index.caffeine, caffeine, score);
-    for (const origin of bean.origins ?? []) {
-      if (origin.country) accumulate(index.origins, origin.country, score);
+    for (const country of uniqueOriginCountries(bean.origins)) {
+      accumulate(index.origins, country, score);
     }
     for (const note of bean.tastingNotes ?? []) {
       accumulate(index.flavours, note, score);

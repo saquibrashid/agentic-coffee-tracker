@@ -152,3 +152,32 @@ describe('hasEnoughHistory', () => {
     expect(hasEnoughHistory(prefs)).toBe(true);
   });
 });
+
+describe('a blend listing one country twice (#297)', () => {
+  const blend = bean('fastforward', {
+    origins: [
+      { country: 'Guatemala', farm: 'Manos Campesinas' },
+      { country: 'Guatemala', farm: 'Finca La Hermosa' },
+    ],
+  });
+
+  it('counts one rating of it as one observation of Guatemala, not two', () => {
+    const prefs = computePreferencesFrom([blend], [rating('fastforward', 8)]);
+    const guatemala = prefs.favoriteOrigins.find((item) => item.value === 'Guatemala');
+    expect(guatemala?.count).toBe(1);
+  });
+
+  it('does not let the repeat inflate the origin above the roaster behind it', () => {
+    const prefs = computePreferencesFrom([blend], [rating('fastforward', 8)]);
+    const guatemala = prefs.favoriteOrigins.find((item) => item.value === 'Guatemala');
+    expect(guatemala?.count).toBe(prefs.favoriteRoasters[0]?.count);
+  });
+
+  it('still ranks two genuinely different countries separately', () => {
+    const mixed = bean('mixed', {
+      origins: [{ country: 'Peru' }, { country: 'Ethiopia' }],
+    });
+    const prefs = computePreferencesFrom([mixed], [rating('mixed', 7)]);
+    expect(prefs.favoriteOrigins.map((item) => item.value).sort()).toEqual(['Ethiopia', 'Peru']);
+  });
+});
