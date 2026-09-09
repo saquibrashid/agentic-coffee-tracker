@@ -22,6 +22,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A coffee added from a photo had no way to say where it came from.** Only the
+  link path had an address to record; photograph a Cometeer box and the app
+  reads the label, searches for the roaster and lands on Counter Culture's own
+  page — right as provenance, and leaving nothing to show the coffee arrived in
+  a Cometeer box. The bean page now takes “Where you bought it” by hand, on any
+  coffee, and lets it be changed or cleared later. Clearing removes the field
+  rather than storing a blank, so an empty value is not synced to other devices
+  as though it were an answer, and anything that is not an `http(s)` address is
+  refused rather than saved as a link that cannot be opened. Enrichment still
+  never writes this field; only the user does.
+
 - **Coffees from shops that build their pages in the browser came back empty or
   wrong** (#293). Scraping assumed the words are in the HTML, and fell back to a
   page's embedded product data only when the markup came back _empty_. Cometeer

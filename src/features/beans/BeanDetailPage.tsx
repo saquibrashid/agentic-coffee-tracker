@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ulid } from 'ulid';
@@ -190,6 +190,16 @@ function hostOf(url: string): string | null {
   }
 }
 
+/** True for an address a browser can actually open. */
+function isHttpUrl(value: string): boolean {
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Where this coffee can be read about, which can be two different places.
  *
@@ -201,30 +211,132 @@ function hostOf(url: string): string | null {
  * Both are named by host rather than by a fixed label. The app cannot tell a
  * roaster's own storefront from a reseller's, and "View on the roaster's site"
  * was a claim it could not keep; `cometeer.com` is one it can.
+ *
+ * The vendor address is editable because capture cannot always know it. Only
+ * the link path has a URL to record: photograph a Cometeer box and the app
+ * reads the label, searches for the roaster, and lands on Counter Culture's
+ * page — correct as provenance, and leaving no trace of where the coffee
+ * actually came from. That is not a capture bug to fix, it is a fact the user
+ * holds and the app has no way to derive, so there has to be somewhere to say
+ * it. Enrichment still never writes this field; only the user does.
  */
 function SourceLinks({ bean }: { bean: CoffeeBean }) {
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
   const vendor = bean.vendorUrl;
   const source = bean.sourceUrl;
   // One address written twice is still one place, and the common case -- a
   // coffee added straight from its roaster's page -- must not sprout a
   // duplicate link.
   const links = [
-    ...(vendor ? [{ url: vendor, label: 'Where you added it from' }] : []),
+    ...(vendor ? [{ url: vendor, label: 'Where you bought it' }] : []),
     ...(source && source !== vendor ? [{ url: source, label: 'Where the details came from' }] : []),
   ];
-  if (links.length === 0) return null;
+
+  function startEditing() {
+    setValue(vendor ?? '');
+    setError(null);
+    setEditing(true);
+  }
+
+  async function onSave(event: FormEvent) {
+    event.preventDefault();
+    const trimmed = value.trim();
+    if (trimmed && !isHttpUrl(trimmed)) {
+      setError('Enter a full web address, starting with http:// or https://.');
+      return;
+    }
+    setSaving(true);
+    try {
+      // The callback form so that clearing the box *removes* the field. An
+      // object spec can only assign, and assigning `undefined` would store a
+      // key that is present and empty -- which sync would then copy to every
+      // other device as a deliberate value.
+      await db.beans.update(bean.id, (draft) => {
+        if (trimmed) draft.vendorUrl = trimmed;
+        else delete draft.vendorUrl;
+        draft.updatedAt = new Date().toISOString();
+      });
+      await enqueueUpsert('bean', bean.id);
+      setEditing(false);
+      setError(null);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <ul className="text-muted-foreground mt-4 space-y-1 text-xs">
-      {links.map(({ url, label }) => (
-        <li key={url}>
-          <span>{label}: </span>
-          <a href={url} target="_blank" rel="noreferrer" className="underline underline-offset-2">
-            {hostOf(url) ?? url}
-          </a>
-        </li>
-      ))}
-    </ul>
+    <div className="mt-4">
+      {links.length > 0 && (
+        <ul className="text-muted-foreground space-y-1 text-xs">
+          {links.map(({ url, label }) => (
+            <li key={url}>
+              <span>{label}: </span>
+              <a
+                href={url}
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-2"
+              >
+                {hostOf(url) ?? url}
+              </a>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {editing ? (
+        <form onSubmit={(e) => void onSave(e)} className="mt-2 space-y-2" noValidate>
+          {/* `noValidate` so the one message the user sees is ours. The input is
+              still `type="url"` for the keyboard it summons on a phone, but the
+              browser's own bubble would fire first and say something different,
+              and it would also disagree with us: it accepts `javascript:` and
+              we do not. */}
+          <Label htmlFor="bean-vendor-url" className="text-meta text-muted-foreground">
+            Where you bought it
+          </Label>
+          <Input
+            id="bean-vendor-url"
+            type="url"
+            inputMode="url"
+            placeholder="https://cometeer.com/products/..."
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            aria-describedby={error ? 'bean-vendor-url-error' : undefined}
+          />
+          {error && (
+            <p id="bean-vendor-url-error" role="alert" className="text-destructive text-xs">
+              {error}
+            </p>
+          )}
+          <p className="text-muted-foreground text-xs">
+            The shop or box you bought this from, if that is not the roaster&apos;s own page. Leave
+            it empty to remove it.
+          </p>
+          <div className="flex gap-2">
+            <Button type="submit" size="sm" disabled={saving}>
+              Save
+            </Button>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      ) : (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          className="mt-1 h-auto px-0 text-xs"
+          onClick={startEditing}
+        >
+          {vendor ? 'Change where you bought this' : 'Add where you bought this'}
+        </Button>
+      )}
+    </div>
   );
 }
 
