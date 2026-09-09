@@ -574,6 +574,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A coffee bought from a shop other than its roaster now says so** (#296).
+  A Cometeer box has “Cometeer” printed on it, and the OCR always read that
+  word — the parse schema simply had nowhere to put it, so the only name that
+  survived was the roaster a later web lookup happened to find, and the bean
+  page read “Counter Culture” with no hint of where the box came from. The
+  parse now returns a `vendor`, and the detail page shows “Counter Culture ·
+  via Cometeer”. Null stays the normal answer: most coffee is bought from the
+  people who roasted it, the prompt is told never to repeat the roaster here,
+  and the value is collapsed anyway when it matches. A missing vendor is not
+  treated as a gap, so it never triggers a lookup — and because background
+  enrichment can only write fields on that same list, a later visit to the
+  roaster's own page cannot erase a shop the bag established. The explicit
+  “Fetch missing info” panel can still offer one, since the user is there to
+  refuse it. The name is never turned into a link: `cometeer.com` would be
+  invented, and `vendorUrl` remains the user's to write.
+
 - **A coffee can now link to both where you bought it and where its details came
   from** (#278). Cometeer flash-freezes other roasters' coffee, so a coffee added
   from Cometeer was documented by Counter Culture's own product page — and

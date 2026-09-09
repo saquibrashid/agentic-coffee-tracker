@@ -120,6 +120,8 @@ export interface ParsedOrigin {
 }
 export interface ParsedBean {
   roaster: string | null;
+  /** The shop that sold it, when that is not the roaster. Usually null. */
+  vendor: string | null;
   name: string | null;
   origins: ParsedOrigin[];
   process: 'washed' | 'natural' | 'honey' | 'anaerobic' | 'wet-hulled' | 'other' | null;

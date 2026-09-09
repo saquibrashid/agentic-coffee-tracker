@@ -80,6 +80,7 @@ export interface CoffeeBean {
   // Provenance of data
   source: EntrySource;
   sourceUrl?: string; // where the details were last read from
+  vendor?: string; // the shop that sold it, when not the roaster; read off the bag
   vendorUrl?: string; // who sold it to the user; only ever written by the user
   confidence?: number; // 0–1, from LLM
   rawOcrText?: string; // kept for debugging / re-parsing
@@ -140,6 +141,29 @@ storefront from a reseller's, so it should not claim to.
 
 The same split covers pods, subscription boxes and any other reseller without
 needing to model them as a concept.
+
+### The shop that sold it
+
+`vendor` is the seller's _name_, and it is read off the bag exactly the way the
+roaster is. A Cometeer box says "Cometeer" on it; before this field existed the
+OCR read that word and the schema threw it away, so the only name that survived
+was the roaster a later enrichment search happened to find.
+
+Three rules keep it honest:
+
+- **Null is the normal answer.** Most coffee is bought from the people who
+  roasted it. The parse prompt leans hard towards null and is told never to
+  repeat the roaster here; `parsedBeanToUpdate` collapses the value anyway when
+  it matches the roaster, since an instruction is not a guarantee.
+- **It is never a gap.** `vendor` is deliberately absent from
+  `services/enrich/completeness.ts`, so a missing seller never triggers a
+  lookup and — because `fillMissingFields` filters on that same list — a later
+  lookup against the roaster's own page cannot erase a shop the bag established.
+  Background enrichment cannot write this field at all; the explicit lookup
+  panel can offer it, because the user is there to accept or refuse.
+- **A name is not an address.** Turning "Cometeer" into `cometeer.com` would be
+  inventing a link. `vendorUrl` is where an address goes, and only the user
+  writes it.
 
 ### Caffeine
 
@@ -465,6 +489,7 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
   "additionalProperties": false,
   "required": [
     "roaster",
+    "vendor",
     "name",
     "origins",
     "process",
@@ -479,6 +504,10 @@ Use OpenAI **structured outputs** (JSON schema) with the schema below. The LLM M
   ],
   "properties": {
     "roaster": { "type": ["string", "null"] },
+    "vendor": {
+      "type": ["string", "null"],
+      "description": "The shop that sold it, only when the text names one distinct from the roaster. Null for the ordinary coffee bought from its roaster. A name, never a URL."
+    },
     "name": { "type": ["string", "null"] },
     "origins": {
       "type": "array",
