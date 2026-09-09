@@ -107,8 +107,11 @@ export interface CoffeeBean {
    *
    * So the two are kept apart by who owns them. `sourceUrl` belongs to whatever
    * read the details last and may change with every lookup; this belongs to the
-   * user and is written once, at capture, and never overwritten. The same split
-   * covers pods and subscription boxes without needing to model them.
+   * user. Capture writes it when the user supplied an address, and after that
+   * only the user changes it — nothing automatic ever does. A coffee added from
+   * a photo has no address to record, so the bean page lets one be added by
+   * hand. The same split covers pods and subscription boxes without needing to
+   * model them.
    */
   vendorUrl?: string;
   confidence?: number;

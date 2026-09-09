@@ -80,7 +80,7 @@ export interface CoffeeBean {
   // Provenance of data
   source: EntrySource;
   sourceUrl?: string; // where the details were last read from
-  vendorUrl?: string; // where the user added it from; never overwritten
+  vendorUrl?: string; // who sold it to the user; only ever written by the user
   confidence?: number; // 0–1, from LLM
   rawOcrText?: string; // kept for debugging / re-parsing
   llmModel?: string; // e.g. "gpt-4o-2024-08-06"
@@ -118,8 +118,19 @@ The two fields are split by who owns them:
 - **`sourceUrl` belongs to whatever read the details last.** Enrichment searches
   for the roaster, finds the roaster's page and stamps it here. It is provenance,
   and it may change with every lookup.
-- **`vendorUrl` belongs to the user.** It is written once, at capture, from the
-  address they supplied, and nothing overwrites it.
+- **`vendorUrl` belongs to the user.** Capture writes it from the address they
+  supplied, and thereafter only the user changes it. Nothing automatic ever
+  writes it — not enrichment, not a re-lookup.
+
+Only the link path has an address to record. A coffee added from a photo has
+none: the app reads the label, searches for the roaster and lands on the
+roaster's own page, which is right for `sourceUrl` and leaves no trace of the
+shop the coffee actually came from. That is not something capture can derive —
+photograph a Cometeer box and the box, not the app, is what knows it was
+Cometeer — so the bean page lets the user set and clear this field by hand.
+Clearing it _removes_ the key rather than storing an empty value, because sync
+stores the whole payload and a present-but-empty key would be copied to every
+other device as a deliberate answer.
 
 Before the split there was only `sourceUrl`, so enrichment silently replaced the
 Cometeer address the user had entered with a Counter Culture bag they never

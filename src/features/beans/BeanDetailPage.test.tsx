@@ -527,11 +527,123 @@ describe('BeanDetailPage source links', () => {
     expect(await screen.findByRole('link', { name: 'highwirecoffee.com' })).toBeInTheDocument();
   });
 
-  it('shows nothing when the coffee has no address at all', async () => {
+  it('shows no links when the coffee has no address, but still offers to take one', async () => {
     renderPage();
 
     await screen.findByText('Holler Mtn.');
-    expect(screen.queryByText(/Where you added it from/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Where you bought it/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Where the details came from/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /add where you bought this/i })).toBeInTheDocument();
+  });
+});
+
+/**
+ * A coffee photographed off the shelf has no address at all.
+ *
+ * Only the link path has a URL to record. Photograph a Cometeer box and the app
+ * reads the label, searches for the roaster and lands on Counter Culture's own
+ * page -- right as provenance, and leaving nothing to say the coffee came in a
+ * Cometeer box. That is not something capture can derive, so the user has to be
+ * able to say it, and to correct it when a lookup found the wrong shop.
+ */
+describe('BeanDetailPage vendor address editing', () => {
+  beforeEach(async () => {
+    await db.outbox.clear();
+  });
+
+  it('records where a photographed coffee was bought', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /add where you bought this/i }));
+    await user.type(
+      screen.getByLabelText('Where you bought it'),
+      'https://cometeer.com/products/build-your-own-box',
+    );
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(async () => {
+      expect((await db.beans.get('bean-1'))?.vendorUrl).toBe(
+        'https://cometeer.com/products/build-your-own-box',
+      );
+    });
+    expect(await screen.findByRole('link', { name: 'cometeer.com' })).toBeInTheDocument();
+  });
+
+  it('queues the change for sync', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /add where you bought this/i }));
+    await user.type(screen.getByLabelText('Where you bought it'), 'https://cometeer.com/x');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(async () => {
+      const queued = await db.outbox.toArray();
+      expect(queued.some((row) => row.recordId === 'bean-1')).toBe(true);
+    });
+  });
+
+  it('refuses something that is not a web address rather than storing it', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /add where you bought this/i }));
+    await user.type(screen.getByLabelText('Where you bought it'), 'cometeer');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/full web address/i);
+    expect((await db.beans.get('bean-1'))?.vendorUrl).toBeUndefined();
+  });
+
+  it('rejects a link the browser could not open', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /add where you bought this/i }));
+    // A parseable URL, but not one a link can point at.
+    await user.type(screen.getByLabelText('Where you bought it'), 'javascript:alert(1)');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect((await db.beans.get('bean-1'))?.vendorUrl).toBeUndefined();
+  });
+
+  it('removes the address when the box is emptied, rather than storing a blank', async () => {
+    const user = userEvent.setup();
+    await db.beans.update('bean-1', { vendorUrl: 'https://cometeer.com/x' });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /change where you bought this/i }));
+    await user.clear(screen.getByLabelText('Where you bought it'));
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(async () => {
+      const stored = await db.beans.get('bean-1');
+      // Absent, not present-and-undefined: sync stores the whole payload, so a
+      // key left behind would be copied to every other device as a value.
+      expect(stored && 'vendorUrl' in stored).toBe(false);
+    });
+  });
+
+  it('offers to change an address the coffee already has', async () => {
+    const user = userEvent.setup();
+    await db.beans.update('bean-1', { vendorUrl: 'https://cometeer.com/x' });
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /change where you bought this/i }));
+    expect(screen.getByLabelText('Where you bought it')).toHaveValue('https://cometeer.com/x');
+  });
+
+  it('leaves the coffee alone when the edit is cancelled', async () => {
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: /add where you bought this/i }));
+    await user.type(screen.getByLabelText('Where you bought it'), 'https://cometeer.com/x');
+    await user.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect((await db.beans.get('bean-1'))?.vendorUrl).toBeUndefined();
+    expect(screen.queryByLabelText('Where you bought it')).not.toBeInTheDocument();
   });
 });

@@ -70,9 +70,13 @@ Must include:
 - Ratings timeline
 - Brew types used
 - “Fetch missing info” button
-- Source links, named by host. Two when the coffee was added from one place and
+- Source links, named by host. Two when the coffee was bought in one place and
   documented from another (a Cometeer box and the roaster's own page); one when
-  they are the same address.
+  they are the same address; none when it was added from a photo and no address
+  was ever supplied. “Where you bought it” can be set, changed and cleared by
+  hand, which is the only way a photographed coffee gets one — the app can read
+  the roaster off a bag, but not the shop that sold it. Rejects anything that is
+  not an `http(s)` address rather than storing a link that cannot be opened.
 
 ### 4. Ratings List
 
