@@ -21,6 +21,21 @@ export type RoastLevel = 'light' | 'medium-light' | 'medium' | 'medium-dark' | '
  */
 export type CaffeineLevel = 'caffeinated' | 'decaf' | 'half-caf' | 'unknown';
 
+/**
+ * The form the coffee arrives in.
+ *
+ * Not who sold it. Cometeer flash-freezes other roasters' brewed coffee into
+ * pucks, so a Cometeer box of Counter Culture coffee has Counter Culture as its
+ * roaster and `'cometeer'` as its form; Nespresso and K-Cup are the same shape
+ * of thing. The shop in between — a grocery store, a marketplace — is not
+ * recorded at all, because which shop a coffee came from says nothing about
+ * the coffee.
+ *
+ * A closed set rather than free text is deliberate: it is what stops a retailer
+ * name landing here the moment a receipt is parsed.
+ */
+export type CoffeeFormat = 'whole-bean' | 'ground' | 'cometeer' | 'nespresso' | 'k-cup' | 'instant';
+
 export type Process =
   'washed' | 'natural' | 'honey' | 'anaerobic' | 'wet-hulled' | 'other' | 'unknown';
 
@@ -65,6 +80,17 @@ export interface CoffeeBean {
   process?: Process;
   roastLevel?: RoastLevel;
   /**
+   * How the coffee is packaged, when it is not an ordinary bag of beans.
+   *
+   * Absent means whole bean, which is what `formatForNewBean` records for every
+   * coffee added from now on; a coffee saved before this field existed is also
+   * absent and is read the same way. Nothing treats a blank as a gap worth
+   * looking up, and background enrichment cannot write this field at all —
+   * Counter Culture's own page would otherwise "correct" a Cometeer puck to
+   * whole beans, which is exactly backwards.
+   */
+  format?: CoffeeFormat;
+  /**
    * Deliberately optional and deliberately not part of `schemaVersion`.
    *
    * Bumping the version would make every device running an older build refuse
@@ -94,20 +120,6 @@ export interface CoffeeBean {
 
   source: EntrySource;
   sourceUrl?: string;
-  /**
-   * The shop that sold this coffee, when that is not the roaster.
-   *
-   * Read off the packaging or the page, the same way the roaster is: a Cometeer
-   * box says "Cometeer" on it, and before this field existed that word was
-   * discarded because the schema had nowhere to put it. Absent is the normal
-   * answer — most coffee is bought straight from the people who roasted it —
-   * so a blank here means "no separate seller", not "not yet known", and
-   * nothing treats it as a gap worth looking up.
-   *
-   * A name, never an address. Turning "Cometeer" into a URL would be inventing
-   * a link; `vendorUrl` is where an address goes, and only the user writes it.
-   */
-  vendor?: string;
   /**
    * The page the user added this coffee from, which is not always the page its
    * details were read from.

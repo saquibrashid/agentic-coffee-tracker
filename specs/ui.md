@@ -65,9 +65,10 @@ Must include:
   by hand, because it is the only one the app assumes rather than reads, and a
   web lookup cannot correct it. Always shown, including on a coffee nothing else
   is known about.
-- Roaster, and beside it the shop that sold it when the two differ — “Counter
-  Culture · via Cometeer”. Read off the bag like any other field; absent for the
-  ordinary coffee bought straight from its roaster.
+- Roaster, and beside it how the coffee is packaged when that is not an
+  ordinary bag — “Counter Culture · Cometeer”. The roaster still made it;
+  Cometeer only froze it. Whole bean is left unsaid, since nearly every coffee
+  is one and the label would distinguish nothing.
 - Tasting notes
 - Roast date
 - Ratings timeline
@@ -78,7 +79,7 @@ Must include:
   they are the same address; none when it was added from a photo and no address
   was ever supplied. “Where you bought it” can be set, changed and cleared by
   hand, which is the only way a photographed coffee gets one — the app can read
-  a shop's _name_ off a bag, but never invents an address from it. Rejects
+  a bag's _packaging_ off a photo, but never invents an address from it. Rejects
   anything that is not an `http(s)` address rather than storing a link that
   cannot be opened.
 

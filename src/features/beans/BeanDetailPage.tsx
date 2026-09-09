@@ -17,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
+import { formatLabel, hasNotableFormat } from '@/services/beans/format';
 import { CAFFEINE_LEVELS } from '@/services/beans/library';
 import { markBeanReviewed } from '@/services/beans/review';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
@@ -596,11 +597,13 @@ export function BeanDetailPage() {
               <CardTitle>{bean.name}</CardTitle>
               <p className="text-muted-foreground text-sm">
                 {bean.roaster}
-                {/* Identity, not a tasting attribute, so it sits with the
-                    roaster rather than in the grid below. "via" because the
-                    roaster made it and the vendor only sold it -- a Cometeer
-                    box is Counter Culture's coffee. */}
-                {bean.vendor && <span> · via {bean.vendor}</span>}
+                {/* Packaging, not a tasting attribute, so it sits with the
+                    roaster rather than in the grid below. Cometeer flash-freezes
+                    other roasters' coffee, so the box is still Counter Culture's
+                    -- the roaster stays, and this says what form it came in.
+                    Suppressed for whole bean, which is nearly every coffee and
+                    so distinguishes nothing. */}
+                {hasNotableFormat(bean) && <span> · {formatLabel(bean)}</span>}
               </p>
             </div>
             <ScoreBlock ratings={ratings} />

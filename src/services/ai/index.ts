@@ -120,12 +120,12 @@ export interface ParsedOrigin {
 }
 export interface ParsedBean {
   roaster: string | null;
-  /** The shop that sold it, when that is not the roaster. Usually null. */
-  vendor: string | null;
   name: string | null;
   origins: ParsedOrigin[];
   process: 'washed' | 'natural' | 'honey' | 'anaerobic' | 'wet-hulled' | 'other' | null;
   roastLevel: 'light' | 'medium-light' | 'medium' | 'medium-dark' | 'dark' | null;
+  /** The form it arrives in, when the text says. Never who sold it. */
+  format: 'whole-bean' | 'ground' | 'cometeer' | 'nespresso' | 'k-cup' | 'instant' | null;
   caffeine: 'caffeinated' | 'decaf' | 'half-caf' | null;
   tastingNotes: string[];
   roastDate: string | null;

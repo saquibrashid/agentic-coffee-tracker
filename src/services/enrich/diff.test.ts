@@ -27,7 +27,7 @@ function bean(overrides: Partial<CoffeeBean> = {}): CoffeeBean {
 function parsed(overrides: Partial<ParsedBean> = {}): ParsedBean {
   return {
     roaster: 'Onyx Coffee Lab',
-    vendor: null,
+    format: null,
     name: 'Geometry',
     origins: [
       { country: 'Ethiopia', region: 'Guji', farm: null, producer: null, percentage: null },

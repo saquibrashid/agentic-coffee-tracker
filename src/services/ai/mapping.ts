@@ -28,24 +28,6 @@ function toElevation(parsed: ParsedBean): CoffeeBean['elevationMeters'] {
 }
 
 /**
- * The seller, unless it is just the roaster's own name again.
- *
- * The prompt says not to repeat the roaster in `vendor`, but an instruction is
- * not a guarantee, and "Onyx Coffee Lab" sold by "Onyx Coffee Lab" would render
- * as `Onyx Coffee Lab · via Onyx Coffee Lab`. Collapsing here rather than in
- * the API's validator keeps that function a filler of missing keys rather than
- * a rewriter of present ones, and puts the rule beside the other derivations
- * so every path that turns a parse into a bean gets it.
- */
-function toVendor(parsed: ParsedBean): string | undefined {
-  const vendor = parsed.vendor?.trim();
-  if (!vendor) return undefined;
-  const roaster = parsed.roaster?.trim() ?? '';
-  if (vendor.toLowerCase() === roaster.toLowerCase()) return undefined;
-  return vendor;
-}
-
-/**
  * Only fields the model actually resolved are returned, so a sparse parse never
  * blanks out data the user already entered.
  *
@@ -56,6 +38,12 @@ function toVendor(parsed: ParsedBean): string | undefined {
  * parse into a bean -- adding by link, adding by photo, the background OCR
  * queue, and the enrichment review -- gets it, and a path added later gets it
  * without remembering to.
+ *
+ * `format` is passed through and never defaulted here, for the reason
+ * `caffeineForNewBean` keeps its own default out of `inferCaffeine`: this
+ * function also serves enrichment, and assuming whole beans from a silent
+ * lookup would let Counter Culture's own page "correct" a Cometeer puck to a
+ * bag. The assumption belongs to new coffees only.
  */
 export function parsedBeanToUpdate(parsed: ParsedBean): Partial<CoffeeBean> {
   const update: Partial<CoffeeBean> = {};
@@ -63,13 +51,11 @@ export function parsedBeanToUpdate(parsed: ParsedBean): Partial<CoffeeBean> {
   if (parsed.roaster) update.roaster = parsed.roaster;
   if (parsed.name) update.name = parsed.name;
 
-  const vendor = toVendor(parsed);
-  if (vendor) update.vendor = vendor;
-
   const origins = toOrigins(parsed);
   if (origins) update.origins = origins;
 
   if (parsed.process) update.process = parsed.process;
+  if (parsed.format) update.format = parsed.format;
   if (parsed.roastLevel) update.roastLevel = parsed.roastLevel;
   else {
     const inferred = inferRoastLevel({

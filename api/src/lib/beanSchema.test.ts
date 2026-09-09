@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   CAFFEINE_VALUES,
+  FORMAT_VALUES,
   MAX_PLAUSIBLE_ORIGINS,
   PARSED_BEAN_SCHEMA,
   PROCESS_VALUES,
@@ -17,6 +18,7 @@ const valid = {
   origins: [{ country: 'Ethiopia', region: 'Guji', farm: null, producer: null, percentage: 60 }],
   process: 'washed',
   roastLevel: 'medium-light',
+  format: null,
   caffeine: null,
   tastingNotes: ['peach', 'jasmine'],
   roastDate: '2026-01-04',
@@ -32,21 +34,28 @@ describe('validateParsedBean', () => {
     expect(result.valid).toBe(true);
   });
 
-  it('accepts a coffee sold by someone other than its roaster', () => {
-    const result = validateParsedBean({ ...valid, vendor: 'Cometeer' });
+  it('accepts a coffee that arrives in a form other than a bag', () => {
+    const result = validateParsedBean({ ...valid, format: 'cometeer' });
     expect(result.valid).toBe(true);
     if (!result.valid) return;
-    expect(result.value.vendor).toBe('Cometeer');
+    expect(result.value.format).toBe('cometeer');
   });
 
-  it('rejects a vendor that is not a string', () => {
-    const result = validateParsedBean({ ...valid, vendor: { name: 'Cometeer' } });
+  /*
+   * The enum is the whole point of the field. `vendor` was free text, and free
+   * text is what let a shop name -- "Sprouts", read off a receipt -- become a
+   * property of the coffee. A closed set gives it nowhere to land.
+   */
+  it('refuses a shop name where a format belongs', () => {
+    const result = validateParsedBean({ ...valid, format: 'Sprouts' });
     expect(result.valid).toBe(false);
     if (result.valid) return;
-    // Specifically a type complaint. Before `vendor` was part of the contract
-    // this same input failed as "not an allowed property", so asserting only
-    // that `/vendor` appears would pass against a schema that has no such field.
-    expect(result.errors).toContain('/vendor must be a string or null');
+    expect(result.errors.join(' ')).toContain('/format');
+  });
+
+  it('rejects a format that is not a string at all', () => {
+    const result = validateParsedBean({ ...valid, format: { name: 'cometeer' } });
+    expect(result.valid).toBe(false);
   });
 
   it('accepts the mock response so mock mode never 422s', () => {
@@ -218,21 +227,21 @@ describe('normalizeParsedBean', () => {
     });
   });
 
-  it('fills an omitted vendor with null, the ordinary answer', () => {
+  it('fills an omitted format with null, the ordinary answer', () => {
     const out = normalizeParsedBean({ roaster: 'Onyx' }) as Record<string, unknown>;
-    expect(out['vendor']).toBeNull();
+    expect(out['format']).toBeNull();
   });
 
   /*
-   * Collapsing a vendor that merely repeats the roaster is deliberately NOT
-   * done here. This function fills keys the model omitted; rewriting a value it
-   * did send would make it a different kind of thing, and the API is the wrong
-   * layer for a display concern. `parsedBeanToUpdate` handles it on the client,
-   * beside the other derivations, so every path that builds a bean gets it.
+   * Null rather than 'whole-bean'. The assumption that a silent bag is whole
+   * bean belongs to the reader (`services/beans/format.ts`), not to the API:
+   * a stored 'whole-bean' arriving from a lookup of the roaster's own page is
+   * indistinguishable from one the packaging actually claimed, and would let
+   * enrichment overwrite a Cometeer puck.
    */
-  it('leaves a vendor that repeats the roaster for the client to collapse', () => {
-    const out = normalizeParsedBean({ roaster: 'Onyx', vendor: 'Onyx' }) as Record<string, unknown>;
-    expect(out['vendor']).toBe('Onyx');
+  it('does not assume whole bean on the model behalf', () => {
+    const out = normalizeParsedBean({ roaster: 'Onyx' }) as Record<string, unknown>;
+    expect(out['format']).not.toBe('whole-bean');
   });
 });
 
@@ -246,6 +255,7 @@ describe('PARSED_BEAN_SCHEMA', () => {
     expect(PARSED_BEAN_SCHEMA.properties.process.enum).toEqual([...PROCESS_VALUES, null]);
     expect(PARSED_BEAN_SCHEMA.properties.roastLevel.enum).toEqual([...ROAST_LEVEL_VALUES, null]);
     expect(PARSED_BEAN_SCHEMA.properties.caffeine.enum).toEqual([...CAFFEINE_VALUES, null]);
+    expect(PARSED_BEAN_SCHEMA.properties.format.enum).toEqual([...FORMAT_VALUES, null]);
   });
 
   it('forbids extra properties so structured outputs stay strict', () => {
