@@ -181,3 +181,26 @@ describe('a blend listing one country twice (#297)', () => {
     expect(prefs.favoriteOrigins.map((item) => item.value).sort()).toEqual(['Ethiopia', 'Peru']);
   });
 });
+
+describe('a bag listing one tasting note twice (#301)', () => {
+  it('counts one rating of it as one observation of that note, not two', () => {
+    const b = bean('doubled', { tastingNotes: ['Chocolate', 'chocolate'] });
+    const prefs = computePreferencesFrom([b], [rating('doubled', 8)]);
+    const chocolate = prefs.favoriteFlavors.find((item) => item.value === 'chocolate');
+    expect(chocolate?.count).toBe(1);
+  });
+
+  it('does not let the repeat outrank a note genuinely drunk twice', () => {
+    const doubled = bean('doubled', { tastingNotes: ['Chocolate', 'Chocolate'] });
+    const plumA = bean('plum-a', { tastingNotes: ['Plum'] });
+    const plumB = bean('plum-b', { tastingNotes: ['Plum'] });
+    const prefs = computePreferencesFrom(
+      [doubled, plumA, plumB],
+      [rating('doubled', 8), rating('plum-a', 8), rating('plum-b', 8)],
+    );
+    const chocolate = prefs.favoriteFlavors.find((item) => item.value === 'chocolate');
+    const plum = prefs.favoriteFlavors.find((item) => item.value === 'plum');
+    expect(chocolate?.count).toBe(1);
+    expect(plum?.count).toBe(2);
+  });
+});
