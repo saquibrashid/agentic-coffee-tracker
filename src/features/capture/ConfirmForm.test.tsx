@@ -194,3 +194,47 @@ describe('a blend listing one country twice (#297)', () => {
     expect(screen.getByLabelText(/origin/i)).toHaveValue('Peru, Ethiopia');
   });
 });
+
+describe('origin detail through the confirm screen (#304)', () => {
+  const blend = [
+    { country: 'Guatemala', farm: 'Manos Campesinas', percentage: 50 },
+    { country: 'Guatemala', farm: 'Finca La Hermosa', percentage: 50 },
+  ];
+
+  it('keeps the farms behind a country the user did not touch', async () => {
+    const bean = makeBean({ origins: blend });
+    await seed(bean);
+    renderForm(bean);
+
+    await save();
+
+    const saved = await db.beans.get(bean.id);
+    expect(saved?.origins).toEqual(blend);
+  });
+
+  it('still adds a country the user types in', async () => {
+    const bean = makeBean({ origins: blend });
+    await seed(bean);
+    renderForm(bean);
+
+    await userEvent.clear(screen.getByLabelText(/origin/i));
+    await userEvent.type(screen.getByLabelText(/origin/i), 'Guatemala, Peru');
+    await save();
+
+    const saved = await db.beans.get(bean.id);
+    expect(saved?.origins).toEqual([...blend, { country: 'Peru' }]);
+  });
+
+  it('drops a country the user removes', async () => {
+    const bean = makeBean({ origins: blend });
+    await seed(bean);
+    renderForm(bean);
+
+    await userEvent.clear(screen.getByLabelText(/origin/i));
+    await userEvent.type(screen.getByLabelText(/origin/i), 'Peru');
+    await save();
+
+    const saved = await db.beans.get(bean.id);
+    expect(saved?.origins).toEqual([{ country: 'Peru' }]);
+  });
+});
