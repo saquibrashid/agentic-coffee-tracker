@@ -17,6 +17,7 @@ import { parsedBeanToUpdate } from '@/services/ai/mapping';
 import { ApiError } from '@/services/ai';
 import type { CoffeeBean } from '@/types';
 import { EmptyPageError, enrichFromUrl, findCandidates } from './index';
+import type { EnrichedUrl } from './index';
 import { inferRoastLevel } from './inferRoast';
 import { inferComposition } from './inferComposition';
 import { attachPhotoFromUrl } from './photo';
@@ -174,6 +175,41 @@ function withInferredComposition(
 }
 
 /**
+ * Finds and reads the page to enrich from.
+ *
+ * Searches first, then falls back to the address the coffee already carries.
+ *
+ * The fallback exists because an empty search result is not evidence that a
+ * page does not exist. Onyx sells Southwind; searching for it returns nothing.
+ * Blue Bottle's Night Light Decaf was reported as having no product page while
+ * the bean page was displaying a working link to it, which is #316.
+ *
+ * The order is deliberate and must not be inverted. `sourceUrl` is stamped by
+ * capture with whatever address the user supplied, so trying it first would
+ * re-read Cometeer's box page for a Cometeer-captured coffee rather than
+ * searching out the roaster's own — undoing the split #294 introduced.
+ * Fallback-only changes nothing but the case that currently fails.
+ *
+ * `vendorUrl` is never used here, for the same reason: it belongs to the user
+ * and points at where they bought the bag, which for pods and subscription
+ * boxes is not the page that describes the beans.
+ */
+async function readBestPage(bean: CoffeeBean): Promise<EnrichedUrl> {
+  try {
+    const candidates = await findCandidates(bean.roaster, bean.name, 3);
+    const best = candidates[0];
+    if (!best) throw new NoCandidatesError(bean.roaster, bean.name);
+    return await enrichFromUrl(best.url);
+  } catch (err) {
+    // Only "we could not find it" is worth a second attempt. An outage or a
+    // throttle would fail the same way again and must stay retryable, and a
+    // page that read fine but said little is already a success.
+    if (!isNotFoundFailure(err) || !bean.sourceUrl) throw err;
+    return await enrichFromUrl(bean.sourceUrl);
+  }
+}
+
+/**
  * Looks the coffee up on the web and returns what the page could close.
  *
  * `null` means no page was read — the coffee needed nothing. A result with
@@ -183,11 +219,7 @@ function withInferredComposition(
 export async function autoEnrichBean(bean: CoffeeBean): Promise<AutoEnrichResult | null> {
   if (!beanNeedsEnrichment(bean)) return null;
 
-  const candidates = await findCandidates(bean.roaster, bean.name, 3);
-  const best = candidates[0];
-  if (!best) throw new NoCandidatesError(bean.roaster, bean.name);
-
-  const page = await enrichFromUrl(best.url);
+  const page = await readBestPage(bean);
   const update = withInferredComposition(
     bean,
     withInferredRoast(bean, parsedBeanToUpdate(page.parsed)),
