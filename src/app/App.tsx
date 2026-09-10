@@ -73,6 +73,13 @@ function Shell() {
     void import('@/services/enrich/backfillCaffeine').then((m) => m.backfillCaffeine());
   }, []);
 
+  // Same shape again for composition, minus the assumption: a coffee whose
+  // text says neither "blend" nor "single origin" stays unknown, because both
+  // are ordinary and there is no prior worth guessing from.
+  useEffect(() => {
+    void import('@/services/enrich/backfillComposition').then((m) => m.backfillComposition());
+  }, []);
+
   // Sync starts on app open, per specs/sync.md -> Triggers. Lazy for the same
   // reason as the queue runner: neither is needed for first paint, and the
   // Cosmos-facing engine pulls in code a signed-out user never runs.
