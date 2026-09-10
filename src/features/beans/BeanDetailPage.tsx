@@ -18,7 +18,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
 import { formatLabel, hasNotableFormat } from '@/services/beans/format';
-import { COMPOSITIONS, COMPOSITION_LABELS, compositionOf } from '@/services/beans/composition';
+import {
+  COMPOSITIONS,
+  COMPOSITION_LABELS,
+  compositionKnown,
+  compositionOf,
+} from '@/services/beans/composition';
 import { formatOriginList } from '@/services/beans/origins';
 import { CAFFEINE_LEVELS, PROCESSES } from '@/services/beans/library';
 import { markBeanReviewed } from '@/services/beans/review';
@@ -714,6 +719,12 @@ export function BeanDetailPage() {
                     Suppressed for whole bean, which is nearly every coffee and
                     so distinguishes nothing. */}
                 {hasNotableFormat(bean) && <span> · {formatLabel(bean)}</span>}
+                {/* Suppressed when unknown, which is a common and honest state:
+                    a chip reading "Not known" would be noise on every coffee
+                    whose page said neither word. */}
+                {compositionKnown(bean) && (
+                  <span> · {COMPOSITION_LABELS[compositionOf(bean)]}</span>
+                )}
               </p>
             </div>
             <ScoreBlock ratings={ratings} />

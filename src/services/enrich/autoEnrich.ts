@@ -18,6 +18,7 @@ import { ApiError } from '@/services/ai';
 import type { CoffeeBean } from '@/types';
 import { EmptyPageError, enrichFromUrl, findCandidates } from './index';
 import { inferRoastLevel } from './inferRoast';
+import { inferComposition } from './inferComposition';
 import { attachPhotoFromUrl } from './photo';
 import {
   CORE_FIELDS,
@@ -143,6 +144,36 @@ function withInferredRoast(bean: CoffeeBean, update: Partial<CoffeeBean>): Parti
 }
 
 /**
+ * Adds a composition read out of the page, when neither the coffee nor the
+ * parse supplies one.
+ *
+ * The reason this reads `pageText` and the roast inference does not: roasters
+ * put the roast in a sentence about the coffee, which the parse already
+ * captures as `roasterDescription`, but they put "BLEND" or "SINGLE ORIGIN" in
+ * a banner above the product name — Stumptown's Sunrider and Honduras El Puente
+ * both do. That is page furniture rather than prose, so it never reaches the
+ * description, and without the raw text the strongest evidence on the page
+ * would be invisible here.
+ *
+ * `fillMissingFields` still applies afterwards, so this can only fill a gap.
+ */
+function withInferredComposition(
+  bean: CoffeeBean,
+  update: Partial<CoffeeBean>,
+  pageText: string,
+): Partial<CoffeeBean> {
+  if (update.composition && update.composition !== 'unknown') return update;
+
+  const inferred = inferComposition({
+    name: update.name ?? bean.name,
+    roasterDescription: update.roasterDescription ?? bean.roasterDescription,
+    pageText,
+  });
+
+  return inferred ? { ...update, composition: inferred.composition } : update;
+}
+
+/**
  * Looks the coffee up on the web and returns what the page could close.
  *
  * `null` means no page was read — the coffee needed nothing. A result with
@@ -157,7 +188,11 @@ export async function autoEnrichBean(bean: CoffeeBean): Promise<AutoEnrichResult
   if (!best) throw new NoCandidatesError(bean.roaster, bean.name);
 
   const page = await enrichFromUrl(best.url);
-  const update = withInferredRoast(bean, parsedBeanToUpdate(page.parsed));
+  const update = withInferredComposition(
+    bean,
+    withInferredRoast(bean, parsedBeanToUpdate(page.parsed)),
+    page.rawText,
+  );
   const filled = fillMissingFields(bean, update);
   const fields = Object.keys(filled) as EnrichableField[];
 
