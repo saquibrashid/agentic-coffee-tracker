@@ -65,6 +65,40 @@ export function missingFields(bean: CoffeeBean): EnrichableField[] {
   return ENRICHABLE_FIELDS.filter((field) => isFieldMissing(bean, field));
 }
 
+/**
+ * True when a lookup has already read a page for this field and found nothing.
+ *
+ * Separate from `isFieldMissing` on purpose. The field *is* still missing — the
+ * detail page should say so, and `fillMissingFields` must go on treating it as
+ * fillable so that a better page found later can still supply it. What this
+ * changes is only whether the app keeps *asking*.
+ */
+export function isFieldUnpublished(bean: CoffeeBean, field: EnrichableField): boolean {
+  return (bean.unpublishedFields ?? []).includes(field);
+}
+
+/**
+ * Missing, and still worth doing something about.
+ *
+ * This is the predicate every "is this coffee incomplete" question should use.
+ * `isFieldMissing` answers a narrower question — is the value absent — and
+ * conflating the two is what made a blend nag forever about a process its
+ * roaster never printed.
+ */
+export function isFieldOutstanding(bean: CoffeeBean, field: EnrichableField): boolean {
+  return isFieldMissing(bean, field) && !isFieldUnpublished(bean, field);
+}
+
+/**
+ * The core fields a just-read page failed to supply.
+ *
+ * Takes the coffee as it stands *after* the lookup's update has been applied,
+ * so a field the page did fill is not then marked as unavailable from it.
+ */
+export function unpublishedAfterLookup(bean: CoffeeBean): EnrichableField[] {
+  return CORE_FIELDS.filter((field) => isFieldMissing(bean, field));
+}
+
 /** True when the coffee has no usable photo of its own yet. */
 export function beanNeedsPhoto(bean: Pick<CoffeeBean, 'photoId'>): boolean {
   return !bean.photoId;
@@ -75,7 +109,7 @@ export function beanNeedsEnrichment(bean: CoffeeBean): boolean {
   // A missing picture is reason enough on its own. An imported row has no
   // photo by definition, and the library is a wall of cards — a coffee with
   // no image is the most visible gap there is, even when its metadata is complete.
-  return CORE_FIELDS.some((field) => isFieldMissing(bean, field)) || beanNeedsPhoto(bean);
+  return CORE_FIELDS.some((field) => isFieldOutstanding(bean, field)) || beanNeedsPhoto(bean);
 }
 
 /**
@@ -83,7 +117,9 @@ export function beanNeedsEnrichment(bean: CoffeeBean): boolean {
  *
  * Only the core fields plus the photo, because those are the ones that made the
  * coffee count as incomplete in the first place — listing a missing varietal
- * next to them would imply a lookup is pending when none is.
+ * next to them would imply a lookup is pending when none is. A field a lookup
+ * has already drawn a blank on is left out for the same reason: naming it would
+ * promise a fix that no amount of pressing the button can deliver.
  */
 export function describeMissing(bean: CoffeeBean): string[] {
   const labels: Record<string, string> = {
@@ -92,7 +128,7 @@ export function describeMissing(bean: CoffeeBean): string[] {
     roastLevel: 'roast level',
     tastingNotes: 'tasting notes',
   };
-  const missing = CORE_FIELDS.filter((field) => isFieldMissing(bean, field)).map(
+  const missing = CORE_FIELDS.filter((field) => isFieldOutstanding(bean, field)).map(
     (field) => labels[field] ?? field,
   );
   if (beanNeedsPhoto(bean)) missing.push('photo');

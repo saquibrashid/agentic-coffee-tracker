@@ -1,5 +1,5 @@
 import 'fake-indexeddb/auto';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -252,6 +252,50 @@ describe('BeanDetailPage', () => {
     // before for anyone west of UTC.
     expect(screen.getByText('Jun 1, 2026')).toBeInTheDocument();
     expect(screen.getByText('Jun 4, 2026')).toBeInTheDocument();
+  });
+
+  /**
+   * #309. Process is the field a lookup most often cannot supply — a blend does
+   * not have one, and its page says so by saying nothing — so it is the field
+   * that most needs a way in by hand.
+   */
+  describe('setting the process by hand', () => {
+    it('saves the chosen process and queues it for sync', async () => {
+      await db.beans.clear();
+      await db.beans.add({ ...bean, process: 'unknown' });
+      renderPage();
+
+      const select = await screen.findByLabelText('Process');
+      fireEvent.change(select, { target: { value: 'natural' } });
+
+      await waitFor(async () => {
+        expect((await db.beans.get('bean-1'))?.process).toBe('natural');
+      });
+    });
+
+    it('explains a blank the lookup already tried to fill, and clears it on save', async () => {
+      await db.beans.clear();
+      const blend = {
+        ...bean,
+        unpublishedFields: ['process'],
+        unpublishedFrom: 'https://x.test/p',
+      };
+      delete (blend as { process?: unknown }).process;
+      await db.beans.add(blend);
+      renderPage();
+
+      expect(await screen.findByText(/didn't list one/)).toBeInTheDocument();
+
+      fireEvent.change(screen.getByLabelText('Process'), { target: { value: 'washed' } });
+
+      await waitFor(async () => {
+        const updated = await db.beans.get('bean-1');
+        expect(updated?.process).toBe('washed');
+        // The mark stood in for an unanswered question. The answer retires it.
+        expect(updated?.unpublishedFields).toBeUndefined();
+        expect(updated?.unpublishedFrom).toBeUndefined();
+      });
+    });
   });
 
   it('still leaves out the fields the coffee has nothing for', async () => {

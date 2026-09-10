@@ -171,6 +171,38 @@ export interface CoffeeBean {
   lastLookupAt?: string;
   lastLookupOutcome?: LookupOutcome;
 
+  /**
+   * Core fields the last successful lookup read a page for and still could not
+   * fill, so the app stops asking for them.
+   *
+   * Some coffees have no answer to give. A blend does not have *a* process:
+   * Stumptown's Holler Mountain and Hair Bender mix lots processed differently
+   * and their pages state no process at all, and Blue Bottle's Night Light
+   * Decaf is the same. Because `beanNeedsEnrichment` was purely a test of which
+   * fields were empty, those coffees badged "Missing process" forever, inflated
+   * the Settings count forever, and were re-queued by every relookup run
+   * forever — a chore the user could never discharge, because the missing thing
+   * was never published.
+   *
+   * The claim recorded here is deliberately narrow: *the page we found did not
+   * list this*, not "the roaster does not publish it". We cannot know the
+   * second. A delisted coffee — Stumptown's El Jordan is gone from their
+   * catalogue entirely — will match some other page, and asserting anything
+   * about the roaster from it would be wrong. The narrow claim is still enough
+   * to stop the nagging, for the same reason `not-found` already stops it:
+   * re-running the same search reads the same page and learns the same nothing.
+   *
+   * Recomputed in full by every successful lookup rather than added to, so it
+   * is self-correcting: fix an abbreviated name, or set the field by hand, and
+   * the stale marks clear themselves. Additive and optional, like `caffeine`
+   * above, so it needs no `schemaVersion` bump and old builds simply ignore it.
+   *
+   * Read it through `isFieldUnpublished()`, never directly.
+   */
+  unpublishedFields?: string[];
+  /** The page those fields were looked for on, so the claim can be audited. */
+  unpublishedFrom?: string;
+
   createdAt: string;
   updatedAt: string;
 }

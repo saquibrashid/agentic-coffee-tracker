@@ -57,6 +57,23 @@ function bean(overrides: Partial<CoffeeBean> = {}): CoffeeBean {
   };
 }
 
+/**
+ * A coffee complete in every core field except process -- Stumptown's Holler
+ * Mountain, in other words. The one shape that isolates #309: any other gap
+ * would keep the coffee incomplete for reasons unrelated to what is being
+ * asserted.
+ */
+function blendMissingOnlyProcess(): CoffeeBean {
+  const blend = bean({
+    origins: [{ country: 'Guatemala' }],
+    roastLevel: 'medium',
+    tastingNotes: ['cocoa'],
+    photoId: 'p1',
+  });
+  delete blend.process;
+  return blend;
+}
+
 function task(overrides: Partial<PendingAiTask> = {}): PendingAiTask {
   return {
     id: 't1',
@@ -143,6 +160,7 @@ describe('queue runner: web-enrich', () => {
       update: { process: 'washed', tastingNotes: ['cocoa'] },
       sourceUrl: 'https://onyx.example/sw',
       filled: ['process', 'tastingNotes'],
+      applied: true,
     });
 
     await runQueueNow();
@@ -160,6 +178,7 @@ describe('queue runner: web-enrich', () => {
       update: { process: 'washed' },
       sourceUrl: 'https://onyx.example/sw',
       filled: ['process'],
+      applied: true,
     });
 
     await runQueueNow();
@@ -177,6 +196,63 @@ describe('queue runner: web-enrich', () => {
     await runQueueNow();
 
     await expect(db.pendingAiTasks.count()).resolves.toBe(0);
+  });
+
+  /**
+   * #309. A page that was read and had no process is evidence; no page having
+   * been read is not. The queue is the only place that can tell them apart, so
+   * it is the only place the distinction can be recorded.
+   */
+  it('records what a page it actually read failed to supply', async () => {
+    const blend = blendMissingOnlyProcess();
+    await db.beans.add(blend);
+    await db.pendingAiTasks.add(task());
+    autoEnrichBean.mockResolvedValue({
+      update: {},
+      sourceUrl: 'https://stumptown.example/holler-mountain',
+      filled: [],
+      applied: false,
+    });
+
+    await runQueueNow();
+
+    const updated = await db.beans.get('b1');
+    expect(updated?.unpublishedFields).toEqual(['process']);
+    expect(updated?.unpublishedFrom).toBe('https://stumptown.example/holler-mountain');
+  });
+
+  it('records nothing when no page was read at all', async () => {
+    const blend = blendMissingOnlyProcess();
+    await db.beans.add(blend);
+    await db.pendingAiTasks.add(task());
+    autoEnrichBean.mockResolvedValue(null);
+
+    await runQueueNow();
+
+    expect((await db.beans.get('b1'))?.unpublishedFields).toBeUndefined();
+  });
+
+  it('clears a stale mark once a later page supplies the field', async () => {
+    const blend = {
+      ...blendMissingOnlyProcess(),
+      unpublishedFields: ['process'],
+      unpublishedFrom: 'https://stumptown.example/old',
+    };
+    await db.beans.add(blend);
+    await db.pendingAiTasks.add(task());
+    autoEnrichBean.mockResolvedValue({
+      update: { process: 'washed' },
+      sourceUrl: 'https://stumptown.example/new',
+      filled: ['process'],
+      applied: true,
+    });
+
+    await runQueueNow();
+
+    const updated = await db.beans.get('b1');
+    expect(updated?.process).toBe('washed');
+    expect(updated?.unpublishedFields).toBeUndefined();
+    expect(updated?.unpublishedFrom).toBeUndefined();
   });
 
   it('drops the task when the coffee was deleted while it waited', async () => {
@@ -221,7 +297,7 @@ describe('queue runner: web-enrich', () => {
   it('records that a lookup filled the coffee in', async () => {
     await db.beans.add(bean());
     await db.pendingAiTasks.add(task());
-    autoEnrichBean.mockResolvedValue({ update: { process: 'washed' } });
+    autoEnrichBean.mockResolvedValue({ update: { process: 'washed' }, applied: true });
 
     await runQueueNow();
 

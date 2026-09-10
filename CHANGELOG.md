@@ -22,6 +22,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A coffee whose roaster never published a process nagged about it forever.**
+  Three of the library's Stumptown coffees are blends, and a blend does not have
+  a single process — Holler Mtn. and Hair Bender state none anywhere on their
+  pages, and Blue Bottle's Night Light Decaf is the same. Because “incomplete”
+  was purely a test of which fields were empty, those coffees badged “Missing
+  process” on every render, inflated the Settings count, and were re-queued by
+  every relookup run: a chore with no possible end, because the missing thing
+  was never printed. A lookup that reads a page and still cannot fill a core
+  field now records that against the coffee, and those fields drop out of the
+  badge, the count and the re-queue loop — while still being reported as
+  missing, because they are. The claim is deliberately narrow: _the page we
+  found did not list this_, not that the roaster does not publish it, which
+  cannot be known and would be wrong for a delisted coffee that matched some
+  other page. It is recomputed in full by every successful lookup, so a
+  corrected name clears a stale mark by itself. Nothing is inferred — guessing
+  the commonest process would feed the preference, analytics and prediction
+  engines a value nobody checked. Capture itself was never broken: Stumptown's
+  single-origin pages state their process plainly and are read correctly. The
+  coffee's own page also gains a **process control**, alongside the caffeine one
+  it is modelled on: process is the field a lookup can least often supply, so it
+  is the one that most needed a way in for a value you can read off the bag.
+  Setting it retires the mark, since the question it stood in for now has an
+  answer.
+  ([#309](https://github.com/saquibrashid/agentic-coffee-tracker/issues/309))
+
 - **Reading a coffee's page spent most of its budget on the shop's menus.** A
   page is read up to a fixed length, and on a storefront the navigation, cart
   and search come first: on Counter Culture's “Fast Forward” they used 6,873 of
