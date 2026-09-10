@@ -20,23 +20,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   to, and it was spending one of only seven bottom-nav slots to be wrong. The
   nav is now six items and correspondingly roomier.
 
-### Fixed
+### Changed
 
 - **Settings was one long scroll you had to read to the end to navigate.**
-  Twelve full-height cards sat open one after another, so finding _Export_ or
-  the danger zone meant scrolling past everything else and remembering what you
-  had seen. Every section is now a collapsed row carrying its own one-line
-  summary — the signed-in account, the sync state, how many sample coffees are
-  loaded — so the whole page fits on a screen and you can tell what is inside a
-  section without opening it. The rows are grouped under _Account and sync_,
-  _Your coffees_, _AI tools_ and _App_, with the danger zone left ungrouped at
-  the bottom where it cannot be opened by accident. Sections that want
-  attention — signed out, sync failing, an import waiting to be confirmed —
-  show a dot, and the dot is paired with text for anyone who cannot see colour.
-  _Studio photos_ deliberately has no dot: it is the one action that costs
-  money per coffee, and a dot there would read as the app asking to spend it.
-  The rows are built on `<details>`, so browser find-in-page still reaches
-  closed content.
+  Twelve full-height cards sat open one after another — 3969px at phone size,
+  nearly five screens — so finding _Export_ or the danger zone meant scrolling
+  past everything else and remembering what you had seen. Every section is now
+  a collapsed row carrying its own one-line summary — the signed-in account,
+  the sync state, how many sample coffees are loaded — so every section's name
+  is visible in about a screen and a half (1151px), and you can tell what is
+  inside a section without opening it. The rows are grouped under _Account and
+  sync_, _Your coffees_, _AI tools_ and _App_, with the danger zone left
+  ungrouped at the bottom where it cannot be opened by accident. Sections that
+  want attention — signed out, sync failing, an import waiting to be
+  confirmed — show a dot, and the dot is paired with text for anyone who cannot
+  see colour. _Studio photos_ deliberately has no dot: it is the one action
+  that costs money per coffee, and a dot there would read as the app asking to
+  spend it. The rows are built on `<details>`, so browser find-in-page still
+  reaches closed content.
+
+### Fixed
+
 - **“No product page” for a coffee whose page the app was linking to.** Pressing
   _Look up missing details_ reported that a coffee could not be found and
   advised editing its name, while the bean page sat there showing a working
