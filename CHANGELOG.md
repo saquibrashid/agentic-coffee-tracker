@@ -47,7 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text already held and fills the gap where the coffee's own name or description
   says which it is. It writes nothing when they say neither, because both are
   ordinary and a guess would be wrong for about half a library while looking
-  exactly like a fact, and it never touches a composition set by hand. Nothing
+  exactly like a fact, and it leaves any composition you set yourself alone —
+  including a deliberate “not known”, which is a judgement rather than a gap.
+  Nothing
   it writes is synced: every device derives the same answer from text it already
   has, and sending a derived value is what once resurrected a deleted bean.
 

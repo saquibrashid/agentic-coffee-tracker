@@ -45,11 +45,18 @@ import type { CoffeeBean } from '@/types';
  * other device can derive, so the bean page writes it through the outbox
  * normally. This pass then leaves it alone forever, because it only ever writes
  * into a gap.
+ *
+ * ## Why an explicit "not known" counts as answered
+ *
+ * "Not known" is a real option in the bean page's control, and choosing it is a
+ * judgement: the user looked and the roaster does not say. Re-deriving over it
+ * would overrule that on the next app start and keep doing so, so the only
+ * value this pass treats as a gap is the absence of one.
  */
 
-/** A bean is a candidate while nothing has answered for it. */
+/** A bean is a candidate only while nothing has answered for it at all. */
 function needsComposition(bean: CoffeeBean): boolean {
-  return !bean.composition || bean.composition === 'unknown';
+  return bean.composition === undefined;
 }
 
 export interface CompositionBackfillResult {

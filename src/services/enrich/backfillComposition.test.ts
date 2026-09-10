@@ -62,12 +62,16 @@ describe('backfillComposition', () => {
     expect((await db.beans.get('a'))?.composition).toBeUndefined();
   });
 
-  it('treats an explicit "unknown" the same as a missing value', async () => {
+  it('respects an explicit "not known" as an answer, not a gap', async () => {
+    // "Not known" is a real choice in the bean page's control: the user looked
+    // and the roaster does not say. Re-deriving over it would overrule that on
+    // every app start, forever.
     await db.beans.add(bean('a', { name: 'House Blend', composition: 'unknown' }));
 
-    await backfillComposition();
+    const result = await backfillComposition();
 
-    expect((await db.beans.get('a'))?.composition).toBe('blend');
+    expect(result).toEqual({ considered: 0, inferred: 0 });
+    expect((await db.beans.get('a'))?.composition).toBe('unknown');
   });
 
   it('never revisits a composition the user already set', async () => {
@@ -82,12 +86,17 @@ describe('backfillComposition', () => {
   });
 
   it('reaches a coffee that enrichment has given up on', async () => {
-    // The case this pass exists for. #309 marks a blend's missing process as
-    // unpublished so it stops being re-queued, which means no future lookup
-    // will ever visit it -- and its composition would stay blank forever.
+    // The case this pass exists for, with the real product's real name and the
+    // opening of its real description. #309 marks Holler Mountain's missing
+    // process as unpublished so it stops being re-queued, which means no future
+    // lookup will ever visit it -- and note the name alone says nothing, so the
+    // description is what has to carry this.
     await db.beans.add(
       bean('a', {
-        name: 'Holler Mountain Blend',
+        roaster: 'Stumptown',
+        name: 'Holler Mountain',
+        roasterDescription:
+          'Our Holler Mountain organic coffee blend has been a hometown favorite since day one.',
         origins: [{ country: 'Ethiopia' }],
         process: 'washed',
         roastLevel: 'medium',
