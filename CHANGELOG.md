@@ -37,6 +37,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and stays “not known” when the page says neither word, which is a real and
   common answer rather than a gap to nag about.
 
+- **Coffees added before that existed now pick up a composition on their own.**
+  Recording the field only helped coffees captured afterwards, and nothing else
+  was going to reach the rest: composition is deliberately not one of the fields
+  that makes a coffee count as incomplete, so a bean whose core details are
+  filled in is never looked up again — and the blends that prompted the feature
+  are the worst case, since their unpublished process was marked as such
+  precisely so they would stop being re-queued. A pass on app open reads the
+  text already held and fills the gap where the coffee's own name or description
+  says which it is. It writes nothing when they say neither, because both are
+  ordinary and a guess would be wrong for about half a library while looking
+  exactly like a fact, and it leaves any composition you set yourself alone —
+  including a deliberate “not known”, which is a judgement rather than a gap.
+  Nothing
+  it writes is synced: every device derives the same answer from text it already
+  has, and sending a derived value is what once resurrected a deleted bean.
+
 - **A coffee whose roaster never published a process nagged about it forever.**
   Three of the library's Stumptown coffees are blends, and a blend does not have
   a single process — Holler Mtn. and Hair Bender state none anywhere on their
