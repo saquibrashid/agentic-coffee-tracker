@@ -102,3 +102,41 @@ function render(origin: Origin, parts: string[]): string {
   const place = parts.length > 0 ? `${origin.country} (${parts.join(' · ')})` : origin.country;
   return origin.percentage !== undefined ? `${place} ${origin.percentage}%` : place;
 }
+
+/**
+ * Applies an edited list of country names to the origins a coffee already has.
+ *
+ * The confirm screen offers origins as a comma-separated list of countries,
+ * which is a convenience for correcting a misread country rather than a claim
+ * that the coffee has no farm. Rebuilding the list from that text discarded
+ * `region`, `farm`, `producer` and `percentage` from every entry, silently, on
+ * every save (#304).
+ *
+ * So a country the coffee already had keeps the entries it already had — all of
+ * them, because a blend of two Guatemalan lots shows "Guatemala" once but is
+ * still two origins. A country the user added is new and bare, because there is
+ * nothing else known about it yet. A country they removed goes, along with
+ * whatever detail hung off it, which is what removing it means.
+ *
+ * Matching ignores case, so retyping a country in lower case is an edit to
+ * nothing and keeps the stored spelling.
+ */
+export function mergeOriginEdits(
+  original: readonly Origin[] | undefined,
+  countries: readonly string[],
+): Origin[] {
+  const byCountry = new Map<string, Origin[]>();
+  for (const origin of original ?? []) {
+    const key = countryKey(origin.country ?? '');
+    if (!key) continue;
+    byCountry.set(key, [...(byCountry.get(key) ?? []), origin]);
+  }
+
+  const out: Origin[] = [];
+  for (const country of uniqueOriginCountries(countries.map((value) => ({ country: value })))) {
+    const existing = byCountry.get(countryKey(country));
+    if (existing) out.push(...existing);
+    else out.push({ country });
+  }
+  return out;
+}

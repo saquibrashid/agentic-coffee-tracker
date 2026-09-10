@@ -16,7 +16,7 @@ import { beanNeedsEnrichment } from '@/services/enrich/autoEnrich';
 import type { CaffeineLevel, CoffeeBean, Process, RoastLevel } from '@/types';
 import { CAFFEINE_LEVELS, PROCESSES, ROAST_LEVELS } from '@/services/beans/library';
 import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
-import { uniqueOriginCountries } from '@/services/beans/origins';
+import { mergeOriginEdits, uniqueOriginCountries } from '@/services/beans/origins';
 import { ulid } from 'ulid';
 
 /**
@@ -122,7 +122,7 @@ export function ConfirmForm({ bean, rawText, schemaErrors, usedMock }: ConfirmFo
         draft.roastLevel = form.roastLevel;
         draft.caffeine = form.caffeine;
         draft.process = form.process;
-        draft.origins = splitList(form.origin).map((country) => ({ country }));
+        draft.origins = mergeOriginEdits(bean.origins, splitList(form.origin));
         draft.tastingNotes = splitList(form.tastingNotes);
         if (form.roastDate) {
           draft.roastDate = form.roastDate;

@@ -22,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Confirming a coffee threw away everything its origins knew except the
+  country.** The confirm screen offers origins as a comma-separated list of
+  countries, and rebuilt them from that text on save — so farm, region, producer
+  and percentage were dropped, silently, from a coffee that had them. A blend of
+  two Guatemalan lots became one bare “Guatemala”. The field now edits the
+  country names and leaves the detail behind them intact: a country you keep
+  keeps its lots, a country you add is new, and a country you remove takes its
+  detail with it.
+
 - **The same tasting note listed twice on a bag counted twice.** Analytics
   already collapsed repeats; your taste map and the score prediction did not, so
   one bag saying “Chocolate” twice — the roaster's own copy plus an enrichment
