@@ -127,6 +127,8 @@ export interface ParsedBean {
   /** The form it arrives in, when the text says. Never who sold it. */
   format: 'whole-bean' | 'ground' | 'cometeer' | 'nespresso' | 'k-cup' | 'instant' | null;
   caffeine: 'caffeinated' | 'decaf' | 'half-caf' | null;
+  /** One coffee in the bag or several. Independent of `process`. */
+  composition: 'blend' | 'single-origin' | null;
   tastingNotes: string[];
   roastDate: string | null;
   varietals: string[];

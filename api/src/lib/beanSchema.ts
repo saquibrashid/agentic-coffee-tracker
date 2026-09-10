@@ -36,6 +36,19 @@ export const ROAST_LEVEL_VALUES = [
 export const CAFFEINE_VALUES = ['caffeinated', 'decaf', 'half-caf'] as const;
 
 /**
+ * One coffee in the bag or several — a separate axis from `process`, and
+ * deliberately not a value inside it.
+ *
+ * Counter Culture's "Fast Forward" is why: it is sold as a "Year-Round Blend"
+ * and its page also states "Process: Washed". Both are true, so a `blend`
+ * option inside `PROCESS_VALUES` would force the model to throw one away.
+ *
+ * `unknown` is absent for the same reason as above — the model says `null`.
+ * Silence is common and genuine here: plenty of pages say neither word.
+ */
+export const COMPOSITION_VALUES = ['blend', 'single-origin'] as const;
+
+/**
  * The form the coffee arrives in — not who sold it.
  *
  * This began life as a free-text `vendor` on the reading that a Cometeer box is
@@ -61,6 +74,7 @@ export const FORMAT_VALUES = [
 export type ProcessValue = (typeof PROCESS_VALUES)[number];
 export type RoastLevelValue = (typeof ROAST_LEVEL_VALUES)[number];
 export type CaffeineValue = (typeof CAFFEINE_VALUES)[number];
+export type CompositionValue = (typeof COMPOSITION_VALUES)[number];
 export type FormatValue = (typeof FORMAT_VALUES)[number];
 
 /**
@@ -104,6 +118,7 @@ export interface ParsedBean {
   roastLevel: RoastLevelValue | null;
   format: FormatValue | null;
   caffeine: CaffeineValue | null;
+  composition: CompositionValue | null;
   tastingNotes: string[];
   roastDate: string | null;
   varietals: string[];
@@ -121,6 +136,7 @@ export const REQUIRED_BEAN_KEYS = [
   'roastLevel',
   'format',
   'caffeine',
+  'composition',
   'tastingNotes',
   'roastDate',
   'varietals',
@@ -173,6 +189,12 @@ export const PARSED_BEAN_SCHEMA = {
       enum: [...CAFFEINE_VALUES, null],
       description:
         'Only when the text says so — "decaf", "decaffeinated", "Swiss Water", "EA/sugarcane process", or "half-caf". Most coffee is caffeinated and does not advertise it, so silence means null, NOT "caffeinated". Do not infer decaf from a name that merely sounds like an evening drink.',
+    },
+    composition: {
+      type: ['string', 'null'],
+      enum: [...COMPOSITION_VALUES, null],
+      description:
+        'Whether the bag holds several coffees or one. "blend" when the text calls it a blend or names multiple component lots; "single-origin" when it says single origin (however spelled) or presents one farm/lot as the whole coffee. This is independent of process — a blend can still state a process, so record both. Return null when the text does not say; do not guess from the name or from how many origins are listed.',
     },
     tastingNotes: {
       type: 'array',
@@ -227,6 +249,7 @@ export function normalizeParsedBean(input: unknown): unknown {
     'roastLevel',
     'format',
     'caffeine',
+    'composition',
     'roastDate',
     'roasterDescription',
   ]) {
@@ -358,6 +381,7 @@ export function validateParsedBean(input: unknown): ValidationResult {
   checkEnum(candidate['roastLevel'], ROAST_LEVEL_VALUES, '/roastLevel', errors);
   checkEnum(candidate['format'], FORMAT_VALUES, '/format', errors);
   checkEnum(candidate['caffeine'], CAFFEINE_VALUES, '/caffeine', errors);
+  checkEnum(candidate['composition'], COMPOSITION_VALUES, '/composition', errors);
   checkStringArray(candidate['tastingNotes'], '/tastingNotes', errors);
   checkStringArray(candidate['varietals'], '/varietals', errors);
   checkOrigins(candidate['origins'], errors);
@@ -384,6 +408,7 @@ export function mockParsedBean(ocrText: string): ParsedBean {
     roastLevel: 'medium',
     format: null,
     caffeine: 'caffeinated',
+    composition: 'blend',
     tastingNotes: ['chocolate', 'caramel', 'sweet'],
     roastDate: null,
     varietals: [],

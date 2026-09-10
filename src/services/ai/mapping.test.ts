@@ -10,6 +10,7 @@ const empty: ParsedBean = {
   process: null,
   roastLevel: null,
   caffeine: null,
+  composition: null,
   tastingNotes: [],
   roastDate: null,
   varietals: [],
@@ -109,6 +110,43 @@ describe('parsedBeanToUpdate', () => {
       });
 
       expect(update.roastLevel).toBeUndefined();
+    });
+  });
+
+  describe('composition', () => {
+    it('takes the parsed value when the model found one', () => {
+      expect(parsedBeanToUpdate({ ...empty, composition: 'blend' }).composition).toBe('blend');
+      expect(parsedBeanToUpdate({ ...empty, composition: 'single-origin' }).composition).toBe(
+        'single-origin',
+      );
+    });
+
+    it('infers from the name when the model returned null', () => {
+      expect(parsedBeanToUpdate({ ...empty, name: 'Hair Bender Coffee Blend' }).composition).toBe(
+        'blend',
+      );
+    });
+
+    it('infers from the roaster description when the name is silent', () => {
+      expect(
+        parsedBeanToUpdate({
+          ...empty,
+          name: 'Sunrider',
+          roasterDescription: 'An exclusive single origin from Colombia.',
+        }).composition,
+      ).toBe('single-origin');
+    });
+
+    it('leaves it unset when nothing says either way', () => {
+      // Unlike caffeine there is no default: blends and single origins are both
+      // ordinary, so silence must not become a value.
+      expect(
+        parsedBeanToUpdate({
+          ...empty,
+          name: 'Night Light Decaf',
+          roasterDescription: 'Chocolate and toasted marshmallow.',
+        }).composition,
+      ).toBeUndefined();
     });
   });
 

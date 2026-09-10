@@ -33,7 +33,8 @@ import {
   type LibraryFilters,
 } from '@/services/beans/library';
 import { CAFFEINE_LABELS } from '@/services/beans/caffeine';
-import type { CaffeineLevel, Process, RoastLevel } from '@/types';
+import { COMPOSITIONS, COMPOSITION_LABELS } from '@/services/beans/composition';
+import type { CaffeineLevel, Composition, Process, RoastLevel } from '@/types';
 
 export interface BeanFiltersProps {
   filters: LibraryFilters;
@@ -161,6 +162,23 @@ export function BeanFilters({ filters, facets, onChange, onReset }: BeanFiltersP
               </Select>
             </div>
 
+            <div>
+              <Label htmlFor="filter-composition" className="mb-1 block">
+                Composition
+              </Label>
+              <Select
+                id="filter-composition"
+                value={filters.composition}
+                onChange={(e) => onChange('composition', e.target.value as Composition | 'all')}
+              >
+                <option value="all">Blends and single origins</option>
+                {COMPOSITIONS.map((value) => (
+                  <option key={value} value={value}>
+                    {COMPOSITION_LABELS[value]}
+                  </option>
+                ))}
+              </Select>
+            </div>
             <div>
               <Label htmlFor="filter-caffeine" className="mb-1 block">
                 Caffeine

@@ -56,6 +56,7 @@ function parsed(overrides: Record<string, unknown> = {}) {
     process: 'washed' as const,
     roastLevel: 'medium-light' as const,
     caffeine: null,
+    composition: null,
     tastingNotes: ['chocolate', 'citrus'],
     roastDate: '2025-06-01',
     varietals: ['Caturra'],
@@ -100,6 +101,7 @@ describe('missingFields / beanNeedsEnrichment', () => {
       'origins',
       'process',
       'roastLevel',
+      'composition',
       'varietals',
       'elevationMeters',
       'tastingNotes',
@@ -114,6 +116,7 @@ describe('missingFields / beanNeedsEnrichment', () => {
       origins: [{ country: 'Colombia' }],
       process: 'washed',
       roastLevel: 'medium',
+      composition: 'single-origin',
       varietals: ['Caturra'],
       elevationMeters: { min: 1700 },
       tastingNotes: ['cocoa'],
@@ -130,6 +133,7 @@ describe('missingFields / beanNeedsEnrichment', () => {
       origins: [{ country: 'Colombia' }],
       process: 'washed',
       roastLevel: 'medium',
+      composition: 'single-origin',
       varietals: ['Caturra'],
       elevationMeters: { min: 1700 },
       tastingNotes: ['cocoa'],
@@ -153,6 +157,7 @@ describe('missingFields / beanNeedsEnrichment', () => {
 
     expect(beanNeedsEnrichment(coreComplete)).toBe(false);
     expect(missingFields(coreComplete)).toEqual([
+      'composition',
       'varietals',
       'elevationMeters',
       'roasterDescription',
@@ -322,6 +327,41 @@ describe('autoEnrichBean', () => {
     return expect(
       autoEnrichBean(bean({ roastLevel: 'unknown' })).then((r) => r?.update.roastLevel),
     ).resolves.toBe('medium-dark');
+  });
+
+  it('reads a composition the page states only in a banner above the name', async () => {
+    // Stumptown puts "SINGLE ORIGIN" in page furniture, not prose, so it never
+    // reaches roasterDescription and the model returns null. The raw page text
+    // is the only place that evidence exists.
+    findCandidates.mockResolvedValue([
+      { url: 'https://stumptown.example/sunrider', title: 'Sunrider', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed({ composition: null, roasterDescription: 'Bright and juicy.' }),
+      rawText: 'Sunrider Coffee Beans | Stumptown Coffee Roasters EXCLUSIVE SINGLE ORIGIN Sunrider',
+      sourceUrl: 'https://stumptown.example/sunrider',
+      model: 'gpt-4o',
+    });
+
+    const result = await autoEnrichBean(bean());
+
+    expect(result?.update.composition).toBe('single-origin');
+  });
+
+  it('never lets an inferred composition displace one the user already set', async () => {
+    findCandidates.mockResolvedValue([
+      { url: 'https://stumptown.example/sunrider', title: 'Sunrider', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed({ composition: null, roasterDescription: 'Bright and juicy.' }),
+      rawText: 'EXCLUSIVE SINGLE ORIGIN Sunrider',
+      sourceUrl: 'https://stumptown.example/sunrider',
+      model: 'gpt-4o',
+    });
+
+    const result = await autoEnrichBean(bean({ composition: 'blend' }));
+
+    expect(result?.update.composition).toBeUndefined();
   });
 
   it('never lets an inferred roast displace one the user already set', async () => {

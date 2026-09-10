@@ -18,11 +18,18 @@ import type { CoffeeBean } from '@/types';
  * is excluded because a product page advertises the roaster's *current* batch,
  * which has nothing to do with the bag drunk months ago. `confidence` is
  * excluded because it describes the parse, not the coffee.
+ *
+ * `composition` is here but deliberately *not* in `CORE_FIELDS` below: plenty
+ * of roasters say neither "blend" nor "single origin", so an unknown
+ * composition is an ordinary permanent state rather than a gap worth chasing.
+ * Filling it when a lookup happens anyway costs nothing; triggering lookups on
+ * it would nag about coffees no page can resolve.
  */
 export const ENRICHABLE_FIELDS = [
   'origins',
   'process',
   'roastLevel',
+  'composition',
   'varietals',
   'elevationMeters',
   'tastingNotes',

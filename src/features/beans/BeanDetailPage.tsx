@@ -18,6 +18,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services/beans/delete';
 import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
 import { formatLabel, hasNotableFormat } from '@/services/beans/format';
+import {
+  COMPOSITIONS,
+  COMPOSITION_LABELS,
+  compositionKnown,
+  compositionOf,
+} from '@/services/beans/composition';
 import { formatOriginList } from '@/services/beans/origins';
 import { CAFFEINE_LEVELS, PROCESSES } from '@/services/beans/library';
 import { markBeanReviewed } from '@/services/beans/review';
@@ -42,7 +48,15 @@ import { EnrichPanel } from './EnrichPanel';
 import { PhotoThumbnail } from './PhotoLightbox';
 import { PhotoPanel } from './PhotoPanel';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
-import type { BrewType, CaffeineLevel, CoffeeBean, Money, Process, Rating } from '@/types';
+import type {
+  BrewType,
+  CaffeineLevel,
+  CoffeeBean,
+  Composition,
+  Money,
+  Process,
+  Rating,
+} from '@/types';
 
 const SCORE_OPTIONS = SCORE_CHOICES;
 
@@ -176,6 +190,51 @@ function CaffeineAttribute({ bean }: { bean: CoffeeBean }) {
           {CAFFEINE_LEVELS.map((level) => (
             <option key={level} value={level}>
               {CAFFEINE_LABELS[level]}
+            </option>
+          ))}
+        </Select>
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * Composition, as a control rather than a read-out.
+ *
+ * The same shape as `CaffeineAttribute`, and editable for the same reason: the
+ * roaster's page frequently says neither "blend" nor "single origin", and the
+ * user usually knows perfectly well which it is. Unlike process there is no
+ * unpublished mark to clear, because composition is not a field the app ever
+ * nags about — see `ENRICHABLE_FIELDS` in `completeness.ts`.
+ */
+function CompositionAttribute({ bean }: { bean: CoffeeBean }) {
+  const [saving, setSaving] = useState(false);
+
+  async function onChange(composition: Composition) {
+    setSaving(true);
+    try {
+      await db.beans.update(bean.id, { composition, updatedAt: new Date().toISOString() });
+      await enqueueUpsert('bean', bean.id);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <dt className="text-meta text-muted-foreground">
+        <Label htmlFor="bean-composition">Composition</Label>
+      </dt>
+      <dd className="mt-0.5 text-sm">
+        <Select
+          id="bean-composition"
+          value={compositionOf(bean)}
+          disabled={saving}
+          onChange={(e) => void onChange(e.target.value as Composition)}
+        >
+          {COMPOSITIONS.map((value) => (
+            <option key={value} value={value}>
+              {COMPOSITION_LABELS[value]}
             </option>
           ))}
         </Select>
@@ -660,6 +719,12 @@ export function BeanDetailPage() {
                     Suppressed for whole bean, which is nearly every coffee and
                     so distinguishes nothing. */}
                 {hasNotableFormat(bean) && <span> · {formatLabel(bean)}</span>}
+                {/* Suppressed when unknown, which is a common and honest state:
+                    a chip reading "Not known" would be noise on every coffee
+                    whose page said neither word. */}
+                {compositionKnown(bean) && (
+                  <span> · {COMPOSITION_LABELS[compositionOf(bean)]}</span>
+                )}
               </p>
             </div>
             <ScoreBlock ratings={ratings} />
@@ -701,6 +766,7 @@ export function BeanDetailPage() {
                 {(bean.origins ?? []).length > 0 && formatOriginList(bean.origins)}
               </Attribute>
               <ProcessAttribute bean={bean} />
+              <CompositionAttribute bean={bean} />
               <CaffeineAttribute bean={bean} />
               <Attribute label="Varietals">
                 {(bean.varietals ?? []).length > 0 && (bean.varietals ?? []).join(', ')}

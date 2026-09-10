@@ -22,6 +22,7 @@
  * So every rule here keys on explicit roast *vocabulary*, and each match is
  * returned with the phrase that produced it, so callers can show their working.
  */
+import { isNegated, normalise } from '@/services/enrich/textEvidence';
 import type { RoastLevel } from '@/types';
 
 export interface RoastInference {
@@ -76,29 +77,6 @@ const MODIFIERS: ReadonlyArray<readonly [string, RoastLevel]> = [
  * word resolving one way from a spreadsheet column and another from a bag.
  */
 
-/**
- * Normalises text so one set of patterns can match every spelling.
- *
- * Hyphens become spaces, so "medium-dark", "medium–dark" and "medium dark" are
- * one case. Everything else that is not a letter or digit becomes a space too,
- * which is what lets a match survive punctuation like "Roast: dark." or
- * "(medium roast)".
- *
- * Sentence terminators survive as a bare `.`, because the negation check below
- * needs to know where one sentence ends. Without them "We do not cut corners.
- * Roast level: dark." reads as a single run of words, and the `not` from the
- * first sentence would suppress the plain statement in the second.
- */
-function normalise(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9+.!?;]+/g, ' ')
-    .replace(/[.!?;]+/g, ' . ')
-    .replace(/\+/g, ' plus ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
 const ALTERNATION = MODIFIERS.map(([phrase]) => phrase.replace(/ /g, '\\s+')).join('|');
 
 /**
@@ -139,26 +117,6 @@ const STANDALONE: ReadonlyArray<readonly [RegExp, RoastLevel]> = [
 function levelFor(modifier: string): RoastLevel | undefined {
   const normalised = modifier.replace(/\s+/g, ' ');
   return MODIFIERS.find(([phrase]) => phrase === normalised)?.[1];
-}
-
-/**
- * Cues that invert the phrase that follows them.
- *
- * "Not your typical dark roast" and "none of the bitterness of a French roast"
- * are ordinary roaster copy, and both name a roast the coffee explicitly is
- * *not*. Without this the module would read them as assertions and record the
- * opposite of what the page says.
- *
- * Only the text since the last sentence boundary is considered, and only a
- * short run of it — far enough to catch the standard constructions, short
- * enough that a negation in a previous sentence cannot reach across and
- * suppress a genuine mention.
- */
-const NEGATIONS =
-  /\b(?:not|isn t|aren t|never|unlike|instead of|rather than|none of|short of|without|no)\b[^.]{0,24}$/;
-
-function isNegated(haystack: string, matchIndex: number): boolean {
-  return NEGATIONS.test(haystack.slice(0, matchIndex));
 }
 
 /**
