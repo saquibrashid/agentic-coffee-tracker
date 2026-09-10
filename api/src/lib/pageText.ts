@@ -52,6 +52,18 @@ export const MIN_USEFUL_TEXT = 400;
  */
 const MAIN_CONTENT = /<main\b[^>]*>([\s\S]*)<\/main>/i;
 
+/**
+ * The page's own title, which on a storefront names the roaster.
+ *
+ * Reading the whole document picked this up for free. Narrowing to `<main>`
+ * dropped it, and the roaster went with it: Counter Culture's page says
+ * "Counter Culture Coffee" in its title and its header and nowhere inside the
+ * content region, so the first narrowed lookup came back with `roaster: null`
+ * where the old one had the name. Keeping the title is what makes the narrowing
+ * a strict improvement rather than a trade.
+ */
+const TITLE = /<title\b[^>]*>([\s\S]*?)<\/title>/i;
+
 function stripToText(html: string): string {
   // Naive: strip scripts/styles then tags. For production use a proper parser.
   return html
@@ -72,7 +84,10 @@ export function extractTextFromHtml(html: string): string {
   // trusting it would throw away a page that had the content elsewhere. The
   // whole document is the safer answer whenever the narrowing did not pay off.
   const main = stripToText(match[1]);
-  return (main.length >= MIN_USEFUL_TEXT ? main : whole).slice(0, MAX_PAGE_TEXT);
+  if (main.length < MIN_USEFUL_TEXT) return whole.slice(0, MAX_PAGE_TEXT);
+
+  const title = stripToText(TITLE.exec(html)?.[1] ?? '');
+  return (title ? `${title} ${main}` : main).slice(0, MAX_PAGE_TEXT);
 }
 
 /** Strips markup, entities and punctuation so two renderings compare equal. */
