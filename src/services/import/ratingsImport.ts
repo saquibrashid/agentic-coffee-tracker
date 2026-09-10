@@ -3,6 +3,7 @@ import { db } from '@/services/db';
 import { beanNeedsEnrichment } from '@/services/enrich/autoEnrich';
 import { inferRoastLevel } from '@/services/enrich/inferRoast';
 import { caffeineForNewBean } from '@/services/enrich/inferCaffeine';
+import { inferComposition } from '@/services/enrich/inferComposition';
 import { DEFAULT_BREW_TYPE } from '@/services/ratings/brewTypes';
 import {
   LEGACY_MAX_SCORE,
@@ -427,6 +428,7 @@ export function planCsvImport(text: string, existing: ExistingData): ImportPlan 
         ROAST_SYNONYMS[normaliseHeader(cell(row, 'roastLevel'))] ??
         inferRoastLevel({ name, tastingNotes })?.level;
       const process = PROCESS_SYNONYMS[normaliseHeader(cell(row, 'process'))];
+      const composition = inferComposition({ name })?.composition;
 
       bean = {
         id: ulid(),
@@ -448,6 +450,10 @@ export function planCsvImport(text: string, existing: ExistingData): ImportPlan 
         // place a spreadsheet records this, and leaving the import as `unknown`
         // hides every row from the decaf/caffeinated split.
         caffeine: caffeineForNewBean({ name }),
+        // Names carry this more often than any column does — "House Blend",
+        // "Ethiopia Guji Single Origin". There is no sensible default to fall
+        // back on, so a name that says neither simply stays unknown.
+        ...(composition ? { composition } : {}),
       };
       beansByKey.set(key, bean);
       plan.newBeans.push(bean);

@@ -151,6 +151,24 @@ describe('filterAndSortBeans', () => {
     expect(ids(filterAndSortBeans(all, filters())).length).toBe(4);
   });
 
+  it('separates blends from single origins', () => {
+    const beans = [
+      bean({ id: 'blend', name: 'Hair Bender', composition: 'blend' }),
+      bean({ id: 'single', name: 'Honduras El Puente', composition: 'single-origin' }),
+      bean({ id: 'legacy', name: 'Recorded Before The Field Existed' }),
+    ];
+    const all = summariseBeans(beans, []);
+
+    expect(ids(filterAndSortBeans(all, filters({ composition: 'blend' })))).toEqual(['blend']);
+    expect(ids(filterAndSortBeans(all, filters({ composition: 'single-origin' })))).toEqual([
+      'single',
+    ]);
+    // Unknown is a real answer here, not a gap awaiting a lookup, so it is
+    // something the user can deliberately look at.
+    expect(ids(filterAndSortBeans(all, filters({ composition: 'unknown' })))).toEqual(['legacy']);
+    expect(ids(filterAndSortBeans(all, filters())).length).toBe(3);
+  });
+
   it('filters to beans the AI flagged for review', () => {
     expect(ids(filterAndSortBeans(summaries, filters({ needsReviewOnly: true })))).toEqual([
       'colombia',

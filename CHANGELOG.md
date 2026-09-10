@@ -22,6 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Blends and single origins are now recorded as such.** A blend's process
+  cell is usually blank, and the obvious fix — treating “blend” as a kind of
+  process — is wrong: Counter Culture's Fast Forward is sold as a “Year-Round
+  Blend” _and_ its page states “Process: Washed”, so one field would have had
+  to discard a published fact. Worse, `process` feeds `favoriteProcesses`, so a
+  blend bucket would have quietly swallowed the real washed or natural
+  preference of anyone who drinks blends. Composition is its own axis instead,
+  read from what the roaster actually writes — the word in the product title or
+  the banner above it, tolerating Stumptown's own “SINGLE ORGIN” typo — and
+  never guessed from a name, from how many origins are listed, or from which
+  section of the shop a coffee sits in, all three of which get Sunrider wrong.
+  It shows on the bean page as a control you can correct, filters the library,
+  and stays “not known” when the page says neither word, which is a real and
+  common answer rather than a gap to nag about.
+
 - **A coffee whose roaster never published a process nagged about it forever.**
   Three of the library's Stumptown coffees are blends, and a blend does not have
   a single process — Holler Mtn. and Hair Bender state none anywhere on their

@@ -1,5 +1,6 @@
-import type { CaffeineLevel, CoffeeBean, Process, RoastLevel } from '@/types';
+import type { CaffeineLevel, CoffeeBean, Composition, Process, RoastLevel } from '@/types';
 import { caffeineOf } from '@/services/beans/caffeine';
+import { compositionOf } from '@/services/beans/composition';
 import { beanNeedsEnrichment } from '@/services/enrich/completeness';
 
 /**
@@ -87,6 +88,13 @@ export interface LibraryFilters {
    */
   caffeine: CaffeineLevel | 'all';
   /**
+   * Blend or single origin. `'unknown'` is offered here, unlike the roast and
+   * process filters, because an unknown composition is an ordinary and often
+   * permanent answer rather than a gap awaiting a lookup — being able to see
+   * which coffees the app cannot classify is useful in itself.
+   */
+  composition: Composition | 'all';
+  /**
    * Multi-select facets. Empty means "no constraint", never "match nothing" —
    * an empty array is the natural state, so treating it as an exclusion would
    * hide the whole library by default.
@@ -122,6 +130,7 @@ export const DEFAULT_FILTERS: LibraryFilters = {
   roastLevel: 'all',
   process: 'all',
   caffeine: 'all',
+  composition: 'all',
   roasters: [],
   origins: [],
   varietals: [],
@@ -152,6 +161,7 @@ export function countActiveFilters(filters: LibraryFilters): number {
   if (filters.roastLevel !== 'all') count += 1;
   if (filters.process !== 'all') count += 1;
   if (filters.caffeine !== 'all') count += 1;
+  if (filters.composition !== 'all') count += 1;
   if (filters.roasters.length > 0) count += 1;
   if (filters.origins.length > 0) count += 1;
   if (filters.varietals.length > 0) count += 1;
@@ -335,6 +345,9 @@ export function filterAndSortBeans(
       return false;
     }
     if (filters.caffeine !== 'all' && caffeineOf(bean) !== filters.caffeine) {
+      return false;
+    }
+    if (filters.composition !== 'all' && compositionOf(bean) !== filters.composition) {
       return false;
     }
     if (!matchesAny(filters.roasters, [bean.roaster])) return false;

@@ -56,6 +56,7 @@ function parsed(overrides: Record<string, unknown> = {}) {
     process: 'washed' as const,
     roastLevel: 'medium-light' as const,
     caffeine: null,
+    composition: null,
     tastingNotes: ['chocolate', 'citrus'],
     roastDate: '2025-06-01',
     varietals: ['Caturra'],
@@ -100,6 +101,7 @@ describe('missingFields / beanNeedsEnrichment', () => {
       'origins',
       'process',
       'roastLevel',
+      'composition',
       'varietals',
       'elevationMeters',
       'tastingNotes',
@@ -114,6 +116,7 @@ describe('missingFields / beanNeedsEnrichment', () => {
       origins: [{ country: 'Colombia' }],
       process: 'washed',
       roastLevel: 'medium',
+      composition: 'single-origin',
       varietals: ['Caturra'],
       elevationMeters: { min: 1700 },
       tastingNotes: ['cocoa'],
@@ -130,6 +133,7 @@ describe('missingFields / beanNeedsEnrichment', () => {
       origins: [{ country: 'Colombia' }],
       process: 'washed',
       roastLevel: 'medium',
+      composition: 'single-origin',
       varietals: ['Caturra'],
       elevationMeters: { min: 1700 },
       tastingNotes: ['cocoa'],
@@ -153,6 +157,7 @@ describe('missingFields / beanNeedsEnrichment', () => {
 
     expect(beanNeedsEnrichment(coreComplete)).toBe(false);
     expect(missingFields(coreComplete)).toEqual([
+      'composition',
       'varietals',
       'elevationMeters',
       'roasterDescription',

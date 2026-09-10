@@ -22,6 +22,23 @@ export type RoastLevel = 'light' | 'medium-light' | 'medium' | 'medium-dark' | '
 export type CaffeineLevel = 'caffeinated' | 'decaf' | 'half-caf' | 'unknown';
 
 /**
+ * Whether the bag holds one coffee or several.
+ *
+ * A separate axis from `Process`, and deliberately not a value inside it.
+ * Counter Culture's “Fast Forward” settles the question: it is sold as a
+ * “Year-Round Blend” *and* its page states “Process: Washed”. A blend can be
+ * entirely washed, genuinely mixed, or simply unstated, so folding “blend” into
+ * the process enum would force that coffee to discard a fact its roaster
+ * published — and would put a phantom bucket into `favoriteProcesses`, where a
+ * blend drinker's real washed preference would vanish into it.
+ *
+ * `unknown` is a real and common answer. Blue Bottle's page for Night Light
+ * Decaf says neither word, and guessing from silence is exactly the mistake
+ * `inferCaffeine` documents at length.
+ */
+export type Composition = 'blend' | 'single-origin' | 'unknown';
+
+/**
  * The form the coffee arrives in.
  *
  * Not who sold it. Cometeer flash-freezes other roasters' brewed coffee into
@@ -104,6 +121,13 @@ export interface CoffeeBean {
    * field existed. Read it through `caffeineOf()` rather than directly.
    */
   caffeine?: CaffeineLevel;
+  /**
+   * One coffee or several. Absent means the same as `'unknown'` — every coffee
+   * recorded before this field existed, and every one whose page says neither
+   * word. Additive and optional for the same reason as `caffeine` above, so it
+   * needs no `schemaVersion` bump. Read it through `compositionOf()`.
+   */
+  composition?: Composition;
   varietals?: string[];
   elevationMeters?: { min?: number; max?: number };
 

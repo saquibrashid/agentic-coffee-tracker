@@ -1,6 +1,7 @@
 /** Maps the LLM contract (`ParsedBean`) onto the local `CoffeeBean` record. */
 import type { ParsedBean } from '@/services/ai';
 import { inferCaffeine } from '@/services/enrich/inferCaffeine';
+import { inferComposition } from '@/services/enrich/inferComposition';
 import { inferRoastLevel } from '@/services/enrich/inferRoast';
 import type { CoffeeBean, Origin } from '@/types';
 
@@ -31,13 +32,13 @@ function toElevation(parsed: ParsedBean): CoffeeBean['elevationMeters'] {
  * Only fields the model actually resolved are returned, so a sparse parse never
  * blanks out data the user already entered.
  *
- * The derived values are the roast level and the caffeine content. The parse
- * prompt is told not to guess, so a roaster who writes either into a sentence
- * or a product name rather than a labelled field yields `null` here. Inferring
- * at this boundary rather than at each caller means every path that turns a
- * parse into a bean -- adding by link, adding by photo, the background OCR
- * queue, and the enrichment review -- gets it, and a path added later gets it
- * without remembering to.
+ * The derived values are the roast level, the caffeine content and the
+ * composition. The parse prompt is told not to guess, so a roaster who writes
+ * any of them into a sentence or a product name rather than a labelled field
+ * yields `null` here. Inferring at this boundary rather than at each caller
+ * means every path that turns a parse into a bean -- adding by link, adding by
+ * photo, the background OCR queue, and the enrichment review -- gets it, and a
+ * path added later gets it without remembering to.
  *
  * `format` is passed through and never defaulted here, for the reason
  * `caffeineForNewBean` keeps its own default out of `inferCaffeine`: this
@@ -72,6 +73,14 @@ export function parsedBeanToUpdate(parsed: ParsedBean): Partial<CoffeeBean> {
       roasterDescription: parsed.roasterDescription ?? undefined,
     });
     if (inferred) update.caffeine = inferred.level;
+  }
+  if (parsed.composition) update.composition = parsed.composition;
+  else {
+    const inferred = inferComposition({
+      name: parsed.name ?? undefined,
+      roasterDescription: parsed.roasterDescription ?? undefined,
+    });
+    if (inferred) update.composition = inferred.composition;
   }
   if (parsed.varietals.length > 0) update.varietals = parsed.varietals;
   if (parsed.tastingNotes.length > 0) update.tastingNotes = parsed.tastingNotes;
