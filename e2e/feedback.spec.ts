@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { openSettingsSection } from './settingsSections';
+
 /**
  * The privacy claims on this panel are the feature (#196): the repository is
  * public, so "we show you everything before it goes" has to be literally true
@@ -8,6 +10,7 @@ import { expect, test } from '@playwright/test';
 test.describe('Send feedback', () => {
   test('says it is public and lists what goes with it, before the button', async ({ page }) => {
     await page.goto('/settings');
+    await openSettingsSection(page, 'Send feedback');
 
     const attached = page.getByRole('group', { name: 'Sent with your message' });
     await expect(page.getByText('This becomes a public issue')).toBeVisible();
@@ -21,6 +24,7 @@ test.describe('Send feedback', () => {
 
   test('will not send an empty message', async ({ page }) => {
     await page.goto('/settings');
+    await openSettingsSection(page, 'Send feedback');
     const send = page.getByRole('button', { name: 'Send feedback' });
     await expect(send).toBeDisabled();
 
@@ -34,6 +38,7 @@ test.describe('Send feedback', () => {
   test('keeps what you wrote when the send fails', async ({ page }) => {
     await page.route('**/api/feedback', (route) => route.abort());
     await page.goto('/settings');
+    await openSettingsSection(page, 'Send feedback');
 
     const message = page.getByLabel('What happened?');
     await message.fill('I got signed out again');
@@ -52,6 +57,7 @@ test.describe('Send feedback', () => {
       }),
     );
     await page.goto('/settings');
+    await openSettingsSection(page, 'Send feedback');
 
     await page.getByLabel('What happened?').fill('the predict page confused me');
     await page.getByRole('button', { name: 'Send feedback' }).click();
@@ -74,6 +80,7 @@ test.describe('Send feedback', () => {
       }),
     );
     await page.goto('/settings');
+    await openSettingsSection(page, 'Send feedback');
 
     await page.getByLabel('What happened?').fill('something odd');
     await page.getByRole('button', { name: 'Send feedback' }).click();

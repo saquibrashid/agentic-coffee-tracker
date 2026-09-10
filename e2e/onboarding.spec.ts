@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { openSettingsSection } from './settingsSections';
+
 /**
  * Seeds a single unrated coffee, which is the exact state the first hint is
  * gated on: something in the library, nothing scored yet.
@@ -77,6 +79,8 @@ test.describe('Onboarding hints', () => {
     await expect(page.getByText(FIRST_HINT)).toBeHidden();
 
     await page.goto('/settings');
+
+    await openSettingsSection(page, 'How this app works');
     await page.getByRole('button', { name: 'Show hints again' }).click();
     await expect(page.getByText('Hints restored', { exact: false })).toBeVisible();
 

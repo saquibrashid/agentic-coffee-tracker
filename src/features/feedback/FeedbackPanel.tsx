@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { MessageSquare } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Label } from '@/components/ui/label';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
@@ -65,17 +65,12 @@ export function FeedbackPanel() {
   }, [category, diagnostics, message, sending]);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <MessageSquare className="size-4" aria-hidden="true" /> Send feedback
-        </CardTitle>
-        <CardDescription>
-          Something broken, confusing, or missing? Tell me here rather than going hunting for the
-          repository.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <CollapsibleCard
+      title="Send feedback"
+      icon={<MessageSquare className="size-4 shrink-0" aria-hidden="true" />}
+      hint="Something broken, confusing, or missing? Tell me here."
+    >
+      <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="feedback-category">What kind of thing is it?</Label>
           <Select
@@ -144,8 +139,8 @@ export function FeedbackPanel() {
         </div>
 
         {result && <FeedbackOutcome result={result} />}
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }
 

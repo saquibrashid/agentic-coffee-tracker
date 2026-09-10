@@ -8,7 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -75,30 +75,30 @@ export function SyncPanel() {
 
   if (!user) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle>Sync</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-muted-foreground text-sm">
-            Sign in above to use the same coffees on more than one device. Your beans, ratings and
-            photos are copied to the cloud; everything derived from them — preferences, summaries,
-            recommendations — is recalculated on each device and never uploaded.
-          </p>
-        </CardContent>
-      </Card>
+      <CollapsibleCard title="Sync" hint="Not syncing — sign in to use more than one device">
+        <p className="text-muted-foreground text-sm">
+          Sign in above to use the same coffees on more than one device. Your beans, ratings and
+          photos are copied to the cloud; everything derived from them — preferences, summaries,
+          recommendations — is recalculated on each device and never uploaded.
+        </p>
+      </CollapsibleCard>
     );
   }
 
   const quota = status.photoQuota;
   const unlocked = confirmation.trim().toUpperCase() === DELETE_CLOUD_PHRASE;
+  // `describeSync` is the same sentence the body opens with, so the closed row
+  // says exactly what opening it would have said. A dot only for the state the
+  // user would want to act on -- syncing is progress, not a problem.
+  const summary = describeSync(status);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Sync</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <CollapsibleCard
+      title="Sync"
+      hint={summary}
+      {...(status.state === 'error' ? { attention: summary } : {})}
+    >
+      <div className="space-y-4">
         <div className="space-y-1">
           <p role="status" className="text-sm">
             {describeSync(status)}
@@ -158,7 +158,7 @@ export function SyncPanel() {
             {error}
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Button } from '@/components/ui/button';
 import { db } from '@/services/db';
 import { loadSampleData, removeSampleData } from '@/services/sample/sampleData';
@@ -57,11 +57,16 @@ export function SampleDataPanel() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Sample coffees</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <CollapsibleCard
+      title="Sample coffees"
+      hint={loaded ? `${sampleBeans} loaded` : 'Not loaded'}
+      {...(loaded && realRatings > 0
+        ? {
+            attention: `${sampleBeans} made-up coffees are still mixed into your ${realRatings} own`,
+          }
+        : {})}
+    >
+      <div className="space-y-3">
         <p className="text-muted-foreground text-sm">
           {loaded
             ? `${sampleBeans} sample coffees are loaded. They are made up, so remove them once you have rated a few of your own.`
@@ -97,7 +102,7 @@ export function SampleDataPanel() {
             {status}
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }

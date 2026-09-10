@@ -1,7 +1,7 @@
 import { useRef, useState, type ChangeEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { refreshPreferences } from '@/services/preferences/compute';
 import {
   applyJsonImportPlan,
@@ -155,11 +155,12 @@ export function ImportPanel() {
         preview.plan.newPhotos.length === 0);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Import</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <CollapsibleCard
+      title="Import"
+      hint="Bring in a spreadsheet of ratings, or restore a backup"
+      {...(preview ? { attention: 'an import is waiting for you to confirm it' } : {})}
+    >
+      <div className="space-y-4">
         <p className="text-muted-foreground text-sm">
           Bring in a rating history from a spreadsheet, or restore a backup exported above. One CSV
           row per cup you drank; coffees are grouped by roaster and name. Nothing is saved until you
@@ -291,7 +292,7 @@ export function ImportPanel() {
             </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }

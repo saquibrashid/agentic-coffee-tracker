@@ -6,7 +6,7 @@
  * whatever they last picked, and a phone that dims at sunset would stop being
  * followed with no way to restore it.
  */
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { THEME_OPTIONS } from '@/services/theme/theme';
 import { useTheme } from '@/services/theme/useTheme';
 
@@ -14,16 +14,15 @@ export function AppearancePanel() {
   const { preference, resolved, setPreference } = useTheme();
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Appearance</CardTitle>
-        <CardDescription>
-          {preference === 'system'
-            ? `Following your device, which is currently ${resolved}.`
-            : `Always ${preference}, whatever your device is set to.`}
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
+    <CollapsibleCard
+      title="Appearance"
+      hint={
+        preference === 'system'
+          ? `Following your device, which is currently ${resolved}.`
+          : `Always ${preference}, whatever your device is set to.`
+      }
+    >
+      <>
         {/*
           A radiogroup rather than three buttons: it is one tab stop with arrow
           keys between options, and it announces "2 of 3" to a screen reader.
@@ -63,7 +62,7 @@ export function AppearancePanel() {
             })}
           </div>
         </fieldset>
-      </CardContent>
-    </Card>
+      </>
+    </CollapsibleCard>
   );
 }

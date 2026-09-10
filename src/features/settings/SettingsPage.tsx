@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard, CollapsibleCardHeadingLevel } from '@/components/ui/collapsible-card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -71,82 +71,119 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-4">
-      <AccountPanel />
-      <SyncPanel />
-      <AppearancePanel />
+    <div className="space-y-6">
+      <SettingsGroup title="Account &amp; sync">
+        <AccountPanel />
+        <SyncPanel />
+      </SettingsGroup>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Export</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void exportCsv()}>
-            Export CSV
-          </Button>
-          <Button variant="outline" onClick={() => void exportJson()}>
-            Export JSON
-          </Button>
-          <Button variant="outline" onClick={() => void exportJsonWithPhotos()}>
-            Export JSON + photos
-          </Button>
-        </CardContent>
-      </Card>
-
-      <ImportPanel />
-
-      <SampleDataPanel />
-
-      <WalkthroughPanel />
-
-      <FeedbackPanel />
-
-      <RelookupPanel />
-
-      <StudioPhotoPanel />
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Pending AI operations ({pending.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {pending.length === 0 && (
-            <p className="text-muted-foreground text-sm">No pending operations.</p>
-          )}
-          <ul className="space-y-2">
-            {pending.map((t) => (
-              <li key={t.id} className="rounded border p-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="font-medium">{describeTask(t)}</div>
-                    <div className="text-muted-foreground text-xs">
-                      attempts: {t.attempts}{' '}
-                      {t.nextAttemptAt
-                        ? `· next: ${new Date(t.nextAttemptAt).toLocaleString()}`
-                        : ''}
-                    </div>
-                    {t.lastError && <div className="text-xs text-red-600">{t.lastError}</div>}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => void retryTask(t.id)}>
-                      Retry
-                    </Button>
-                    <Button variant="outline" onClick={() => void cancelTask(t.id)}>
-                      Cancel
-                    </Button>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
-          <div className="mt-3">
-            <Button onClick={() => void runQueueNow()}>Run queue now</Button>
+      <SettingsGroup title="Your coffees">
+        <ImportPanel />
+        <CollapsibleCard title="Export" hint="Take a copy of everything out">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={() => void exportCsv()}>
+              Export CSV
+            </Button>
+            <Button variant="outline" onClick={() => void exportJson()}>
+              Export JSON
+            </Button>
+            <Button variant="outline" onClick={() => void exportJsonWithPhotos()}>
+              Export JSON + photos
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+        </CollapsibleCard>
+        <SampleDataPanel />
+      </SettingsGroup>
 
+      <SettingsGroup title="AI tools">
+        <RelookupPanel />
+        <StudioPhotoPanel />
+        <CollapsibleCard
+          title="Pending AI operations"
+          hint={
+            pending.length === 0
+              ? 'Nothing running'
+              : `${pending.length} ${pending.length === 1 ? 'operation' : 'operations'} waiting`
+          }
+          {...(pending.length > 0
+            ? {
+                attention: `${pending.length} ${pending.length === 1 ? 'operation is' : 'operations are'} still running`,
+              }
+            : {})}
+        >
+          <>
+            {pending.length === 0 && (
+              <p className="text-muted-foreground text-sm">No pending operations.</p>
+            )}
+            <ul className="space-y-2">
+              {pending.map((t) => (
+                <li key={t.id} className="rounded border p-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-medium">{describeTask(t)}</div>
+                      <div className="text-muted-foreground text-xs">
+                        attempts: {t.attempts}{' '}
+                        {t.nextAttemptAt
+                          ? `· next: ${new Date(t.nextAttemptAt).toLocaleString()}`
+                          : ''}
+                      </div>
+                      {t.lastError && <div className="text-xs text-red-600">{t.lastError}</div>}
+                    </div>
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => void retryTask(t.id)}>
+                        Retry
+                      </Button>
+                      <Button variant="outline" onClick={() => void cancelTask(t.id)}>
+                        Cancel
+                      </Button>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            <div className="mt-3">
+              <Button onClick={() => void runQueueNow()}>Run queue now</Button>
+            </div>
+          </>
+        </CollapsibleCard>
+      </SettingsGroup>
+
+      <SettingsGroup title="App">
+        <AppearancePanel />
+        <WalkthroughPanel />
+        <FeedbackPanel />
+      </SettingsGroup>
+
+      {/*
+        Outside every group and last, with no heading over it. Grouping exists
+        to help the eye land somewhere; this is the one section nobody should
+        land on by accident.
+      */}
       <DangerZone />
     </div>
+  );
+}
+
+/**
+ * A titled run of collapsed sections.
+ *
+ * Twelve cards in a flat list gave no way to know what the page held without
+ * scrolling the whole thing. Collapsing them makes it scannable; grouping is
+ * what makes the scan mean something, by turning twelve equal rows into four
+ * short lists with a subject each.
+ *
+ * The heading is `h2` because each `CollapsibleCard` inside drops to `h3` via
+ * `CollapsibleCardHeadingLevel`. A section must not outrank the heading it sits
+ * beneath, or the outline every screen reader announces comes out inverted.
+ */
+function SettingsGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <h2 className="text-muted-foreground px-1 text-xs font-medium tracking-wide uppercase">
+        {title}
+      </h2>
+      <CollapsibleCardHeadingLevel level="h3">{children}</CollapsibleCardHeadingLevel>
+    </section>
   );
 }
 
@@ -193,11 +230,20 @@ function RelookupPanel() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Fill in missing details</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <CollapsibleCard
+      title="Fill in missing details"
+      hint={
+        incomplete === 0
+          ? 'Every coffee has its details filled in'
+          : `${incomplete} ${incomplete === 1 ? 'coffee is' : 'coffees are'} missing something`
+      }
+      {...(incomplete > 0
+        ? {
+            attention: `${incomplete} ${incomplete === 1 ? 'coffee is' : 'coffees are'} missing details`,
+          }
+        : {})}
+    >
+      <div className="space-y-3">
         <p className="text-muted-foreground text-sm">
           {incomplete === 0 ? (
             'Every coffee has its details filled in.'
@@ -224,8 +270,8 @@ function RelookupPanel() {
           </p>
         )}
         {error && <p className="text-destructive text-sm">{error}</p>}
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }
 
@@ -272,11 +318,17 @@ function StudioPhotoPanel() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Studio photos</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    // No attention dot, deliberately: this is the one operation that costs
+    // money per photo, and a dot would read as the app asking to spend it.
+    <CollapsibleCard
+      title="Studio photos"
+      hint={
+        reshootable === 0
+          ? 'Every coffee with a photo has been re-shot'
+          : `${reshootable} ${reshootable === 1 ? 'photo has' : 'photos have'} not been re-shot`
+      }
+    >
+      <div className="space-y-3">
         <p className="text-muted-foreground text-sm">
           {reshootable === 0
             ? 'Every coffee with a photo has already been re-shot.'
@@ -312,8 +364,8 @@ function StudioPhotoPanel() {
           </Button>
         )}
         {status && <p className="text-sm">{status}</p>}
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }
 
@@ -349,11 +401,18 @@ function DangerZone() {
   }
 
   return (
-    <Card className="border-destructive/50">
-      <CardHeader>
-        <CardTitle className="text-destructive">Danger zone</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <CollapsibleCard
+      title="Danger zone"
+      className="border-destructive/50"
+      hint={
+        estimate === null
+          ? 'Storage and deleting everything on this device'
+          : estimate.supported
+            ? `Using ${formatBytes(estimate.usageBytes)} on this device`
+            : 'Deleting everything on this device'
+      }
+    >
+      <div className="space-y-4">
         <div>
           <h3 className="text-sm font-medium">Storage used</h3>
           <p className="text-muted-foreground text-sm">
@@ -400,7 +459,7 @@ function DangerZone() {
             </p>
           )}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }
