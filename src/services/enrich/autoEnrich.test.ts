@@ -368,7 +368,9 @@ describe('autoEnrichBean', () => {
     expect(enrichFromUrl).not.toHaveBeenCalled();
   });
 
-  it('returns null when the page added nothing new', async () => {
+  it('reports a page that was read but added nothing new', async () => {
+    // Not `null`: the caller has to tell "a page said nothing" apart from "no
+    // page was read", and only the first is evidence about the coffee (#309).
     findCandidates.mockResolvedValue([
       { url: 'https://onyx.example/sw', title: 'Southern Weather', snippet: '' },
     ]);
@@ -387,7 +389,11 @@ describe('autoEnrichBean', () => {
       model: 'gpt-4o',
     });
 
-    await expect(autoEnrichBean(bean())).resolves.toBeNull();
+    const result = await autoEnrichBean(bean());
+    expect(result).not.toBeNull();
+    expect(result?.applied).toBe(false);
+    expect(result?.update).toEqual({});
+    expect(result?.sourceUrl).toBe('https://onyx.example/sw');
   });
 
   it('saves a photo even when the page had no new details', async () => {

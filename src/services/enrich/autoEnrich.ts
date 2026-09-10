@@ -25,7 +25,10 @@ import {
   beanNeedsEnrichment,
   beanNeedsPhoto,
   isFieldMissing,
+  isFieldOutstanding,
+  isFieldUnpublished,
   missingFields,
+  unpublishedAfterLookup,
   type EnrichableField,
 } from './completeness';
 
@@ -37,7 +40,10 @@ export {
   ENRICHABLE_FIELDS,
   beanNeedsEnrichment,
   isFieldMissing,
+  isFieldOutstanding,
+  isFieldUnpublished,
   missingFields,
+  unpublishedAfterLookup,
   type EnrichableField,
 };
 
@@ -97,6 +103,16 @@ export interface AutoEnrichResult {
   filled: EnrichableField[];
   /** True when the lookup also supplied a photo the coffee did not have. */
   photoAttached: boolean;
+  /**
+   * False when a page was read but had nothing the coffee needed.
+   *
+   * The result is still returned rather than collapsed to `null`, because the
+   * caller has to tell two very different silences apart: a page that was read
+   * and offered nothing, versus no page having been read at all. Only the first
+   * is evidence about the coffee, and only the first may be recorded as such
+   * (#309). `update` is empty when this is false, so applying it is a no-op.
+   */
+  applied: boolean;
 }
 
 /**
@@ -127,8 +143,11 @@ function withInferredRoast(bean: CoffeeBean, update: Partial<CoffeeBean>): Parti
 }
 
 /**
- * Looks the coffee up on the web and returns only the gaps it could close, or
- * `null` when there was nothing to fill or nothing new was found.
+ * Looks the coffee up on the web and returns what the page could close.
+ *
+ * `null` means no page was read — the coffee needed nothing. A result with
+ * `applied: false` means a page *was* read and had nothing to add, which is a
+ * different fact and the one the caller records against the coffee.
  */
 export async function autoEnrichBean(bean: CoffeeBean): Promise<AutoEnrichResult | null> {
   if (!beanNeedsEnrichment(bean)) return null;
@@ -149,7 +168,15 @@ export async function autoEnrichBean(bean: CoffeeBean): Promise<AutoEnrichResult
 
   // A photo alone is worth persisting: a coffee whose metadata was already
   // complete can still be missing the image that makes its library card useful.
-  if (fields.length === 0 && !photo) return null;
+  if (fields.length === 0 && !photo) {
+    return {
+      update: {},
+      sourceUrl: page.sourceUrl,
+      filled: [],
+      photoAttached: false,
+      applied: false,
+    };
+  }
 
   return {
     update: {
@@ -162,5 +189,6 @@ export async function autoEnrichBean(bean: CoffeeBean): Promise<AutoEnrichResult
     sourceUrl: page.sourceUrl,
     filled: fields,
     photoAttached: photo !== null,
+    applied: true,
   };
 }

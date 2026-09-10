@@ -14,6 +14,11 @@ import {
   isNotFoundFailure,
   isTerminalEnrichFailure,
 } from '@/services/enrich/autoEnrich';
+// From `completeness` rather than through `autoEnrich`'s re-export: that module
+// pulls in the AI client, and taking the predicate from its dependency-free
+// home is what lets the queue's tests mock the lookup without also having to
+// stub the arithmetic of what counts as missing (#246).
+import { unpublishedAfterLookup } from '@/services/enrich/completeness';
 import { recordLookupOutcome } from '@/services/enrich/lookupOutcome';
 import {
   applyStudioPhoto,
@@ -140,14 +145,34 @@ async function processEnrichTask(task: PendingAiTask): Promise<void> {
   }
 
   const result = await autoEnrichBean(bean);
-  if (result) {
+  if (result?.applied) {
     await db.beans.update(bean.id, result.update);
     await enqueueUpsert('bean', bean.id);
   }
+
+  // A page was read, so what it did *not* say is now evidence about this coffee
+  // rather than an open question (#309). Recorded against the coffee as it
+  // stands after the update, and recomputed in full each time so that a fixed
+  // name or a hand-typed value clears a stale mark by itself.
+  if (result) {
+    const after = { ...bean, ...result.update };
+    const unpublished = unpublishedAfterLookup(after);
+    await db.beans.update(bean.id, (draft) => {
+      if (unpublished.length > 0) {
+        draft.unpublishedFields = unpublished;
+        draft.unpublishedFrom = result.sourceUrl;
+      } else {
+        delete draft.unpublishedFields;
+        delete draft.unpublishedFrom;
+      }
+    });
+    await enqueueUpsert('bean', bean.id);
+  }
+
   // Recorded either way (#246). A lookup that found nothing used to be
   // indistinguishable from one that never ran, which is why the Settings count
   // appeared frozen after a run.
-  await recordLookupOutcome(bean.id, result ? 'filled' : 'nothing-new');
+  await recordLookupOutcome(bean.id, result?.applied ? 'filled' : 'nothing-new');
   await db.pendingAiTasks.delete(task.id);
 }
 

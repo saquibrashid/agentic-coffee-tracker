@@ -19,8 +19,9 @@ import { deleteBeans, summariseDeletion, type DeletionSummary } from '@/services
 import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
 import { formatLabel, hasNotableFormat } from '@/services/beans/format';
 import { formatOriginList } from '@/services/beans/origins';
-import { CAFFEINE_LEVELS } from '@/services/beans/library';
+import { CAFFEINE_LEVELS, PROCESSES } from '@/services/beans/library';
 import { markBeanReviewed } from '@/services/beans/review';
+import { isFieldUnpublished } from '@/services/enrich/completeness';
 import { deleteRating, updateRating } from '@/services/ratings/mutations';
 import {
   dateInputToRatedAt,
@@ -41,7 +42,7 @@ import { EnrichPanel } from './EnrichPanel';
 import { PhotoThumbnail } from './PhotoLightbox';
 import { PhotoPanel } from './PhotoPanel';
 import { ConfirmDeleteDialog } from './ConfirmDeleteDialog';
-import type { BrewType, CaffeineLevel, CoffeeBean, Money, Rating } from '@/types';
+import type { BrewType, CaffeineLevel, CoffeeBean, Money, Process, Rating } from '@/types';
 
 const SCORE_OPTIONS = SCORE_CHOICES;
 
@@ -178,6 +179,72 @@ function CaffeineAttribute({ bean }: { bean: CoffeeBean }) {
             </option>
           ))}
         </Select>
+      </dd>
+    </div>
+  );
+}
+
+/**
+ * Process, as a control rather than a read-out.
+ *
+ * The same shape as `CaffeineAttribute` above and for the same reason: this is
+ * the one field a lookup routinely cannot supply, because a blend does not have
+ * a single process and its page says so by saying nothing (#309). Leaving the
+ * user nothing but a blank cell meant a value they knew perfectly well — off
+ * the bag, or from the roaster's own description — had nowhere to go.
+ *
+ * `unknown` is offered as an ordinary option so the control can be undone. It
+ * is the schema's blank, not a value, and `isFieldMissing` reads it as absent.
+ */
+function ProcessAttribute({ bean }: { bean: CoffeeBean }) {
+  const [saving, setSaving] = useState(false);
+  const unpublished = isFieldUnpublished(bean, 'process');
+
+  async function onChange(process: Process) {
+    setSaving(true);
+    try {
+      // Typing a value answers the question the mark was standing in for, so
+      // the mark goes with it -- otherwise clearing the field later would leave
+      // the coffee silently exempt from a lookup that could now succeed.
+      await db.beans.update(bean.id, (draft) => {
+        draft.process = process;
+        draft.updatedAt = new Date().toISOString();
+        const rest = (draft.unpublishedFields ?? []).filter((f) => f !== 'process');
+        if (rest.length > 0) draft.unpublishedFields = rest;
+        else {
+          delete draft.unpublishedFields;
+          delete draft.unpublishedFrom;
+        }
+      });
+      await enqueueUpsert('bean', bean.id);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div>
+      <dt className="text-meta text-muted-foreground">
+        <Label htmlFor="bean-process">Process</Label>
+      </dt>
+      <dd className="mt-0.5 text-sm">
+        <Select
+          id="bean-process"
+          value={bean.process ?? 'unknown'}
+          disabled={saving}
+          onChange={(e) => void onChange(e.target.value as Process)}
+        >
+          {PROCESSES.map((process) => (
+            <option key={process} value={process}>
+              {process === 'unknown' ? 'Not set' : process}
+            </option>
+          ))}
+        </Select>
+        {unpublished && (
+          <p className="text-muted-foreground mt-1 text-xs">
+            The page we found didn&apos;t list one — blends often don&apos;t have a single process.
+          </p>
+        )}
       </dd>
     </div>
   );
@@ -633,9 +700,7 @@ export function BeanDetailPage() {
               <Attribute label="Origin">
                 {(bean.origins ?? []).length > 0 && formatOriginList(bean.origins)}
               </Attribute>
-              <Attribute label="Process">
-                {bean.process !== undefined && bean.process !== 'unknown' && bean.process}
-              </Attribute>
+              <ProcessAttribute bean={bean} />
               <CaffeineAttribute bean={bean} />
               <Attribute label="Varietals">
                 {(bean.varietals ?? []).length > 0 && (bean.varietals ?? []).join(', ')}

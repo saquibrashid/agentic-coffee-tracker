@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { beanNeedsEnrichment, describeMissing, missingBadgeLabel } from './completeness';
+import {
+  beanNeedsEnrichment,
+  describeMissing,
+  isFieldMissing,
+  isFieldOutstanding,
+  isFieldUnpublished,
+  missingBadgeLabel,
+  missingFields,
+  unpublishedAfterLookup,
+} from './completeness';
 import type { CoffeeBean } from '@/types';
 
 function bean(overrides: Partial<CoffeeBean> = {}): CoffeeBean {
@@ -98,5 +107,49 @@ describe('missingBadgeLabel', () => {
     const bare = without(bean(), 'origins', 'process', 'roastLevel', 'tastingNotes', 'photoId');
 
     expect(missingBadgeLabel(bare)).toBe('Missing 5 details');
+  });
+});
+
+/**
+ * A field the roaster's page never carried (#309).
+ *
+ * The Stumptown case: Holler Mountain and Hair Bender are blends, their pages
+ * state no process at all, and the coffee therefore badged "Missing process"
+ * on every render and was re-queued by every relookup run — a chore with no
+ * possible end. These assert the field stays *missing* while ceasing to be
+ * *outstanding*, because the two are different questions.
+ */
+describe('fields a lookup has already drawn a blank on', () => {
+  const blend = () => without(bean({ unpublishedFields: ['process'] }), 'process');
+
+  it('still reports the field as missing', () => {
+    expect(isFieldMissing(blend(), 'process')).toBe(true);
+    expect(missingFields(blend())).toContain('process');
+  });
+
+  it('stops counting it as outstanding, so the nagging ends', () => {
+    expect(isFieldOutstanding(blend(), 'process')).toBe(false);
+    expect(isFieldUnpublished(blend(), 'process')).toBe(true);
+    expect(describeMissing(blend())).toEqual([]);
+    expect(missingBadgeLabel(blend())).toBeNull();
+    expect(beanNeedsEnrichment(blend())).toBe(false);
+  });
+
+  it('does not exempt a field nobody has looked for', () => {
+    const other = without(bean({ unpublishedFields: ['process'] }), 'process', 'roastLevel');
+    expect(isFieldOutstanding(other, 'roastLevel')).toBe(true);
+    expect(describeMissing(other)).toEqual(['roast level']);
+    expect(beanNeedsEnrichment(other)).toBe(true);
+  });
+
+  it('still asks for a photo, which is never unpublishable', () => {
+    const noPhoto = without(bean({ unpublishedFields: ['process'] }), 'process', 'photoId');
+    expect(beanNeedsEnrichment(noPhoto)).toBe(true);
+    expect(describeMissing(noPhoto)).toEqual(['photo']);
+  });
+
+  it('reports what a page failed to supply, for recording after a lookup', () => {
+    expect(unpublishedAfterLookup(without(bean(), 'process'))).toEqual(['process']);
+    expect(unpublishedAfterLookup(bean())).toEqual([]);
   });
 });
