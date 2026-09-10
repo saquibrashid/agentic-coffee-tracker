@@ -22,6 +22,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **“No product page” for a coffee whose page the app was linking to.** Pressing
+  _Look up missing details_ reported that a coffee could not be found and
+  advised editing its name, while the bean page sat there showing a working
+  link to the roaster's page for it. The lookup always started from a fresh web
+  search and never consulted the address the coffee already carried — and an
+  empty search result is not evidence that a page does not exist: Onyx sells
+  Southwind, and searching for it comes back with nothing. The search still goes
+  first, because for a Cometeer coffee it is what finds the actual roaster
+  rather than the box it shipped in, but when it turns up nothing — or lands on
+  a page with no text — the coffee's own recorded address is tried before giving
+  up.
+
 - **Blends and single origins are now recorded as such.** A blend's process
   cell is usually blank, and the obvious fix — treating “blend” as a kind of
   process — is wrong: Counter Culture's Fast Forward is sold as a “Year-Round

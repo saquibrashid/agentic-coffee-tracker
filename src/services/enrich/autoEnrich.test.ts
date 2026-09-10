@@ -245,6 +245,86 @@ describe('autoEnrichBean', () => {
     expect(result?.filled).toContain('roastLevel');
   });
 
+  it('falls back to the address the coffee already carries when the search finds nothing', async () => {
+    // #316. An empty search result is not evidence the page does not exist:
+    // Onyx sells Southwind and searching for it returns nothing. Blue Bottle's
+    // Night Light Decaf was reported as having no product page while the bean
+    // page was displaying a working link to that very page.
+    findCandidates.mockResolvedValue([]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed(),
+      rawText: 'raw',
+      sourceUrl: 'https://bluebottle.example/night-light',
+      model: 'gpt-4o',
+    });
+
+    const result = await autoEnrichBean(
+      bean({ sourceUrl: 'https://bluebottle.example/night-light' }),
+    );
+
+    expect(enrichFromUrl).toHaveBeenCalledWith('https://bluebottle.example/night-light');
+    expect(result?.applied).toBe(true);
+  });
+
+  it('falls back when the search matched a page with no text on it', async () => {
+    // The other half of `isNotFoundFailure`. A page that reads as blank is one
+    // the search matched wrongly, so the stored address is the better guess.
+    findCandidates.mockResolvedValue([
+      { url: 'https://wrong.example/x', title: 'Something else', snippet: '' },
+    ]);
+    enrichFromUrl
+      .mockRejectedValueOnce(new EmptyPageError('https://wrong.example/x'))
+      .mockResolvedValue({
+        parsed: parsed(),
+        rawText: 'raw',
+        sourceUrl: 'https://onyx.example/sw',
+        model: 'gpt-4o',
+      });
+
+    const result = await autoEnrichBean(bean({ sourceUrl: 'https://onyx.example/sw' }));
+
+    expect(enrichFromUrl).toHaveBeenLastCalledWith('https://onyx.example/sw');
+    expect(result?.applied).toBe(true);
+  });
+
+  it('searches before it falls back, so a Cometeer coffee still finds its roaster', async () => {
+    // The order matters and must not be inverted. Capture stamps `sourceUrl`
+    // with the address the user supplied, so trying it first would re-read
+    // Cometeer's box page instead of Counter Culture's own -- undoing #294.
+    findCandidates.mockResolvedValue([
+      { url: 'https://counterculture.example/fast-forward', title: 'Fast Forward', snippet: '' },
+    ]);
+    enrichFromUrl.mockResolvedValue({
+      parsed: parsed(),
+      rawText: 'raw',
+      sourceUrl: 'https://counterculture.example/fast-forward',
+      model: 'gpt-4o',
+    });
+
+    await autoEnrichBean(bean({ sourceUrl: 'https://cometeer.example/box' }));
+
+    expect(enrichFromUrl).toHaveBeenCalledTimes(1);
+    expect(enrichFromUrl).toHaveBeenCalledWith('https://counterculture.example/fast-forward');
+  });
+
+  it('still reports not found when there is no stored address to fall back to', async () => {
+    findCandidates.mockResolvedValue([]);
+
+    await expect(autoEnrichBean(bean())).rejects.toBeInstanceOf(NoCandidatesError);
+    expect(enrichFromUrl).not.toHaveBeenCalled();
+  });
+
+  it('does not retry an outage against the stored address', async () => {
+    // A throttle or a dead backend would fail the same way again, and burning
+    // the retry would turn a passing outage into a permanent "not found".
+    findCandidates.mockRejectedValue(new ApiError('slow down', 429));
+
+    await expect(
+      autoEnrichBean(bean({ sourceUrl: 'https://onyx.example/sw' })),
+    ).rejects.toBeInstanceOf(ApiError);
+    expect(enrichFromUrl).not.toHaveBeenCalled();
+  });
+
   it('leaves the address the user added the coffee from alone', async () => {
     // The Cometeer case. Enrichment searches for the roaster and finds the
     // roaster's page, which is right for `sourceUrl` and wrong as the link back
