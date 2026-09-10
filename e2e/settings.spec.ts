@@ -1,8 +1,11 @@
 import { test, expect } from '@playwright/test';
 
+import { openSettingsSection } from './settingsSections';
+
 test.describe('Settings danger zone', () => {
   test('delete button stays locked until the confirmation phrase is typed', async ({ page }) => {
     await page.goto('/settings');
+    await openSettingsSection(page, 'Danger zone');
 
     const deleteButton = page.getByRole('button', { name: 'Delete all data' });
     await expect(deleteButton).toBeDisabled();
@@ -23,6 +26,7 @@ test.describe('Settings danger zone', () => {
 
   test('reports storage usage', async ({ page }) => {
     await page.goto('/settings');
+    await openSettingsSection(page, 'Danger zone');
     await expect(page.getByText(/Storage used/i)).toBeVisible();
     await expect(page.getByText(/available|does not report storage usage/i).first()).toBeVisible();
   });
@@ -37,6 +41,7 @@ test.describe('Sample coffees', () => {
    */
   test('turn the empty screens into working ones, and can be taken back out', async ({ page }) => {
     await page.goto('/settings');
+    await openSettingsSection(page, 'Sample coffees');
 
     await page.getByRole('button', { name: 'Load sample coffees' }).click();
     await expect(page.getByRole('button', { name: 'Remove sample coffees' })).toBeVisible();
@@ -53,6 +58,7 @@ test.describe('Sample coffees', () => {
     await expect(page.getByText(/rate a few coffees|not enough/i)).toHaveCount(0);
 
     await page.goto('/settings');
+    await openSettingsSection(page, 'Sample coffees');
     await page.getByRole('button', { name: 'Remove sample coffees' }).click();
     await expect(page.getByRole('button', { name: 'Load sample coffees' })).toBeVisible();
 

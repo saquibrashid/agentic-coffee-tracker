@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
+import { openSettingsSection } from './settingsSections';
+
 /**
  * Drives the real "Will I like it?" flow end to end: seed a history through the
  * import screen, then check that a coffee matching the good half of that history
@@ -33,6 +35,7 @@ const CSV = [
 
 async function seedHistory(page: Page) {
   await page.goto('/settings');
+  await openSettingsSection(page, 'Import');
   await expect(page.getByRole('heading', { name: 'Import' })).toBeVisible();
   await page.setInputFiles('#import-file', {
     name: 'history.csv',

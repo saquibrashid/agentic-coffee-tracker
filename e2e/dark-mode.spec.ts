@@ -1,4 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
+
+import { openSettingsSection } from './settingsSections';
 import AxeBuilder from '@axe-core/playwright';
 
 /**
@@ -70,6 +72,7 @@ test.describe('dark mode', () => {
 
   test('can be changed from Settings and survives a reload', async ({ page }) => {
     await page.goto('/settings');
+    await openSettingsSection(page, 'Appearance');
 
     // Click the label, not the radio: the input is sr-only so that the control
     // keeps native keyboard semantics, which means the label is the thing a
@@ -79,6 +82,10 @@ test.describe('dark mode', () => {
 
     await page.reload();
     await expect(page.locator('html')).toHaveClass(/dark/);
+    // Sections start closed on every visit, so the choice has to be re-opened
+    // to be read back. That the theme survived the reload is already proven by
+    // the class on <html>; this checks the control agrees with it.
+    await openSettingsSection(page, 'Appearance');
     await expect(page.getByRole('radio', { name: 'Dark' })).toBeChecked();
   });
 
@@ -86,6 +93,7 @@ test.describe('dark mode', () => {
   // which only works because the inputs are real radios rather than buttons.
   test('is keyboard operable', async ({ page }) => {
     await page.goto('/settings');
+    await openSettingsSection(page, 'Appearance');
     await page.getByRole('radio', { name: 'System' }).focus();
     await page.keyboard.press('ArrowRight');
     await expect(page.getByRole('radio', { name: 'Light' })).toBeChecked();

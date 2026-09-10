@@ -6,7 +6,7 @@
  * not have to be rewritten every time the sync feature set changes, which is
  * exactly how it came to be wrong once already.
  */
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { Button } from '@/components/ui/button';
 import { useAuthUser } from '@/services/auth';
 
@@ -17,12 +17,21 @@ export function AccountPanel() {
   // is just noise. Staying local-only is the app working as designed.
   if (!available) return null;
 
+  // Signed out is the state worth a dot: it is the one thing on this page that
+  // silently stops the coffees reaching another device.
+  const hint = loading
+    ? 'Checking…'
+    : user
+      ? `Signed in as ${user.displayName ?? user.userId}`
+      : 'Not signed in';
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Account</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <CollapsibleCard
+      title="Account"
+      hint={hint}
+      {...(!loading && !user ? { attention: 'not signed in' } : {})}
+    >
+      <div className="space-y-3">
         {loading ? (
           <p className="text-muted-foreground text-sm">Checking…</p>
         ) : user ? (
@@ -52,7 +61,7 @@ export function AccountPanel() {
             {error}
           </p>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }

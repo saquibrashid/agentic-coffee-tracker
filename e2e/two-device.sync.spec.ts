@@ -1,5 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from '@playwright/test';
 
+import { openSettingsSection } from './settingsSections';
+
 import { FakeSyncService } from './fakeSyncService';
 
 /**
@@ -154,6 +156,7 @@ async function deleteBean(page: Page, id: string, deletedAt: string): Promise<vo
  */
 async function syncNow(page: Page): Promise<void> {
   await page.goto('/settings');
+  await openSettingsSection(page, 'Sync');
   await clickSync(page);
 }
 
@@ -355,6 +358,7 @@ test.describe('two devices, one account', () => {
     // the connection after navigating and the record was already gone.
     reachable = false;
     await deviceB.goto('/settings');
+    await openSettingsSection(deviceB, 'Sync');
     await expect(deviceB.getByRole('button', { name: /Sync now/i })).toBeEnabled();
     await deviceB.context().setOffline(true);
     await clickSync(deviceB);

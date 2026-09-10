@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Compass } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { CollapsibleCard } from '@/components/ui/collapsible-card';
 import { WALKTHROUGH } from '@/services/onboarding/hints';
 import { resetHints } from '@/services/onboarding/store';
 
@@ -24,16 +24,12 @@ export function WalkthroughPanel() {
   }, []);
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Compass className="size-4" aria-hidden="true" /> How this app works
-        </CardTitle>
-        <CardDescription>
-          A quick tour of the main features, in the order they become useful.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <CollapsibleCard
+      title="How this app works"
+      icon={<Compass className="size-4 shrink-0" aria-hidden="true" />}
+      hint="A quick tour of the main features, in the order they become useful."
+    >
+      <div className="space-y-4">
         <ol className="space-y-4">
           {WALKTHROUGH.map((step, index) => (
             <li key={step.title} className="flex gap-3">
@@ -62,7 +58,7 @@ export function WalkthroughPanel() {
               : 'Brings back any tips you dismissed on the home screen.'}
           </p>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </CollapsibleCard>
   );
 }
