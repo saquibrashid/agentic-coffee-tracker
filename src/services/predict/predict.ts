@@ -25,6 +25,7 @@ import { MAX_SCORE, NEUTRAL_SCORE, clampToScale } from '@/services/ratings/scale
 import { flavourFamily, originFamily, PROCESS_NEIGHBOUR_DISCOUNT, PROCESS_ORDER } from './families';
 import { CAFFEINE_LABELS, caffeineOf } from '@/services/beans/caffeine';
 import { uniqueOriginCountries } from '@/services/beans/origins';
+import { uniqueTastingNotes } from '@/services/beans/notes';
 import type { CaffeineLevel, CoffeeBean, Origin, Process, Rating, RoastLevel } from '@/types';
 
 /**
@@ -229,7 +230,7 @@ export function buildIndex(beans: CoffeeBean[], ratings: Rating[]): PredictionIn
     for (const country of uniqueOriginCountries(bean.origins)) {
       accumulate(index.origins, country, score);
     }
-    for (const note of bean.tastingNotes ?? []) {
+    for (const note of uniqueTastingNotes(bean.tastingNotes)) {
       accumulate(index.flavours, note, score);
     }
   }

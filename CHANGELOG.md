@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The same tasting note listed twice on a bag counted twice.** Analytics
+  already collapsed repeats; your taste map and the score prediction did not, so
+  one bag saying “Chocolate” twice — the roaster's own copy plus an enrichment
+  lookup, or a blend describing each component — contributed one observation of
+  chocolate to one screen and two to another. All three now read the same rule,
+  which also treats “dark chocolate” and “dark chocolate” as the note they
+  plainly are (#202).
+
 - **A blend of two lots from one country read “Guatemala, Guatemala” and counted
   twice.** Counter Culture's “Fast Forward” is half Manos Campesinas and half
   Finca La Hermosa, both Guatemalan; two entries is the right record of that
