@@ -160,6 +160,26 @@ describe('extractTextFromHtml', () => {
     expect(extractTextFromHtml(html)).toContain('blackcurrant');
   });
 
+  it('keeps the page title, which is where a storefront names its roaster', () => {
+    // Reading the whole document picked this up for free; narrowing to `<main>`
+    // dropped it, and Counter Culture's roaster went with it — the name is in
+    // the title and the header and nowhere in the content region, so the first
+    // narrowed lookup returned `roaster: null` where the old one had the name.
+    const html = `<html><head><title>Fast Forward | Counter Culture Coffee</title></head><body>${CHROME}<main><p>${DESCRIPTION}</p><p>${FILLER}</p></main></body></html>`;
+
+    const text = extractTextFromHtml(html);
+
+    expect(text).toContain('Counter Culture Coffee');
+    expect(text).toContain('blackcurrant');
+    expect(text).not.toContain('Gift Cards');
+  });
+
+  it('does not repeat the title when it reads the whole document', () => {
+    const html = `<html><head><title>Holler Mountain</title></head><body>${CHROME}</body></html>`;
+
+    expect(extractTextFromHtml(html).match(/Holler Mountain/g)).toHaveLength(1);
+  });
+
   it('still caps what it returns', () => {
     const html = `<html><body><main>${'z '.repeat(MAX_PAGE_TEXT)}</main></body></html>`;
 
