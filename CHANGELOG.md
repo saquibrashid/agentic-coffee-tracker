@@ -22,6 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Reading a coffee's page spent most of its budget on the shop's menus.** A
+  page is read up to a fixed length, and on a storefront the navigation, cart
+  and search come first: on Counter Culture's “Fast Forward” they used 6,873 of
+  the 8,000 characters before a single origin appeared, so the blend's
+  composition was cut off mid-list and the lookup was shown nine of its eighteen
+  lots — whichever nine the truncation happened to reach. Pages that say which
+  part of themselves is the content are now read there, which on that page fits
+  every lot and the roaster's description with room to spare. Pages that do not
+  say are read exactly as before.
+
 - **A blend of two lots from one country read “Guatemala, Guatemala” and counted
   twice.** Counter Culture's “Fast Forward” is half Manos Campesinas and half
   Finca La Hermosa, both Guatemalan; two entries is the right record of that
