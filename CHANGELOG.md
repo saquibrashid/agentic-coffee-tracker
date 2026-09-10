@@ -22,6 +22,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Confirming a coffee threw away everything its origins knew except the
+  country.** The confirm screen offers origins as a comma-separated list of
+  countries, and rebuilt them from that text on save — so farm, region, producer
+  and percentage were dropped, silently, from a coffee that had them. A blend of
+  two Guatemalan lots became one bare “Guatemala”. The field now edits the
+  country names and leaves the detail behind them intact: a country you keep
+  keeps its lots, a country you add is new, and a country you remove takes its
+  detail with it.
+
 - **A blend of two lots from one country read “Guatemala, Guatemala” and counted
   twice.** Counter Culture's “Fast Forward” is half Manos Campesinas and half
   Finca La Hermosa, both Guatemalan; two entries is the right record of that
