@@ -31,15 +31,48 @@ export const MAX_PAGE_TEXT = 8000;
  */
 export const MIN_USEFUL_TEXT = 400;
 
-export function extractTextFromHtml(html: string): string {
+/**
+ * The part of a page that is about the product, when the page says which part
+ * that is.
+ *
+ * Storefront chrome is enormous and it is *first*: on Counter Culture's "Fast
+ * Forward" page the menus, cart and search consume 6,873 of the 8,000-character
+ * budget before a single origin appears, and the blend composition is then cut
+ * off mid-list — the model was shown nine of eighteen lot fragments, chosen by
+ * where the truncation happened to land (#302).
+ *
+ * `<main>` is the page's own answer to "which part of this is the content", so
+ * it is used when present rather than guessed at. Stripping `nav`, `header` and
+ * `footer` instead was tried and barely helped: this storefront, like most,
+ * builds its chrome from `div`s.
+ *
+ * Greedy to the *last* `</main>`, not the first. A stray closing tag partway
+ * down is far more common in hand-written templates than two genuine main
+ * regions, and stopping early would silently truncate the content.
+ */
+const MAIN_CONTENT = /<main\b[^>]*>([\s\S]*)<\/main>/i;
+
+function stripToText(html: string): string {
   // Naive: strip scripts/styles then tags. For production use a proper parser.
   return html
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, MAX_PAGE_TEXT);
+    .trim();
+}
+
+export function extractTextFromHtml(html: string): string {
+  const whole = stripToText(html);
+
+  const match = MAIN_CONTENT.exec(html);
+  if (match?.[1] === undefined) return whole.slice(0, MAX_PAGE_TEXT);
+
+  // A `<main>` that yields almost nothing is a malformed or decorative one, and
+  // trusting it would throw away a page that had the content elsewhere. The
+  // whole document is the safer answer whenever the narrowing did not pay off.
+  const main = stripToText(match[1]);
+  return (main.length >= MIN_USEFUL_TEXT ? main : whole).slice(0, MAX_PAGE_TEXT);
 }
 
 /** Strips markup, entities and punctuation so two renderings compare equal. */

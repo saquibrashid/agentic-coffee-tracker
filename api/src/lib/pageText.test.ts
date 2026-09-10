@@ -109,6 +109,64 @@ describe('readPageText', () => {
   });
 });
 
+describe('extractTextFromHtml', () => {
+  /*
+   * Storefront chrome is enormous and it comes first. On Counter Culture's
+   * "Fast Forward" page it consumed 6,873 of the 8,000-character budget before
+   * a single origin appeared, so the blend composition was cut off mid-list and
+   * the model saw nine of eighteen lot fragments — chosen by where the
+   * truncation happened to land rather than by relevance (#302).
+   */
+  const FILLER = 'tasting notes and brewing guidance for this lot. '.repeat(20);
+
+  it('reads the content region in preference to the chrome around it', () => {
+    const html = `<html><body>${CHROME}<main><p>${DESCRIPTION}</p><p>${FILLER}</p></main>${CHROME}</body></html>`;
+
+    const text = extractTextFromHtml(html);
+
+    expect(text).toContain('blackcurrant');
+    expect(text).not.toContain('Gift Cards');
+  });
+
+  it('stops the chrome crowding out content the cap would otherwise cut', () => {
+    const marker = 'fifty percent Manos Campesinas Guatemala';
+    const bloat = `<nav>${'Shop Subscribe Gift Contact '.repeat(400)}</nav>`;
+    const html = `<html><body>${bloat}<main><p>${DESCRIPTION}</p><p>${FILLER}</p><p>${marker}</p></main></body></html>`;
+
+    expect(extractTextFromHtml(`<html><body>${bloat}<p>${marker}</p></body></html>`)).not.toContain(
+      marker,
+    );
+    expect(extractTextFromHtml(html)).toContain(marker);
+  });
+
+  it('reads the whole document when the page has no content region', () => {
+    // Every page that predates `<main>`, and plenty that postdate it.
+    expect(extractTextFromHtml(`<html><body>${CHROME}</body></html>`)).toContain('Gift Cards');
+  });
+
+  it('falls back when the content region is too small to be the content', () => {
+    // A decorative or malformed `<main>` must not throw away a page that had
+    // its content elsewhere.
+    const html = `<html><body><main> </main><p>${DESCRIPTION}</p><p>${FILLER}</p></body></html>`;
+
+    expect(extractTextFromHtml(html)).toContain('blackcurrant');
+  });
+
+  it('reads to the last closing tag, not a stray one partway down', () => {
+    // A stray `</main>` in a hand-written template is likelier than two genuine
+    // content regions, and stopping at the first would truncate silently.
+    const html = `<html><body><main><p>${FILLER}</p></main><p>${DESCRIPTION}</p></main></body></html>`;
+
+    expect(extractTextFromHtml(html)).toContain('blackcurrant');
+  });
+
+  it('still caps what it returns', () => {
+    const html = `<html><body><main>${'z '.repeat(MAX_PAGE_TEXT)}</main></body></html>`;
+
+    expect(extractTextFromHtml(html).length).toBeLessThanOrEqual(MAX_PAGE_TEXT);
+  });
+});
+
 describe('pageTextOmitsProduct', () => {
   it('matches through the markup and punctuation a page adds', () => {
     // The same sentence split across elements, with an entity and a line break
