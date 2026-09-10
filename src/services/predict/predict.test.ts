@@ -641,3 +641,12 @@ describe('a blend listing one country twice (#297)', () => {
     expect(index.origins.get('guatemala')?.averageScore).toBe(8);
   });
 });
+
+describe('a bag listing one tasting note twice (#301)', () => {
+  it('counts one rating of it as one observation of that note, not two', () => {
+    const b = bean({ tastingNotes: ['Chocolate', 'chocolate'] });
+    const index = buildIndex([b], [rating(b.id, 8)]);
+    expect(index.flavours.get('chocolate')?.count).toBe(1);
+    expect(index.flavours.get('chocolate')?.averageScore).toBe(8);
+  });
+});

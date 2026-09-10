@@ -19,6 +19,7 @@
  * the small, anonymous summary sent to `/api/recommend`.
  */
 import { uniqueOriginCountries } from '@/services/beans/origins';
+import { uniqueTastingNotes } from '@/services/beans/notes';
 import { NEUTRAL_SCORE } from '@/services/ratings/scale';
 import { shrinkToBaseline } from '@/services/ratings/shrink';
 import { db } from '@/services/db';
@@ -108,7 +109,7 @@ export function computePreferencesFrom(beans: CoffeeBean[], ratings: Rating[]): 
     for (const country of uniqueOriginCountries(bean.origins)) {
       add(origins, country, score);
     }
-    for (const note of bean.tastingNotes ?? []) {
+    for (const note of uniqueTastingNotes(bean.tastingNotes)) {
       add(flavors, note.toLowerCase(), score);
     }
   }

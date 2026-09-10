@@ -209,3 +209,18 @@ describe('a blend listing one country twice (#297)', () => {
     expect(result.topOrigins[0]?.count).toBe(result.topRoasters[0]?.count);
   });
 });
+
+describe('a bag listing one tasting note twice (#301)', () => {
+  const now = new Date('2026-08-13T12:00:00.000Z');
+
+  it('keeps counting it once, now from the shared rule', () => {
+    const b = bean('doubled', { tastingNotes: ['Chocolate', 'chocolate'] });
+    const result = computeAnalyticsFrom(
+      [b],
+      [rating('r1', 'doubled', 8, '2026-08-12T00:00:00.000Z')],
+      'all',
+      now,
+    );
+    expect(result.topFlavors.find((item) => item.value === 'chocolate')?.count).toBe(1);
+  });
+});
