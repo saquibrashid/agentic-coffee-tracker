@@ -1,5 +1,6 @@
 import { db } from '@/services/db';
 import { uniqueOriginCountries } from '@/services/beans/origins';
+import { uniqueTastingNotes } from '@/services/beans/notes';
 import { MAX_SCORE, MIN_SCORE, NEUTRAL_SCORE } from '@/services/ratings/scale';
 import { shrinkToBaseline } from '@/services/ratings/shrink';
 import type { CoffeeBean, Rating } from '@/types';
@@ -265,8 +266,8 @@ export function computeAnalyticsFrom(
     for (const country of uniqueOriginCountries(bean.origins)) {
       add(origins, country, rating.score, rating.beanId);
     }
-    for (const flavor of new Set((bean.tastingNotes ?? []).map((note) => note.toLowerCase()))) {
-      add(flavors, flavor, rating.score, rating.beanId);
+    for (const note of uniqueTastingNotes(bean.tastingNotes)) {
+      add(flavors, note.toLowerCase(), rating.score, rating.beanId);
     }
   }
 
