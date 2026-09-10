@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
+import { openSettingsSection } from './settingsSections';
+
 /**
  * Drives the real Settings import flow: pick a file, read the preview, confirm,
  * then check the coffees and ratings actually landed in the library.
@@ -18,6 +20,7 @@ const CSV = [
 
 async function gotoSettings(page: Page) {
   await page.goto('/settings');
+  await openSettingsSection(page, 'Import');
   await expect(page.getByRole('heading', { name: 'Import' })).toBeVisible();
 }
 
@@ -112,7 +115,12 @@ test.describe('bulk import', () => {
       buffer: Buffer.from(backup, 'utf-8'),
     });
 
-    await expect(page.getByText(/1.*coffees.*1.*ratings/)).toBeVisible();
+    // Scoped to the list item: the preview line lives in a <li>, and a bare
+    // text match now also hits the enclosing settings group, whose collapsed
+    // sections contribute their text to the group's own element.
+    await expect(
+      page.getByRole('listitem').filter({ hasText: /1.*coffees.*1.*ratings/ }),
+    ).toBeVisible();
     await page.getByRole('button', { name: 'Import', exact: true }).click();
     await expect(page.getByRole('status')).toContainText('Restored 1 coffees');
 

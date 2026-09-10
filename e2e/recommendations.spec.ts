@@ -1,5 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
+import { openSettingsSection } from './settingsSections';
+
 /**
  * Covers what the server tests cannot: that a grounded suggestion actually
  * reaches the user as a clickable coffee, with the roaster named and the
@@ -25,6 +27,7 @@ const RATIONALE = 'Bright and citrus-forward, like the Ethiopians you rate highe
 
 async function seedHistory(page: Page) {
   await page.goto('/settings');
+  await openSettingsSection(page, 'Import');
   await expect(page.getByRole('heading', { name: 'Import' })).toBeVisible();
   await page.setInputFiles('#import-file', {
     name: 'history.csv',
