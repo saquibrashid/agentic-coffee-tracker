@@ -32,7 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `429` and an upstream outage as `503`, with the provider's own `Retry-After`
   passed through untouched — a number we invented would be a guess about
   someone else's capacity. The mapping lives in `errorResponse`, which every
-  route already calls, so none of the seven can forget it. The queue now says
+  route already calls, so no route can forget it — Azure OpenAI, the Foundry
+  image model and Azure Vision all report the same way now. The queue now says
   what happened in words and that it will keep trying, which is true: there is
   no attempt cap, only backoff. An unrecognised failure keeps its original
   message, because a friendly sentence over an unknown error would throw away
