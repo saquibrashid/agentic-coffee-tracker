@@ -27,6 +27,7 @@ import {
   sourcePhotoFor,
 } from '@/services/enrich/studioPhoto';
 import { enqueueUpsert } from '@/services/sync/outbox';
+import { describeQueueFailure } from './describeQueueFailure';
 import type { CoffeeBean, PendingAiTask } from '@/types';
 
 const MAX_BACKOFF_MS = 60 * 60 * 1000;
@@ -209,7 +210,7 @@ async function handleFailure(task: PendingAiTask, err: unknown): Promise<void> {
   const nextDelay = Math.min(MAX_BACKOFF_MS, 2 ** attempts * 1000);
   await db.pendingAiTasks.update(task.id, {
     attempts,
-    lastError: error.message,
+    lastError: describeQueueFailure(error),
     nextAttemptAt: new Date(Date.now() + nextDelay).toISOString(),
   });
 }

@@ -17,6 +17,7 @@
 
 import { recordUsage, withModelSpan } from './telemetry.js';
 import { authHeaders } from './openaiAuth.js';
+import { retryAfterSeconds, UpstreamError } from './upstreamError.js';
 
 export interface OpenAiConfig {
   endpoint: string;
@@ -253,12 +254,9 @@ export function extractUrlCitations(data: unknown): UrlCitation[] {
     });
 }
 
-export class OpenAiError extends Error {
-  constructor(
-    readonly status: number,
-    readonly body: string,
-  ) {
-    super(`Azure OpenAI returned ${status}: ${body}`);
+export class OpenAiError extends UpstreamError {
+  constructor(status: number, body: string, retryAfter?: number) {
+    super('Azure OpenAI', status, body, retryAfter);
     this.name = 'OpenAiError';
   }
 }
@@ -300,7 +298,8 @@ export async function callResponsesTurn(
       }),
     });
 
-    if (!res.ok) throw new OpenAiError(res.status, await res.text());
+    if (!res.ok)
+      throw new OpenAiError(res.status, await res.text(), retryAfterSeconds(res.headers));
     const data: unknown = await res.json();
     const payload = data as { output?: ConversationItem[] };
     const usage = extractUsage(data);

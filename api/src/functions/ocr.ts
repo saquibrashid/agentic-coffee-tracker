@@ -7,6 +7,7 @@ import {
 import { errorResponse, json, readJson } from '../lib/http.js';
 import { AI_RATE_LIMIT } from '../lib/rateLimit.js';
 import { enforceRateLimit } from '../lib/rateLimitHttp.js';
+import { retryAfterSeconds, UpstreamError } from '../lib/upstreamError.js';
 
 interface OcrRequest {
   imageBase64?: unknown;
@@ -28,7 +29,12 @@ async function callAzureVision(
     body: Buffer.from(imageBase64, 'base64'),
   });
   if (!res.ok) {
-    throw new Error(`Azure Vision returned ${res.status}: ${await res.text()}`);
+    throw new UpstreamError(
+      'Azure Vision',
+      res.status,
+      await res.text(),
+      retryAfterSeconds(res.headers),
+    );
   }
   const data = (await res.json()) as {
     readResult?: { blocks?: { lines?: { text?: string }[] }[] };
