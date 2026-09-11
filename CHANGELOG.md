@@ -22,6 +22,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A busy AI service was reported as a crash.** A coffee stuck in _Pending AI
+  operations_ showed `POST /api/parse -> 500` in red — a string that says
+  nothing except that something is broken, and reads like the user's fault.
+  Application Insights had the real answer: Azure OpenAI returned **429, rate
+  limit exceeded**. Every route that calls a model wrapped its work in one
+  blanket `catch` that answered 500, so a passing throttle and a genuine fault
+  were the same status and the same red line. Throttling now comes back as
+  `429` and an upstream outage as `503`, with the provider's own `Retry-After`
+  passed through untouched — a number we invented would be a guess about
+  someone else's capacity. The mapping lives in `errorResponse`, which every
+  route already calls, so none of the seven can forget it. The queue now says
+  what happened in words and that it will keep trying, which is true: there is
+  no attempt cap, only backoff. An unrecognised failure keeps its original
+  message, because a friendly sentence over an unknown error would throw away
+  the only clue anyone has.
 - **“No product page” for a coffee whose page the app was linking to.** Pressing
   _Look up missing details_ reported that a coffee could not be found and
   advised editing its name, while the bean page sat there showing a working

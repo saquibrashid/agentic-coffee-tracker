@@ -32,6 +32,8 @@
  * so it never sits in the deployed configuration in plaintext.
  */
 
+import { retryAfterSeconds, UpstreamError } from './upstreamError.js';
+
 export interface ImageModelConfig {
   endpoint: string;
   key: string;
@@ -110,7 +112,8 @@ export async function callImageEdit(
     body: form,
   });
 
-  if (!res.ok) throw new ImageModelError(res.status, await res.text());
+  if (!res.ok)
+    throw new ImageModelError(res.status, await res.text(), retryAfterSeconds(res.headers));
 
   const data = (await res.json()) as {
     data?: { b64_json?: string; url?: string }[];
@@ -130,12 +133,9 @@ export async function callImageEdit(
   };
 }
 
-export class ImageModelError extends Error {
-  constructor(
-    readonly status: number,
-    readonly body: string,
-  ) {
-    super(`Image model returned ${status}: ${body}`);
+export class ImageModelError extends UpstreamError {
+  constructor(status: number, body: string, retryAfter?: number) {
+    super('Image model', status, body, retryAfter);
     this.name = 'ImageModelError';
   }
 }
