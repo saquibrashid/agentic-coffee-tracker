@@ -190,7 +190,9 @@ export interface SearchResponse {
  * impossible: `ApiTimeoutError` is not an `ApiError`, so `isTerminalEnrichFailure`
  * treats it as a passing outage, and the queue has no attempt cap, so it retries
  * the same doomed call for as long as the coffee exists. Letting the search
- * finish lets it answer "nothing found", which is terminal, so the task stops.
+ * finish lets it answer "nothing found", which is terminal, so the loop ends —
+ * either as a dropped task marked not-found, or, for a coffee that already
+ * carries an address, as one more attempt at that page before giving up.
  *
  * This does not buy a full minute. Static Web Apps abandons a linked-backend
  * call at 45 seconds (see docs/deployment.md), so that, not this number, is the
