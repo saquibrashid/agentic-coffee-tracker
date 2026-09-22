@@ -22,6 +22,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A lookup that took too long could never succeed, and retried forever.**
+  `/api/search` was the one model-backed endpoint still on the client's default
+  20-second ceiling; `ocr`, `parse` and `recommend` were given a longer one and
+  it was missed. It is also the slowest endpoint, and the least predictable: it
+  asks the model for the roaster's domain, then walks a ladder of guesses, and a
+  guess that does not resolve costs a full connect timeout before the next is
+  tried. Measured against the deployed API, that is 1.5s for Onyx and 6s for
+  Stumptown — which match on their first domain — but **32s** for a roaster
+  whose real store sat third behind two dead guesses.
+  The ceiling did not make such a lookup slow, it made it impossible. A timeout
+  raises `ApiTimeoutError`, which is not an `ApiError`, so the queue classes it
+  as a passing outage; with no attempt cap it re-ran the same doomed call for as
+  long as the coffee existed. Allowed to finish, the search answers "nothing
+  found" instead — which _is_ terminal, so the task stops and the coffee is
+  marked not-found with advice, rather than sitting in _Pending AI operations_
+  accumulating attempts.
+
 - **A busy AI service was reported as a crash.** A coffee stuck in _Pending AI
   operations_ showed `POST /api/parse -> 500` in red — a string that says
   nothing except that something is broken, and reads like the user's fault.

@@ -176,7 +176,33 @@ export interface SearchResult {
 export interface SearchResponse {
   results: SearchResult[];
 }
-export const search = (req: SearchRequest): Promise<SearchResponse> => apiPost('/api/search', req);
+/**
+ * The slowest endpoint in the app, and the one least able to predict its own
+ * cost. It asks the model for the roaster's domain, then walks a ladder of
+ * guessed domains, and a guess that does not resolve costs a full connect
+ * timeout before the next is tried — most guesses are wrong by design.
+ *
+ * Measured against the deployed API: 1.5s for Onyx and 6s for Stumptown, which
+ * match on their first domain, against 32s for a roaster whose real store came
+ * third behind two dead guesses.
+ *
+ * The default ceiling therefore did not make such a lookup slow, it made it
+ * impossible: `ApiTimeoutError` is not an `ApiError`, so `isTerminalEnrichFailure`
+ * treats it as a passing outage, and the queue has no attempt cap, so it retries
+ * the same doomed call for as long as the coffee exists. Letting the search
+ * finish lets it answer "nothing found", which is terminal, so the loop ends —
+ * either as a dropped task marked not-found, or, for a coffee that already
+ * carries an address, as one more attempt at that page before giving up.
+ *
+ * This does not buy a full minute. Static Web Apps abandons a linked-backend
+ * call at 45 seconds (see docs/deployment.md), so that, not this number, is the
+ * real ceiling in production; past it the browser sees the front door's own
+ * failure rather than this timeout. The constant is shared with the other
+ * model-backed endpoints instead of being tuned to 45s because it is a backstop
+ * for the case where nothing answers at all, not a budget being handed out.
+ */
+export const search = (req: SearchRequest): Promise<SearchResponse> =>
+  apiPost('/api/search', req, MODEL_TIMEOUT_MS);
 
 // ---- Scrape ----
 export interface ScrapeRequest {

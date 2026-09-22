@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ApiError, ApiTimeoutError, search } from './index';
+import { ApiError, ApiTimeoutError, scrape, search } from './index';
 
 /** A fetch that never answers unless its abort signal fires. */
 function hangingFetch(): typeof fetch {
@@ -38,7 +38,7 @@ describe('apiPost', () => {
   it('rejects with ApiTimeoutError when the backend never answers', async () => {
     globalThis.fetch = hangingFetch();
 
-    const pending = search({ roaster: 'Onyx', name: 'Geometry' });
+    const pending = scrape({ url: 'https://example.com/coffee' });
     const assertion = expect(pending).rejects.toBeInstanceOf(ApiTimeoutError);
     await vi.advanceTimersByTimeAsync(20_000);
     await assertion;
@@ -58,6 +58,34 @@ describe('apiPost', () => {
     const pending = search({ roaster: 'Onyx', name: 'Geometry' });
     const assertion = expect(pending).rejects.toBeInstanceOf(ApiError);
     await vi.advanceTimersByTimeAsync(1_000);
+    await assertion;
+  });
+
+  /**
+   * Regression for a lookup that could never succeed. `/api/search` walks a
+   * ladder of guessed roaster domains, and a dead one costs a full connect
+   * timeout before the next is tried — measured at 32s against the deployed API
+   * for a roaster whose real store was third in the ladder.
+   *
+   * Under the default ceiling that is not a slow success but a permanent
+   * failure: `ApiTimeoutError` is not an `ApiError`, so `isTerminalEnrichFailure`
+   * keeps it retryable and the queue re-runs the same doomed call forever.
+   */
+  it('gives the slowest lookup a model-length budget rather than the default', async () => {
+    globalThis.fetch = hangingFetch();
+
+    const pending = search({ roaster: 'Storyville Coffee Company', name: 'Prologue' });
+    const assertion = expect(pending).rejects.toBeInstanceOf(ApiTimeoutError);
+
+    let settled = false;
+    void pending.catch(() => {
+      settled = true;
+    });
+
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(40_000);
     await assertion;
   });
 });
